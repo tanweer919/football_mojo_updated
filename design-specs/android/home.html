@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — Home</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<style>
+  .scroll { height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 110px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* Top app bar */
+  .appbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 12px; }
+  .appbar__right { display: flex; align-items: center; gap: 12px; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: oklch(18% 0.005 70 / 0.6); border: 1px solid var(--border-soft); color: var(--fg); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .dot { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); border: 2px solid var(--bg); }
+  .icon-btn { position: relative; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, oklch(55% 0.16 75), oklch(35% 0.1 60)); display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 13px; color: oklch(15% 0.02 70); box-shadow: 0 0 0 1.5px var(--gold-hairline); }
+
+  /* ─── World Cup hero ─── */
+  .wc-hero { margin: 0 16px 20px; padding: 20px; border-radius: var(--r-5); position: relative; overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 50% 0%, oklch(35% 0.1 145 / 0.45), transparent 55%),
+      linear-gradient(180deg, oklch(15% 0.02 75) 0%, oklch(10% 0.01 65) 100%);
+    border: 1px solid var(--gold-hairline);
+    box-shadow: 0 32px 60px -28px oklch(0% 0 0 / 0.7);
+  }
+  .wc-hero::before { content:''; position:absolute; inset:0; background:
+    repeating-linear-gradient(90deg, transparent 0 60px, oklch(74% 0.18 145 / 0.05) 60px 61px); pointer-events:none; }
+  .wc-hero__top { display: flex; align-items: center; justify-content: space-between; }
+  .wc-hero__crest {
+    font-family: var(--font-display); font-weight: 800; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold); display: flex; align-items: center; gap: 6px;
+  }
+  .wc-hero__crest::before { content: '★'; color: var(--gold-deep); }
+  .wc-hero__title { margin: 18px 0 10px; font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -0.04em; color: var(--fg); }
+  .wc-hero__title em { font-style: italic; font-family: var(--font-serif); font-weight: 500; color: var(--gold); }
+  .wc-hero__sub { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 18px; }
+
+  .countdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .countdown__cell {
+    background: oklch(8% 0.005 70 / 0.55); border: 1px solid var(--border-soft);
+    border-radius: var(--r-2); padding: 10px 8px; text-align: center;
+    backdrop-filter: blur(20px);
+  }
+  .countdown__n { font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--gold); letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .countdown__l { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.16em; margin-top: 6px; text-transform: uppercase; }
+
+  .wc-hero__cta { display: flex; gap: 8px; margin-top: 16px; }
+
+  /* Section header */
+  .sect-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 20px; margin: 28px 0 14px; }
+  .sect-head__title { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.015em; }
+  .sect-head__action { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* Live strip */
+  .live-strip { display: flex; gap: 12px; padding: 0 20px 4px; overflow-x: auto; scrollbar-width: none; }
+  .live-strip::-webkit-scrollbar { display: none; }
+  .live-card { min-width: 240px; padding: 16px; border-radius: var(--r-4); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); scroll-snap-align: start; position: relative; }
+  .live-card__hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .live-card__league { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  .live-card__row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+  .live-card__team { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 14px; }
+  .live-card__score { font-family: var(--font-mono); font-weight: 800; font-size: 18px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .live-card__score--win { color: var(--gold); }
+  .live-card__min { margin-top: 10px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--pitch); text-transform: uppercase; }
+
+  /* Fantasy snapshot */
+  .fantasy-card { margin: 0 16px; padding: 20px; border-radius: var(--r-4); position: relative; overflow: hidden;
+    background:
+      radial-gradient(80% 60% at 100% 0%, oklch(50% 0.18 80 / 0.25), transparent 60%),
+      linear-gradient(180deg, oklch(15% 0.012 75), oklch(10% 0.008 70));
+    border: 1px solid var(--gold-hairline);
+  }
+  .fantasy-card__hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .fantasy-card__title { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+  .fantasy-card__rank { display: flex; align-items: baseline; gap: 8px; }
+  .fantasy-card__rank-n { font-family: var(--font-display); font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+    -webkit-background-clip: text; background-clip: text; color: transparent; font-variant-numeric: tabular-nums;
+  }
+  .fantasy-card__rank-of { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.08em; }
+  .fantasy-card__delta { font-family: var(--font-mono); font-size: 11px; color: var(--pitch); margin-top: 4px; }
+  .fantasy-card__stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+  .fantasy-stat { }
+  .fantasy-stat__v { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -0.015em; }
+  .fantasy-stat__l { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 4px; }
+
+  /* News cards */
+  .news-list { display: flex; flex-direction: column; gap: 14px; padding: 0 16px; }
+  .news-item { display: flex; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); }
+  .news-item:last-child { border-bottom: 0; }
+  .news-item__img {
+    width: 88px; height: 88px; border-radius: 12px; flex-shrink: 0; position: relative; overflow: hidden;
+  }
+  .news-item__img--a { background:
+    radial-gradient(80% 60% at 30% 20%, oklch(50% 0.16 85), oklch(25% 0.08 70) 60%),
+    linear-gradient(180deg, oklch(35% 0.12 75), oklch(15% 0.04 60));
+  }
+  .news-item__img--b { background:
+    radial-gradient(80% 60% at 70% 20%, oklch(50% 0.18 145), oklch(20% 0.08 145) 60%),
+    linear-gradient(180deg, oklch(40% 0.14 145), oklch(15% 0.04 140));
+  }
+  .news-item__img--c { background:
+    radial-gradient(80% 60% at 50% 30%, oklch(50% 0.2 25), oklch(20% 0.08 30) 60%),
+    linear-gradient(180deg, oklch(35% 0.16 25), oklch(15% 0.04 20));
+  }
+  .news-item__img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,.5)); }
+  .news-item__body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .news-item__src { font-family: var(--font-mono); font-size: 9px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+  .news-item__t { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; color: var(--fg); }
+  .news-item__meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted-2); letter-spacing: 0.06em; }
+
+  /* Featured player card moment */
+  .featured-card { margin: 16px; padding: 20px; border-radius: var(--r-5); position: relative; overflow: hidden;
+    background:
+      radial-gradient(60% 80% at 100% 0%, oklch(50% 0.22 295 / 0.3), transparent 60%),
+      linear-gradient(135deg, oklch(20% 0.05 290), oklch(10% 0.02 280));
+    border: 1px solid oklch(45% 0.18 295 / 0.4);
+  }
+  .featured-card__grid { display: grid; grid-template-columns: 100px 1fr; gap: 16px; align-items: center; }
+  .featured-card .pcard { width: 100px; }
+  .featured-card__copy h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 6px; color: var(--fg); }
+  .featured-card__copy p { font-size: 12px; color: var(--muted); line-height: 1.45; margin-bottom: 12px; }
+
+  /* My team strip */
+  .myteam { margin: 0 16px; padding: 18px; border-radius: var(--r-4);
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--border-soft);
+  }
+  .myteam__hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .myteam__title { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; }
+  .myteam__row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .myteam__match { display: flex; align-items: center; gap: 12px; }
+  .myteam__crest { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, oklch(45% 0.12 240), oklch(25% 0.06 240)); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 11px; color: white; }
+  .myteam__crest--ars { background: linear-gradient(135deg, oklch(45% 0.18 25), oklch(25% 0.12 25)); }
+  .myteam__crest--che { background: linear-gradient(135deg, oklch(40% 0.18 245), oklch(20% 0.1 245)); }
+  .myteam__teams { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: -0.01em; }
+  .myteam__when { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-align: right; text-transform: uppercase; }
+  .myteam__date { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--fg); }
+
+  /* Greeting */
+  .greet { padding: 0 20px 8px; }
+  .greet__hi { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.16em; text-transform: uppercase; }
+  .greet__h1 { margin-top: 6px; font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; }
+  .greet__h1 em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen"><div class="punch"></div>
+
+    <!-- Status bar -->
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="sig">
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M2 4a7 7 0 0 1 14 0v1H2V4zm0 3h14v1H2V7zm2 3h10v1H4v-1z"/></svg>
+        <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"><rect x="1" y="2" width="20" height="8" rx="2"/><rect x="3" y="4" width="16" height="4" rx="0.5" fill="currentColor"/><rect x="22" y="4.5" width="1.5" height="3" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="scroll">
+
+      <!-- App bar -->
+      <div class="appbar">
+        <div class="logo logo-mark"><span>PITCH</span></div>
+        <div class="appbar__right">
+          <button class="icon-btn"><span class="dot"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/></svg></button>
+          <div class="avatar">JS</div>
+        </div>
+      </div>
+
+      <!-- Greeting -->
+      <div class="greet">
+        <div class="greet__hi">Saturday · 14 May</div>
+        <h1 class="greet__h1">Welcome back,<br><em>Jordan.</em></h1>
+      </div>
+
+      <!-- WORLD CUP HERO -->
+      <div class="wc-hero">
+        <div class="wc-hero__top">
+          <div class="wc-hero__crest">FIFA World Cup 2026</div>
+          <span class="eyebrow eyebrow--gold">Group Stage</span>
+        </div>
+        <h2 class="wc-hero__title">The world<br>plays in <em>28 days</em>.</h2>
+        <div class="wc-hero__sub">United States · Canada · Mexico · 16 cities</div>
+        <div class="countdown">
+          <div class="countdown__cell"><div class="countdown__n">28</div><div class="countdown__l">Days</div></div>
+          <div class="countdown__cell"><div class="countdown__n">14</div><div class="countdown__l">Hours</div></div>
+          <div class="countdown__cell"><div class="countdown__n">22</div><div class="countdown__l">Min</div></div>
+          <div class="countdown__cell"><div class="countdown__n">06</div><div class="countdown__l">Sec</div></div>
+        </div>
+        <div class="wc-hero__cta">
+          <button class="btn btn--gold" style="flex: 1;">Enter Global Cup</button>
+          <button class="btn btn--ghost btn--sm">View bracket</button>
+        </div>
+      </div>
+
+      <!-- Live now -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Live now</h3>
+        <span class="sect-head__action">All matches →</span>
+      </div>
+
+      <div class="live-strip">
+        <article class="live-card">
+          <div class="live-card__hd">
+            <span class="live-card__league">UCL · Semi-final 2nd leg</span>
+            <span class="live-dot">Live</span>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--es"></span>Real Madrid</div>
+            <div class="live-card__score live-card__score--win">2</div>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--de"></span>Bayern Munich</div>
+            <div class="live-card__score">1</div>
+          </div>
+          <div class="live-card__min">73' · ↑ Vinicius Jr (62')</div>
+        </article>
+
+        <article class="live-card">
+          <div class="live-card__hd">
+            <span class="live-card__league">Premier League · MW 36</span>
+            <span class="live-dot">Live</span>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--en"></span>Arsenal</div>
+            <div class="live-card__score live-card__score--win">3</div>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--en"></span>Chelsea</div>
+            <div class="live-card__score">0</div>
+          </div>
+          <div class="live-card__min">68' · HT 2-0</div>
+        </article>
+
+        <article class="live-card">
+          <div class="live-card__hd">
+            <span class="live-card__league">La Liga · MD 36</span>
+            <span class="live-dot">Live</span>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--es"></span>Barcelona</div>
+            <div class="live-card__score">1</div>
+          </div>
+          <div class="live-card__row">
+            <div class="live-card__team"><span class="flag flag--es"></span>Atlético</div>
+            <div class="live-card__score live-card__score--win">2</div>
+          </div>
+          <div class="live-card__min">81' · ↑ Griezmann (54')</div>
+        </article>
+      </div>
+
+      <!-- Fantasy snapshot -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Your form</h3>
+        <span class="sect-head__action">Manager →</span>
+      </div>
+
+      <section class="fantasy-card">
+        <div class="fantasy-card__hd">
+          <div class="fantasy-card__title">Global Cup · GW 36</div>
+          <span class="rarity rarity--legendary">Legendary club</span>
+        </div>
+        <div class="fantasy-card__rank">
+          <div class="fantasy-card__rank-n">14,328</div>
+          <div>
+            <div class="fantasy-card__rank-of" data-num>of 8.4M</div>
+            <div class="fantasy-card__delta">▲ 2,401 this week</div>
+          </div>
+        </div>
+        <div class="fantasy-card__stats">
+          <div class="fantasy-stat">
+            <div class="fantasy-stat__v" data-num>82</div>
+            <div class="fantasy-stat__l">GW points</div>
+          </div>
+          <div class="fantasy-stat">
+            <div class="fantasy-stat__v" data-num>2,148</div>
+            <div class="fantasy-stat__l">Total</div>
+          </div>
+          <div class="fantasy-stat">
+            <div class="fantasy-stat__v" data-num>11<span style="font-size:11px;color:var(--muted);margin-left:2px">W</span></div>
+            <div class="fantasy-stat__l">1v1 streak</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Featured card reward -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Reward unlocked</h3>
+        <span class="sect-head__action">Mint now →</span>
+      </div>
+
+      <div class="featured-card">
+        <div class="featured-card__grid">
+          <div class="pcard pcard--epic">
+            <div class="pcard__bg"></div>
+            <div class="pcard__glow"></div>
+            <div class="pcard__shine"></div>
+            <div class="pcard__chrome">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div class="pcard__rating">89</div>
+                <span class="rarity rarity--epic">Epic</span>
+              </div>
+              <div class="pcard__name">Pedri</div>
+              <div class="pcard__meta"><span>CM</span><span>ESP</span></div>
+            </div>
+          </div>
+          <div class="featured-card__copy">
+            <span class="eyebrow eyebrow--gold">Epic mint</span>
+            <h3 style="margin-top:8px">Pedri, 89-rated playmaker</h3>
+            <p>Earned for finishing top 5% in last week's 1v1 ladder. Mint to your collection.</p>
+            <button class="btn btn--gold btn--sm">Mint card</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- News -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Today's stories</h3>
+        <span class="sect-head__action">All news →</span>
+      </div>
+
+      <div class="news-list">
+        <article class="news-item">
+          <div class="news-item__img news-item__img--a"></div>
+          <div class="news-item__body">
+            <span class="news-item__src">The Pitch · Long read</span>
+            <h4 class="news-item__t">Mbappé's first World Cup as captain — France's high-wire act in New Jersey.</h4>
+            <span class="news-item__meta">6 min read · Marcus Wright</span>
+          </div>
+        </article>
+        <article class="news-item">
+          <div class="news-item__img news-item__img--b"></div>
+          <div class="news-item__body">
+            <span class="news-item__src">Tactics</span>
+            <h4 class="news-item__t">Why Argentina's back three is the most asymmetric in the tournament.</h4>
+            <span class="news-item__meta">4 min · Sofía Marín</span>
+          </div>
+        </article>
+        <article class="news-item">
+          <div class="news-item__img news-item__img--c"></div>
+          <div class="news-item__body">
+            <span class="news-item__src">Transfers</span>
+            <h4 class="news-item__t">Bellingham to wear 10 for England; Southgate confirms armband stays with Kane.</h4>
+            <span class="news-item__meta">2 min · Tom Reeves</span>
+          </div>
+        </article>
+      </div>
+
+      <!-- My team upcoming -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Following</h3>
+        <span class="sect-head__action">Edit →</span>
+      </div>
+
+      <section class="myteam">
+        <div class="myteam__hd">
+          <span class="myteam__title">Arsenal · Premier League</span>
+          <span class="pitch-stripe">Up next</span>
+        </div>
+        <div class="myteam__row">
+          <div class="myteam__match">
+            <div class="myteam__crest myteam__crest--ars">ARS</div>
+            <div>
+              <div class="myteam__teams">vs Manchester United</div>
+              <div class="body-sm">Emirates Stadium · MW 37</div>
+            </div>
+          </div>
+          <div class="myteam__when">
+            <div class="myteam__date">Sun, 21:00</div>
+            <div>15 May</div>
+          </div>
+        </div>
+        <div class="hairline" style="margin: 6px 0"></div>
+        <div class="myteam__row">
+          <div class="myteam__match">
+            <div class="myteam__crest myteam__crest--che">CHE</div>
+            <div>
+              <div class="myteam__teams">Chelsea — away</div>
+              <div class="body-sm">Stamford Bridge · MW 38</div>
+            </div>
+          </div>
+          <div class="myteam__when">
+            <div class="myteam__date">Sat, 17:30</div>
+            <div>21 May</div>
+          </div>
+        </div>
+      </section>
+
+      <div style="height: 24px"></div>
+    </div>
+
+    <!-- Tab bar -->
+    <nav class="tabbar">
+      <a class="tabbar__item is-active" href="home.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+        Home
+      </a>
+      <a class="tabbar__item" href="world-cup.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>
+        World Cup
+      </a>
+      <a class="tabbar__item" href="fantasy.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>
+        Fantasy
+      </a>
+      <a class="tabbar__item" href="collection.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+        Cards
+      </a>
+      <a class="tabbar__item" href="profile.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M3 21c0-4 4-7 9-7s9 3 9 7"/></svg>
+        You
+      </a>
+    </nav>
+
+    <div class="navbar"></div>
+  </div></div>
+</div>
+</body>
+</html>

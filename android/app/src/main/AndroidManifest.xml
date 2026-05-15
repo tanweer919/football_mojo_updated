@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.footballmojo">
     <!-- io.flutter.app.FlutterApplication is an android.app.Application that
          calls FlutterMain.startInitialization(this); in its onCreate method.
@@ -8,8 +9,17 @@
     <application
         android:label="Football Mojo"
         android:icon="@mipmap/launcher_icon">
+        <!-- Flutter 3.41: Impeller is opt-in on Android (default on iOS).
+             Reduces first-frame jank from shader compilation and smooths
+             complex animations (lineup pitch paint, card flip, score roll). -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller"
+                   android:value="true" />
+        <!-- Vulkan backend on devices that support it; falls back to OpenGL ES. -->
+        <meta-data android:name="io.flutter.embedding.android.ImpellerBackend"
+                   android:value="vulkan" />
         <activity
             android:name=".MainActivity"
+            android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -50,6 +60,22 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- AdMob App ID. Filled per build type via manifestPlaceholders in
+             android/app/build.gradle: debug=test ID, release=real production ID. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
+        <!-- Manifest-merger conflict resolution:
+             google_mobile_ads declares @xml/gma_ad_services_config
+             firebase_analytics  declares @xml/ga_ad_services_config
+             Both claim the same Ad Services config property. AdMob's version is
+             the superset (it includes the analytics topics), so we pick it. -->
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/gma_ad_services_config"
+            tools:replace="android:resource" />
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

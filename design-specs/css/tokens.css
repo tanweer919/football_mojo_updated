@@ -1,0 +1,80 @@
+/* PITCH — luxury dark + gold tokens */
+:root {
+  /* Surfaces — deep neutral with warmth like aged leather */
+  --bg:          oklch(8%  0.004 60);
+  --bg-deep:     oklch(5%  0.004 60);
+  --surface:     oklch(12% 0.005 60);
+  --surface-2:   oklch(16% 0.006 65);
+  --surface-3:   oklch(20% 0.008 70);
+  --surface-hi:  oklch(24% 0.01  70);
+
+  /* Borders */
+  --border:      oklch(28% 0.01  65);
+  --border-soft: oklch(22% 0.008 65);
+  --border-hi:   oklch(34% 0.012 70);
+
+  /* Text */
+  --fg:          oklch(97% 0.005 85);
+  --fg-soft:     oklch(82% 0.008 75);
+  --muted:       oklch(62% 0.01  70);
+  --muted-2:     oklch(42% 0.012 68);
+
+  /* Accent — champagne gold system */
+  --gold:        oklch(82% 0.135 88);
+  --gold-deep:   oklch(70% 0.16  80);
+  --gold-soft:   oklch(86% 0.08  90);
+  --gold-glow:   oklch(82% 0.135 88 / 0.22);
+  --gold-hairline: oklch(70% 0.16 80 / 0.45);
+
+  /* Status */
+  --live:        oklch(68% 0.22  27);
+  --live-glow:   oklch(68% 0.22  27 / 0.28);
+  --pitch:       oklch(74% 0.18 145);
+  --pitch-glow:  oklch(74% 0.18 145 / 0.25);
+  --info:        oklch(70% 0.15 220);
+  --warn:        oklch(80% 0.16  85);
+
+  /* Card rarity */
+  --r-common:    oklch(62% 0.012 240);
+  --r-rare:      oklch(64% 0.18  230);
+  --r-epic:      oklch(60% 0.22  295);
+  --r-legendary: oklch(78% 0.16  82);
+  --r-iconic-a:  oklch(72% 0.20 200);
+  --r-iconic-b:  oklch(70% 0.24 320);
+  --r-iconic-c:  oklch(82% 0.16  85);
+
+  /* Type — refined geometric sans for display, system body, mono numerics */
+  --font-display: 'Inter Display', 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --font-serif:   'Iowan Old Style', 'Charter', Georgia, serif;
+
+  /* Spacing */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px;
+  --s-9: 48px; --s-10: 64px; --s-11: 80px;
+
+  /* Radius — subtle, leather-tooled */
+  --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 20px; --r-full: 999px;
+
+  /* Shadows — gold-tinted, atmospheric */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 0 0 1px var(--border-soft) inset;
+  --shadow-2: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px var(--border-soft) inset;
+  --shadow-3: 0 24px 60px rgba(0,0,0,.65), 0 0 0 1px var(--border) inset;
+  --shadow-gold: 0 0 0 1px var(--gold-hairline) inset, 0 0 32px var(--gold-glow);
+  --shadow-live: 0 0 0 1px oklch(68% 0.22 27 / 0.5) inset, 0 0 24px var(--live-glow);
+
+  /* Motion */
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg-deep); color: var(--fg); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+body { font-size: 14px; line-height: 1.45; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
+img { display: block; max-width: 100%; }
+
+/* Numerics — always tabular */
+.num, [data-num] { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1, 'lnum' 1; }

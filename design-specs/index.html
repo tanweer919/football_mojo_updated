@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — Design overview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/tokens.css">
+<style>
+  body { background:
+    radial-gradient(1400px 700px at 20% -10%, oklch(18% 0.03 75 / 0.5), transparent 60%),
+    radial-gradient(1000px 600px at 100% 110%, oklch(15% 0.04 60 / 0.4), transparent 60%),
+    var(--bg-deep);
+    min-height: 100vh; padding: 64px 48px 96px;
+  }
+
+  .wrap { max-width: 1480px; margin: 0 auto; }
+
+  /* Header */
+  .h-hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border-soft); margin-bottom: 48px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .logo-mark { display: inline-flex; align-items: center; gap: 10px; }
+  .logo-mark::before { content: ''; width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, oklch(95% 0.02 85), oklch(78% 0.14 85) 60%, oklch(55% 0.14 75)), var(--gold);
+    box-shadow: 0 0 0 1px oklch(40% 0.05 75) inset, 0 2px 8px oklch(50% 0.16 80 / 0.4);
+  }
+  .logo-mark span { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.025em;
+    background: linear-gradient(180deg, oklch(86% 0.08 90), oklch(70% 0.16 80));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .h-hero__title { font-family: var(--font-display); font-size: 60px; font-weight: 800; line-height: 0.95; letter-spacing: -0.045em; }
+  .h-hero__title em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+  .h-hero__sub { font-family: var(--font-body); font-size: 16px; color: var(--muted); margin-top: 16px; max-width: 580px; line-height: 1.5; }
+  .h-meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.16em; text-transform: uppercase; }
+  .h-meta div { padding: 4px 0; }
+  .h-meta b { color: var(--gold); font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: -0.005em; text-transform: none; margin-left: 12px; }
+
+  /* Platform section */
+  .section { margin-top: 56px; }
+  .section__hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border-soft); }
+  .section__title { display: flex; align-items: baseline; gap: 14px; }
+  .section__title h2 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.035em; }
+  .section__title h2 em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+  .section__title span { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+  .section__count { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; }
+
+  /* Gallery */
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .gallery--tab { grid-template-columns: repeat(2, 1fr); }
+
+  .tile { background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); border-radius: var(--r-4); overflow: hidden; transition: all .25s var(--ease); }
+  .tile:hover { transform: translateY(-4px); border-color: var(--gold-hairline); box-shadow: 0 24px 48px -16px rgba(0,0,0,.5); }
+  .tile__frame {
+    aspect-ratio: 412 / 900;
+    position: relative; overflow: hidden;
+    background: oklch(5% 0.003 60);
+    display: grid; place-items: center;
+  }
+  .tile__frame iframe {
+    border: 0; pointer-events: none;
+    width: 412px; height: 900px;
+    transform-origin: top left;
+    transform: scale(0.78);
+    background: oklch(5% 0.003 60);
+  }
+  .tile__frame--tab { aspect-ratio: 834 / 1194; }
+  .tile__frame--tab iframe { width: 834px; height: 1194px; transform: scale(0.46); }
+
+  .tile__cap { padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border-soft); }
+  .tile__cap-l { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; }
+  .tile__cap-t { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }
+  .tile__cap-d { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; margin-top: 4px; }
+  .tile__open { padding: 10px 14px; border-radius: var(--r-2); background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep)); color: oklch(15% 0.02 70); font-family: var(--font-display); font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+  .tile__open:hover { box-shadow: 0 6px 20px oklch(60% 0.16 80 / 0.4); }
+
+  /* Tile variation */
+  .tile--lead { border-color: var(--gold-hairline); }
+  .tile--lead .tile__frame { background:
+    radial-gradient(80% 60% at 50% 0%, oklch(20% 0.05 80 / 0.4), transparent 60%), oklch(5% 0.003 60);
+  }
+
+  /* Footer */
+  .foot { margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.12em; }
+  .foot em { color: var(--gold); font-style: normal; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- Header -->
+  <header class="h-hero">
+    <div>
+      <div class="brand"><span class="logo-mark"><span>PITCH</span></span></div>
+      <h1 class="h-hero__title">A football fantasy app<br>built for the <em>world cup</em>.</h1>
+      <p class="h-hero__sub">Live scores, fantasy ladders, and jaw-dropping player cards minted to your collection — designed across Android phone and tablet, full World Cup 2026 takeover, premium luxury-dark theme.</p>
+    </div>
+    <div class="h-meta" style="text-align: right">
+      <div>Project · <b>PITCH</b></div>
+      <div>Theme · <b>Luxury dark · gold</b></div>
+      <div>Platform · <b>Android + Tablet</b></div>
+      <div>Screens · <b>20 total</b></div>
+      <div>Date · <b>14 May 2026</b></div>
+    </div>
+  </header>
+
+  <!-- Android section -->
+  <section class="section">
+    <div class="section__hd">
+      <div class="section__title"><h2>Android <em>phone</em></h2><span>Pixel · 412 × 900</span></div>
+      <span class="section__count">10 screens</span>
+    </div>
+    <div class="gallery">
+      <a class="tile tile--lead" href="android/home.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/home.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Home · 01</div><div class="tile__cap-t">Home</div><div class="tile__cap-d">Live + News + Fantasy + WC</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/world-cup.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/world-cup.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">World Cup · 02</div><div class="tile__cap-t">World Cup hub</div><div class="tile__cap-d">Groups · Bracket · Scorers</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/fantasy.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/fantasy.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Fantasy · 03</div><div class="tile__cap-t">Fantasy lobby</div><div class="tile__cap-d">Global Cup · 1v1 · formats</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/lineup.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/lineup.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Build XI · 04</div><div class="tile__cap-t">Lineup builder</div><div class="tile__cap-d">5-a-side · 100 pt cap · captain 2×</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/match.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/match.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Live · 04</div><div class="tile__cap-t">Match detail</div><div class="tile__cap-d">Formation · Stats · Events</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/news.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/news.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Read · 05</div><div class="tile__cap-t">News article</div><div class="tile__cap-d">Editorial long-read</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/collection.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/collection.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Cards · 06</div><div class="tile__cap-t">Collection</div><div class="tile__cap-d">147 cards · 5 rarity tiers</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/trade.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/trade.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Trade · 07</div><div class="tile__cap-t">Direct trade</div><div class="tile__cap-d">1v1 · side-by-side · chat</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/profile.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/profile.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">You · 08</div><div class="tile__cap-t">Profile · Settings</div><div class="tile__cap-d">Preferences · achievements</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="android/onboarding.html" target="_blank">
+        <div class="tile__frame"><iframe src="android/onboarding.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Welcome · 09</div><div class="tile__cap-t">Onboarding</div><div class="tile__cap-d">Sign up · 3D card stage</div></div><span class="tile__open">Open →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Tablet section -->
+  <section class="section">
+    <div class="section__hd">
+      <div class="section__title"><h2>Tablet <em>portrait</em></h2><span>iPad Pro · 834 × 1194</span></div>
+      <span class="section__count">10 screens</span>
+    </div>
+    <div class="gallery gallery--tab">
+      <a class="tile tile--lead" href="tablet/home.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/home.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Home · 01</div><div class="tile__cap-t">Home (split-pane)</div><div class="tile__cap-d">Sidebar · 2-column streams</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/world-cup.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/world-cup.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">World Cup · 02</div><div class="tile__cap-t">World Cup hub</div><div class="tile__cap-d">6 groups · full bracket</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/fantasy.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/fantasy.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Fantasy · 03</div><div class="tile__cap-t">Fantasy lobby</div><div class="tile__cap-d">3-col format grid · leagues</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/lineup.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/lineup.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Build XI · 04</div><div class="tile__cap-t">Lineup builder</div><div class="tile__cap-d">Pitch + persistent player rail</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/match.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/match.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Live · 04</div><div class="tile__cap-t">Match detail</div><div class="tile__cap-d">Formation + events split</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/news.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/news.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Read · 05</div><div class="tile__cap-t">News article</div><div class="tile__cap-d">Magazine layout + side rail</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/collection.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/collection.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Cards · 06</div><div class="tile__cap-t">Collection</div><div class="tile__cap-d">5-col card wall · filters</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/trade.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/trade.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Trade · 07</div><div class="tile__cap-t">Direct trade</div><div class="tile__cap-d">Full side-by-side arena</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/profile.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/profile.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">You · 08</div><div class="tile__cap-t">Profile · Settings</div><div class="tile__cap-d">2-column settings panels</div></div><span class="tile__open">Open →</span></div>
+      </a>
+      <a class="tile" href="tablet/onboarding.html" target="_blank">
+        <div class="tile__frame tile__frame--tab"><iframe src="tablet/onboarding.html"></iframe></div>
+        <div class="tile__cap"><div><div class="tile__cap-l">Welcome · 09</div><div class="tile__cap-t">Onboarding</div><div class="tile__cap-d">Cinematic 2-col hero</div></div><span class="tile__open">Open →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>PITCH · A premium football fantasy app · <em>luxury dark</em> · gold · pitch green</span>
+    <span>Designed 14 May 2026 · World Cup opens in 28 days</span>
+  </footer>
+</div>
+
+</body>
+</html>

@@ -1,157 +1,51 @@
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_analytics/observer.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'start.dart';
-import 'package:provider/provider.dart';
-import 'screens/NoInternetScreen.dart';
-import 'services/NetworkStatusService.dart';
-import 'Provider/ThemeProvider.dart';
-import 'App.dart';
-import 'dart:developer' as developer;
+import 'package:flutter/services.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
+import 'app.dart';
+
+/// Hard rule: anything `await`-ed here delays the first frame. Only put work
+/// here that's required to render the splash-replacement frame correctly.
+///
+/// Deferred to first frame (via [runDeferredBootstrap] in HomeShell):
+///   AdMob init, FCM bootstrap + permission ask, Clarity, in-app update,
+///   Shorebird patch check, Remote Config gate.
+///
+/// Splash budget:
+///   - The native (Android 12+ / iOS) launch screen renders BEFORE Flutter
+///     starts. We retain it via flutter_native_splash so the user never sees
+///     a white flash between OS splash and Flutter splash.
+///   - First frame fires at runApp(). FlutterNativeSplash.remove() is called
+///     from FootballMojoApp.initState after that.
 Future<void> main() async {
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
+
+  // Fire-and-forget — orientation lock doesn't gate the first frame.
+  SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Parallelise: Hive (local cache) and Firebase init are independent.
+  // Cutting from serial ~250ms to ~max(50, 200) ≈ 200ms.
+  await Future.wait([
+    Hive.initFlutter(),
+    _initFirebase(),
+  ]);
+
+  runApp(const ProviderScope(child: FootballMojoApp()));
+}
+
+Future<void> _initFirebase() async {
   try {
-    WidgetsFlutterBinding.ensureInitialized();
-    developer.log('Flutter binding initialized');
-
-    // Configure theme
-    final ThemeData lightTheme = ThemeData(
-      primaryColor: const Color(0xFF50C878),
-      primaryColorDark: const Color(0X8A000000),
-      brightness: Brightness.light,
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF50C878),
-        brightness: Brightness.light,
-      ),
-    );
-
-    final ThemeData darkTheme = ThemeData(
-      primaryColor: const Color(0xFF54B2FB),
-      primaryColorDark: const Color(0XFFD1D1D1),
-      brightness: Brightness.dark,
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF54B2FB),
-        brightness: Brightness.dark,
-      ),
-    );
-
-    developer.log('Theme configuration completed');
-
-    // Configure error reporting
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-    FlutterError.onError = (FlutterErrorDetails details) {
-      developer.log(
-        'Flutter error caught',
-        error: details.exception,
-        stackTrace: details.stack,
-      );
-      FirebaseCrashlytics.instance.recordFlutterError(details);
-    };
-
-    // Initialize app services
-    await App.initialiseApp();
-    developer.log('App services initialized');
-
-    // Configure EasyLoading
-    EasyLoading.instance
-      ..displayDuration = const Duration(milliseconds: 2000)
-      ..indicatorType = EasyLoadingIndicatorType.fadingCircle
-      ..loadingStyle = EasyLoadingStyle.dark
-      ..indicatorSize = 45.0
-      ..radius = 10.0
-      ..progressColor = Colors.yellow
-      ..backgroundColor = Colors.green
-      ..indicatorColor = Colors.yellow
-      ..textColor = Colors.yellow
-      ..maskColor = Colors.blue.withOpacity(0.5)
-      ..userInteractions = true
-      ..dismissOnTap = false;
-
-    developer.log('EasyLoading configured');
-
-    runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (context) => App.appProvider,
-          ),
-          StreamProvider<NetworkStatus>(
-            create: (context) =>
-                App.networkStatusService.networkStatusController.stream,
-            initialData: NetworkStatus.Offline,
-          ),
-          ChangeNotifierProvider(
-            create: (context) => App.themeProvider,
-          ),
-        ],
-        child: FlutterEasyLoading(
-          child: Consumer<ThemeProvider>(
-            builder: (context, model, child) => MaterialApp(
-              debugShowCheckedModeBanner: false,
-              title: 'Football Mojo',
-              theme: lightTheme,
-              darkTheme: darkTheme,
-              themeMode: model.appTheme == AppTheme.Light
-                  ? ThemeMode.light
-                  : ThemeMode.dark,
-              navigatorKey: App.routerService.navigationKey,
-              home: WillPopScope(
-                onWillPop: () => Future.value(false),
-                child: App.result ? const Start() : const NoInternetScreen(),
-              ),
-              onGenerateRoute: App.routerService.generateRoutes,
-              navigatorObservers: [
-                HeroController(),
-                FirebaseAnalyticsObserver(analytics: App.analytics),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    developer.log('App started successfully');
-  } catch (e, stackTrace) {
-    developer.log(
-      'Error during app startup',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    // Show error UI
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 48,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Failed to start app',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  e.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    await Firebase.initializeApp();
+  } catch (e, st) {
+    // Tolerate missing Firebase config in dev — the rest of the app still boots.
+    if (kDebugMode) debugPrint('Firebase init skipped: $e\n$st');
   }
 }

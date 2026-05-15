@@ -1,0 +1,154 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PlayerPosition } from '@prisma/client';
+import { PrismaService } from '../../common/prisma.service';
+import { SQUAD } from './fantasy.constants';
+
+export interface LineupPick {
+  playerId: string;
+  position: PlayerPosition;
+  isCaptain?: boolean;
+}
+
+@Injectable()
+export class FantasyService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  // ─── Tournament / gameweek discovery ──────────────────────────────────────
+  async listTournaments() {
+    return this.prisma.fantasyTournament.findMany({
+      orderBy: { startsAt: 'desc' },
+      include: { gameweeks: { orderBy: { number: 'asc' } } },
+    });
+  }
+
+  async getTournament(slug: string) {
+    const t = await this.prisma.fantasyTournament.findUnique({
+      where: { slug },
+      include: { gameweeks: { orderBy: { number: 'asc' } }, prizes: { include: { cardTemplate: true } } },
+    });
+    if (!t) throw new NotFoundException('tournament_not_found');
+    return t;
+  }
+
+  async currentGameweek(tournamentId: string) {
+    const now = new Date();
+    // Earliest gameweek whose deadline is in the future, else the latest past one.
+    return (await this.prisma.fantasyGameweek.findFirst({
+      where: { tournamentId, lockAt: { gt: now } },
+      orderBy: { number: 'asc' },
+    })) ?? this.prisma.fantasyGameweek.findFirst({
+      where: { tournamentId },
+      orderBy: { number: 'desc' },
+    });
+  }
+
+  // ─── Selectable player pool ───────────────────────────────────────────────
+  async listSelectablePlayers(tournamentId: string) {
+    const t = await this.prisma.fantasyTournament.findUnique({
+      where: { id: tournamentId },
+      select: { competitionId: true },
+    });
+    if (!t) throw new NotFoundException('tournament_not_found');
+
+    return this.prisma.playerValuation.findMany({
+      where: { player: { team: { competitionId: t.competitionId } } },
+      include: { player: { include: { team: true } } },
+      orderBy: [{ position: 'asc' }, { price: 'desc' }],
+    });
+  }
+
+  // ─── Lineup submission ────────────────────────────────────────────────────
+  /**
+   * Validate + upsert a user's lineup for a given gameweek.
+   * Enforces: position quotas, budget, captain in squad, deadline, supply-side checks.
+   */
+  async submitLineup(userId: string, gameweekId: string, picks: LineupPick[], captainId: string) {
+    // 5-a-side composition rules:
+    //   - exactly 5 picks total
+    //   - exactly 1 GK
+    //   - at least 1 DEF, 1 MID, 1 FWD (the dedicated outfield slots)
+    //   - the 5th pick (UTL) is a free DEF/MID/FWD — covered implicitly because
+    //     1+1+1+1 = 4 plus the GK = 5 with one outfield slot left to assign.
+    if (picks.length !== SQUAD.size)
+      throw new BadRequestException(`squad_must_have_${SQUAD.size}_players`);
+
+    const byPos = picks.reduce<Record<string, number>>((acc, p) => {
+      acc[p.position] = (acc[p.position] ?? 0) + 1; return acc;
+    }, {});
+
+    if ((byPos['GK'] ?? 0) !== SQUAD.exactGK)
+      throw new BadRequestException(`bad_gk_count: ${byPos['GK'] ?? 0} expected ${SQUAD.exactGK}`);
+
+    for (const [pos, min] of Object.entries(SQUAD.minByPosition)) {
+      if ((byPos[pos] ?? 0) < min)
+        throw new BadRequestException(`need_at_least_${min}_${pos.toLowerCase()}`);
+    }
+
+    const ids = picks.map((p) => p.playerId);
+    if (new Set(ids).size !== ids.length) throw new BadRequestException('duplicate_player');
+    if (!ids.includes(captainId)) throw new BadRequestException('captain_not_in_squad');
+
+    const gw = await this.prisma.fantasyGameweek.findUnique({
+      where: { id: gameweekId },
+      include: { tournament: true },
+    });
+    if (!gw) throw new NotFoundException('gameweek_not_found');
+    if (gw.lockAt.getTime() <= Date.now()) throw new ForbiddenException('gameweek_locked');
+
+    const valuations = await this.prisma.playerValuation.findMany({
+      where: { playerId: { in: ids } },
+    });
+    if (valuations.length !== ids.length) throw new BadRequestException('unknown_player');
+
+    // Each pick's position must match the canonical valuation position.
+    const vMap = new Map(valuations.map((v) => [v.playerId, v]));
+    for (const p of picks) {
+      const v = vMap.get(p.playerId)!;
+      if (v.position !== p.position)
+        throw new BadRequestException(`position_mismatch: ${p.playerId}`);
+    }
+
+    const budgetUsed = valuations.reduce((s, v) => s + v.price, 0);
+    if (budgetUsed > gw.tournament.budget)
+      throw new BadRequestException(`over_budget: ${budgetUsed.toFixed(1)}/${gw.tournament.budget}`);
+
+    return this.prisma.fantasyLineup.upsert({
+      where: { userId_gameweekId: { userId, gameweekId } },
+      create: {
+        userId, gameweekId,
+        picks: picks as unknown as object,
+        captainId,
+        budgetUsed,
+        locked: false,
+      },
+      update: {
+        picks: picks as unknown as object,
+        captainId,
+        budgetUsed,
+      },
+    });
+  }
+
+  async getMyLineup(userId: string, gameweekId: string) {
+    return this.prisma.fantasyLineup.findUnique({
+      where: { userId_gameweekId: { userId, gameweekId } },
+    });
+  }
+
+  async leaderboard(gameweekId: string, limit = 100) {
+    const lineups = await this.prisma.fantasyLineup.findMany({
+      where: { gameweekId },
+      orderBy: [{ totalPoints: 'desc' }],
+      take: limit,
+      include: { user: { select: { id: true, displayName: true, photoUrl: true } } },
+    });
+    return lineups.map((l, i) => ({
+      rank: l.rank ?? i + 1,
+      userId: l.userId,
+      displayName: l.user.displayName,
+      photoUrl: l.user.photoUrl,
+      points: l.totalPoints,
+      budgetUsed: l.budgetUsed,
+    }));
+  }
+}

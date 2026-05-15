@@ -1,0 +1,27 @@
+# Build artifacts
+node_modules
+dist
+coverage
+
+# Secrets / config — never bake into image
+.env
+.env.*
+!.env.example
+
+# Version control + tooling
+.git
+.gitignore
+.dockerignore
+.editorconfig
+.vscode
+.idea
+
+# Tests + docs — not needed at runtime
+test
+*.md
+docs
+
+# Compose + dev-only init scripts
+docker-compose*.yml
+db
+.nvmrc

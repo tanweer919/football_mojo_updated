@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '12.0'
+platform :ios, '13.0'
 
 source 'https://github.com/CocoaPods/Specs.git'
 
@@ -36,20 +36,15 @@ end
 
 target 'Runner' do
   use_frameworks!
-  pod 'GoogleUtilities', '~> 7.12.0'  # Updated version
-  
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-    
-    # Force GoogleUtilities version
-    if target.name == 'GoogleUtilities'
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      end
+    target.build_configurations.each do |config|
+      # Ensure every pod is built against the same minimum as the host project.
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
     end
   end
 end

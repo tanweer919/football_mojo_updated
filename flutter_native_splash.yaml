@@ -1,5 +1,22 @@
+# Run after editing:
+#   fvm dart run flutter_native_splash:create
 flutter_native_splash:
-  image: assets/images/splash_screen.png
-  color: "50C878"
+  color:    "#1F8A4C"           # brand green, matches AppTheme._seed
+  color_dark: "#0F2A18"
+  image:    assets/images/splash_screen.png
+  image_dark: assets/images/splash_screen.png
   android: true
-  fill: true
+  ios: true
+  web: false
+
+  # Android 12+ uses the system splash screen API. flutter_native_splash
+  # generates the proper drawable + theme overlay automatically.
+  android_12:
+    color:    "#1F8A4C"
+    color_dark: "#0F2A18"
+    image:    assets/images/splash_screen.png
+    image_dark: assets/images/splash_screen.png
+    icon_background_color:    "#1F8A4C"
+    icon_background_color_dark: "#0F2A18"
+
+  fullscreen: false               # respect status/nav bar
