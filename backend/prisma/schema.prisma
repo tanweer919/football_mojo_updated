@@ -159,6 +159,10 @@ model User {
   id              String   @id              // Firebase UID
   email           String?  @unique
   displayName     String?
+  /// Public handle other users search/follow by — e.g. "jordan42".
+  /// Lowercase letters/numbers/`_`/`.`, 3–20 chars. Optional until claimed.
+  /// Stored already-lowercased so the unique constraint is case-insensitive.
+  userTag         String?  @unique
   photoUrl        String?
   countryCode     String?
   coins           Int      @default(0)     // earned currency
@@ -166,6 +170,10 @@ model User {
   proExpiresAt    DateTime?
   fcmTokens       String[] @default([])
   favouriteTeams  String[] @default([])
+  /// Set to `now()` once the user dismisses the signup-gift reveal screen.
+  /// While null, /v1/users/me surfaces the welcome card so the client can
+  /// re-show the reveal after a reinstall (until the user actually sees it).
+  welcomeCardSeenAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -277,6 +285,8 @@ enum AcquisitionSource {
   TRADE
   DIRECT_PURCHASE
   ADMIN_GRANT
+  /// Welcome gift minted on first sign-in (Common / Uncommon / Rare).
+  SIGNUP_GIFT
 }
 
 model CardSet {

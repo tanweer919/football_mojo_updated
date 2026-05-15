@@ -54,8 +54,12 @@ class WorldCupScreen extends ConsumerWidget {
                       child: _OpeningMatchCard(opening: o.openingMatch!),
                     ),
             ),
-            // Groups
-            const SectionHead(title: 'Groups', action: 'All →'),
+            // Groups — tap header to open the full standings page.
+            SectionHead(
+              title: 'Groups',
+              action: 'Standings →',
+              onAction: () => context.push('/wc/standings'),
+            ),
             groups.when(
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -83,6 +87,16 @@ class WorldCupScreen extends ConsumerWidget {
                   ),
                 );
               },
+            ),
+            // Stats — top scorers + assists shortcut.
+            SectionHead(
+              title: 'Stats',
+              action: 'Top scorers →',
+              onAction: () => context.push('/wc/top-scorers'),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _StatsTeaser(),
             ),
             // Venues
             const SectionHead(title: 'Venues'),
@@ -496,6 +510,55 @@ class _VenueCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StatsTeaser extends StatelessWidget {
+  const _StatsTeaser();
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push('/wc/top-scorers'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+          gradient: const LinearGradient(
+            colors: [AppColors.surface2, AppColors.surface],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.emoji_events, size: 24, color: AppColors.gold),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text(
+                    'Golden Boot · Top assists',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.fg,
+                      letterSpacing: -0.21,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Eyebrow('Live tournament leaderboards', size: 10),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.muted),
+          ],
+        ),
       ),
     );
   }

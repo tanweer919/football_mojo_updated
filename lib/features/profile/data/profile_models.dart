@@ -66,11 +66,53 @@ class ProfileStats {
       );
 }
 
+/// One-off signup gift surfaced by /me until the user dismisses the reveal.
+class WelcomeCard {
+  WelcomeCard({
+    required this.id,
+    required this.serialNumber,
+    required this.rarity,
+    required this.totalSupply,
+    this.artUrl,
+    this.playerName,
+    this.playerPosition,
+    this.teamName,
+    this.teamCrestUrl,
+  });
+  final String id;
+  final int serialNumber;
+  final String rarity;
+  final int totalSupply;
+  final String? artUrl;
+  final String? playerName;
+  final String? playerPosition;
+  final String? teamName;
+  final String? teamCrestUrl;
+
+  factory WelcomeCard.fromJson(Map<String, dynamic> j) {
+    final t = (j['template'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final p = (j['player']   as Map?)?.cast<String, dynamic>();
+    final team = (p?['team']  as Map?)?.cast<String, dynamic>();
+    return WelcomeCard(
+      id: j['id'] as String,
+      serialNumber: (j['serialNumber'] as num?)?.toInt() ?? 0,
+      rarity: (t['rarity'] as String?) ?? 'COMMON',
+      totalSupply: (t['totalSupply'] as num?)?.toInt() ?? 0,
+      artUrl: (t['artUrl'] as String?) ?? p?['photoUrl'] as String?,
+      playerName: p?['name'] as String?,
+      playerPosition: p?['position'] as String?,
+      teamName: team?['name'] as String?,
+      teamCrestUrl: team?['crestUrl'] as String?,
+    );
+  }
+}
+
 class Profile {
   Profile({
     required this.id,
     this.email,
     this.displayName,
+    this.userTag,
     this.photoUrl,
     this.countryCode,
     required this.coins,
@@ -80,10 +122,13 @@ class Profile {
     required this.stats,
     required this.achievements,
     required this.followedTeams,
+    this.welcomeCard,
   });
   final String id;
   final String? email;
   final String? displayName;
+  /// Public handle other users search/follow by — null until claimed.
+  final String? userTag;
   final String? photoUrl;
   final String? countryCode;
   final int coins;
@@ -93,17 +138,22 @@ class Profile {
   final ProfileStats stats;
   final List<ProfileAchievement> achievements;
   final List<ProfileTeam> followedTeams;
+  /// Set when the server has minted a signup gift the user hasn't seen yet.
+  /// Triggers the full-screen reveal animation on next sign-in.
+  final WelcomeCard? welcomeCard;
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
         id: j['id'] as String,
         email: j['email'] as String?,
         displayName: j['displayName'] as String?,
+        userTag: j['userTag'] as String?,
         photoUrl: j['photoUrl'] as String?,
         countryCode: j['countryCode'] as String?,
         coins: (j['coins'] as num?)?.toInt() ?? 0,
         gems: (j['gems'] as num?)?.toInt() ?? 0,
         proExpiresAt: j['proExpiresAt'] == null ? null : DateTime.parse(j['proExpiresAt'] as String),
         memberSince: DateTime.parse(j['memberSince'] as String),
+        welcomeCard: j['welcomeCard'] == null ? null : WelcomeCard.fromJson(j['welcomeCard'] as Map<String, dynamic>),
         stats: ProfileStats.fromJson(j['stats'] as Map<String, dynamic>),
         achievements: ((j['achievements'] as List?) ?? const [])
             .map((a) => ProfileAchievement.fromJson(a as Map<String, dynamic>))

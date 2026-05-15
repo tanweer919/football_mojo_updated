@@ -34,6 +34,8 @@ class RoutePaths {
   // Insights
   static const injuries           = '/insights/injuries';
   static const playerProfile      = '/players/:id';
+  static const standings          = '/wc/standings';
+  static const topScorers         = '/wc/top-scorers';
 
   // IAP
   static const proPaywall         = '/pro';

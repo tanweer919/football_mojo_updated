@@ -26,6 +26,8 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/settings_screen.dart';
 import '../../features/today/presentation/screens/today_screen.dart';
 import '../../features/tournament/presentation/screens/bracket_screen.dart';
+import '../../features/world_cup/presentation/screens/standings_screen.dart';
+import '../../features/world_cup/presentation/screens/top_scorers_screen.dart';
 import '../../features/world_cup/presentation/screens/world_cup_screen.dart';
 import '../auth/auth_providers.dart';
 import '../bootstrap/deferred_bootstrap.dart';
@@ -107,6 +109,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: RoutePaths.injuries,    builder: (_, __) => const InjuriesScreen()),
+      GoRoute(path: RoutePaths.standings,   builder: (_, __) => const StandingsScreen(competitionId: 'WC2026')),
+      GoRoute(path: RoutePaths.topScorers,  builder: (_, __) => const TopScorersScreen()),
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
       GoRoute(
         path: RoutePaths.playerProfile,

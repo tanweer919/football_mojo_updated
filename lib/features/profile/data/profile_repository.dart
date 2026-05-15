@@ -23,6 +23,17 @@ class ProfileRepository {
       rethrow;
     }
   }
+
+  /// Mark the welcome-card reveal as seen on the server so /me stops
+  /// returning it. Called after the user dismisses the reveal screen.
+  Future<void> dismissWelcomeCard() async {
+    try {
+      await _dio.post('/v1/users/me/welcome-card/dismiss');
+    } on DioException {
+      // Non-fatal — server-side state will catch up on next /me read or on
+      // a retry after the user reconnects. Don't surface to the UI.
+    }
+  }
 }
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {

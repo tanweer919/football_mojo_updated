@@ -21,7 +21,9 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
     "seed:roster": "tsx prisma/seed-wc-roster.ts",
-    "seed:leagues": "tsx prisma/seed-leagues.ts"
+    "seed:leagues": "tsx prisma/seed-leagues.ts",
+    "seed:wc": "tsx prisma/seed-wc-2026.ts",
+    "seed:cards": "tsx prisma/seed-wc-cards.ts"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.2.2",

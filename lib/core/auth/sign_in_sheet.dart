@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/profile/data/profile_repository.dart';
+import '../../features/welcome/presentation/screens/welcome_card_reveal_screen.dart';
 import '../design/app_colors.dart';
 import '../widgets/eyebrow.dart';
 import '../widgets/pitch_buttons.dart';
@@ -59,7 +61,42 @@ Future<User?> ensureSignedIn(
   final existing = ref.read(authRepositoryProvider).currentUser;
   if (existing != null && !existing.isAnonymous) return existing;
   if (!_isSignInSupported()) return null;
-  return showSignInSheet(context, reason: reason);
+  final user = await showSignInSheet(context, reason: reason);
+  if (user != null && context.mounted) {
+    await _maybeShowWelcomeCard(context, ref);
+  }
+  return user;
+}
+
+/// After a successful sign-in, peek at /me. If the server has a freshly
+/// minted welcome card sitting in `welcomeCard`, push the reveal screen.
+/// Silent no-op when there's no card or the profile fetch fails.
+///
+/// Called automatically from `ensureSignedIn` and `quickSignIn` so every
+/// auth-required CTA in the app pops the reveal exactly once on first
+/// signup. Subsequent sign-ins find `welcomeCard == null` (server cleared
+/// the flag on dismiss) and skip silently.
+Future<void> _maybeShowWelcomeCard(BuildContext context, WidgetRef ref) async {
+  try {
+    // Force a fresh fetch — the cached profile pre-signin had no auth header.
+    ref.invalidate(myProfileProvider);
+    final profile = await ref.read(myProfileProvider.future);
+    final card = profile?.welcomeCard;
+    if (card == null || !context.mounted) return;
+    await Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 360),
+        pageBuilder: (_, __, ___) => WelcomeCardRevealScreen(card: card),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  } catch (_) {
+    // Non-fatal — sign-in already succeeded. Reveal will fire on the next
+    // /me read (typically when the user opens their profile).
+  }
 }
 
 /// **One-tap sign-in** for in-app CTAs (e.g. "Sign in to claim", "Save
@@ -86,18 +123,20 @@ Future<User?> quickSignIn(BuildContext context, WidgetRef ref) async {
 
   try {
     final user = await ref.read(authRepositoryProvider).signInWithGoogle();
+    overlay.remove();
+    if (context.mounted) await _maybeShowWelcomeCard(context, ref);
     return user;
   } on FirebaseAuthException catch (e) {
+    overlay.remove();
     if (e.code == 'cancelled') return null;
     messenger.showSnackBar(
       SnackBar(content: Text(e.message ?? 'Sign-in failed.')),
     );
     return null;
   } catch (e) {
+    overlay.remove();
     messenger.showSnackBar(SnackBar(content: Text('$e')));
     return null;
-  } finally {
-    overlay.remove();
   }
 }
 

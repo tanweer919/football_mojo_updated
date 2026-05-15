@@ -124,6 +124,16 @@ class _LoadingState extends StatelessWidget {
       );
 }
 
+/// Trims long cup names ("FootballMojo Global Cup 2026" → "Global Cup") so
+/// the eyebrow stays on one line. Falls back to the full name when no known
+/// pattern matches.
+String _shortTournamentLabel(String name) {
+  if (name.contains('Global Cup')) return 'Global Cup';
+  if (name.contains('Champions League')) return 'Champions League';
+  if (name.contains('World Cup')) return 'FIFA World Cup';
+  return name;
+}
+
 // ─── PRIMARY ACTION CARD ───────────────────────────────────────────────────
 // One card. One CTA. State varies by gameweek + lineup status.
 
@@ -186,8 +196,16 @@ class _PrimaryAction extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Eyebrow(tournament.name, gold: true, size: 11),
-                  const Spacer(),
+                  Expanded(
+                    child: Eyebrow(
+                      // Long names like "FootballMojo Global Cup 2026" wrap to
+                      // two lines and crowd the title — show only the cup name
+                      // (drop year) and let the headline carry the weight.
+                      _shortTournamentLabel(tournament.name),
+                      gold: true,
+                      size: 11,
+                    ),
+                  ),
                   if (hasGw) Eyebrow('GW ${gameweek!.number}', gold: true, size: 11),
                 ],
               ),
