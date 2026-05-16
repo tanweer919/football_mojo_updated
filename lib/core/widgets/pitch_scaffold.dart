@@ -29,8 +29,15 @@ class PitchScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.viewPaddingOf(context).top;
-    final bottomInset = withinTabShell ? 110.0 : 24.0;
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    // Reserve space for the system status bar at the top, the floating
+    // tabbar (when in shell) plus the OS gesture-pill / 3-button bar at
+    // the bottom. With edge-to-edge mode enabled in main.dart the Scaffold
+    // background paints all the way under both — so the `bg` colour fills
+    // every pixel and there's no black band.
+    final topInset = viewPadding.top;
+    final bottomGesture = viewPadding.bottom;
+    final bottomInset = (withinTabShell ? 110.0 : 0.0) + bottomGesture + 16;
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
@@ -48,31 +55,34 @@ class PitchScreen extends StatelessWidget {
       ),
     );
 
-    final inner = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(height: topInset),
-        header,
-        Flexible(child: child),
-        SizedBox(height: bottomInset),
-      ],
-    );
-
-    // Wrap in Scaffold so descendant Text widgets have the Material ancestor
-    // they need (otherwise Flutter draws the double-underline "missing
-    // dependency" error indicator). Background still painted explicitly
-    // because some screens render full-bleed gradients above it.
     return Scaffold(
+      // extendBody so the body ColoredBox paints under the gesture pill /
+      // 3-button bar instead of leaving an OS-default black band.
+      extendBody: true,
+      extendBodyBehindAppBar: true,
       backgroundColor: AppColors.bg,
-      body: scrollable
-          ? SingleChildScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              child: SizedBox(
-                height: MediaQuery.sizeOf(context).height,
-                child: inner,
-              ),
-            )
-          : inner,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: topInset),
+          header,
+          Expanded(
+            child: scrollable
+                ? SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics()),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: bottomInset),
+                      child: child,
+                    ),
+                  )
+                : Padding(
+                    padding: EdgeInsets.only(bottom: bottomInset),
+                    child: child,
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

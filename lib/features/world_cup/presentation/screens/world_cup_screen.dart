@@ -27,9 +27,7 @@ class WorldCupScreen extends ConsumerWidget {
       title: 'FIFA World Cup 2026',
       onBack: context.canPop() ? () => context.pop() : null,
       trailing: CircleIconButton(icon: Icons.help_outline, onPressed: () {}),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8),
@@ -130,7 +128,6 @@ class WorldCupScreen extends ConsumerWidget {
             const SizedBox(height: 32),
           ],
         ),
-      ),
     );
   }
 }

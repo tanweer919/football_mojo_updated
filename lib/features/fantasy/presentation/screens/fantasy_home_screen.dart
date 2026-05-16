@@ -74,9 +74,7 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
           padding: const EdgeInsets.all(20),
           child: Text('$e', style: const TextStyle(color: AppColors.live)),
         ),
-        data: (t) => SingleChildScrollView(
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          child: Column(
+        data: (t) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 8),
@@ -109,7 +107,6 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
               const SizedBox(height: 32),
             ],
           ),
-        ),
       ),
     );
   }

@@ -11,12 +11,14 @@ class RoutePaths {
   static const tournament  = '/tournament';
   static const news        = '/news';
   static const album       = '/album';
+  static const market      = '/market';
   static const profile     = '/profile';
 
   // Detail
   static const matchDetail = '/matches/:id';
   static const newsReader  = '/news/:id';
   static const cardDetail  = '/album/:id';
+  static const marketCard  = '/market/:templateId';
   static const settings    = '/settings';
   static const bracket     = '/tournament/bracket';
 

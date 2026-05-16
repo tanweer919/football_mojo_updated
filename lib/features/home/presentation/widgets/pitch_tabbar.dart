@@ -19,7 +19,9 @@ class PitchTabbar extends ConsumerWidget {
     _Dest('Home',      _IconHome(),      RoutePaths.home),
     _Dest('World Cup', _IconWorldCup(),  RoutePaths.tournament),
     _Dest('Fantasy',   _IconFantasy(),   RoutePaths.fantasyHome),
-    _Dest('Cards',     _IconCards(),     RoutePaths.album),
+    // Tab opens the public marketplace browse. The "Collection" affordance
+    // in the market header lets signed-in users jump into their album.
+    _Dest('Cards',     _IconCards(),     RoutePaths.market),
     _Dest('You',       _IconYou(),       RoutePaths.profile),
   ];
 

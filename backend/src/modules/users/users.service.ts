@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { mintWelcomeCard } from '../auth/welcome-card';
 
 /// Allowed shape for a user-facing handle.
 ///   - lowercase letters, digits, dot, underscore
@@ -64,9 +65,21 @@ export class UsersService {
 
     // Surface the signup-gift card until the user dismisses the reveal.
     // After dismissal `welcomeCardSeenAt` is set and we stop returning it.
-    const welcomeCard = user.welcomeCardSeenAt == null
+    //
+    // Self-heal: if the user has no SIGNUP_GIFT card yet (e.g. they signed up
+    // before `seed:cards` had been run, so the original mint attempt found an
+    // empty catalogue) attempt to mint one now. Fire-and-forget pattern — if
+    // the second mint also fails the user simply gets `welcomeCard: null` and
+    // we'll try again on the next /me read.
+    let welcomeCard = user.welcomeCardSeenAt == null
         ? await this._loadUnseenWelcomeCard(uid)
         : null;
+    if (welcomeCard == null && user.welcomeCardSeenAt == null) {
+      const mintedId = await mintWelcomeCard(this.prisma, uid).catch(() => null);
+      if (mintedId) {
+        welcomeCard = await this._loadUnseenWelcomeCard(uid);
+      }
+    }
 
     return {
       id: user.id,

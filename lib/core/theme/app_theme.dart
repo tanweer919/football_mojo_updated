@@ -54,12 +54,16 @@ class AppTheme {
       fontFamily: 'Inter',
     );
 
-    // Status bar to match the dark stage.
+    // Edge-to-edge: both bars are transparent, OS draws icons on top of our
+    // gradient. With this + `SystemUiMode.edgeToEdge` (set in main.dart) the
+    // black band that used to sit at the bottom of pushed screens is gone.
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppColors.bgDeep,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
     ));
 
     final text = base.textTheme.apply(

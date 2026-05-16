@@ -16,6 +16,8 @@ import '../../features/player/presentation/screens/player_profile_screen.dart';
 import '../../features/h2h/presentation/screens/h2h_screen.dart';
 import '../../features/home/presentation/screens/home_dashboard_screen.dart';
 import '../../features/home/presentation/screens/home_shell.dart';
+import '../../features/market/presentation/screens/cards_market_screen.dart';
+import '../../features/market/presentation/screens/market_template_detail_screen.dart';
 import '../../features/matches/presentation/screens/match_detail_screen.dart';
 import '../../features/matches/presentation/screens/matches_screen.dart';
 import '../../features/news/presentation/screens/news_reader_screen.dart';
@@ -60,6 +62,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: RoutePaths.matches,     builder: (_, __) => const MatchesScreen()),
           GoRoute(path: RoutePaths.fantasyHome, builder: (_, __) => const FantasyHomeScreen()),
           GoRoute(path: RoutePaths.album,       builder: (_, __) => const AlbumScreen()),
+          GoRoute(path: RoutePaths.market,      builder: (_, __) => const CardsMarketScreen()),
           GoRoute(path: RoutePaths.news,        builder: (_, __) => const NewsScreen()),
           GoRoute(path: RoutePaths.tournament,  builder: (_, __) => const WorldCupScreen()),
           // Legacy "Today" tab — routable but no longer in nav.
@@ -71,6 +74,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.matchDetail, builder: (_, s) => MatchDetailScreen(matchId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.newsReader,  builder: (_, s) => NewsReaderScreen(articleId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.cardDetail,  builder: (_, s) => CardDetailScreen(ownedCardId: s.pathParameters['id']!)),
+      GoRoute(
+        path: RoutePaths.marketCard,
+        builder: (_, s) => MarketTemplateDetailScreen(templateId: s.pathParameters['templateId']!),
+      ),
       GoRoute(path: RoutePaths.profile,     builder: (_, __) => const ProfileScreen()),
       GoRoute(path: RoutePaths.settings,    builder: (_, __) => const SettingsScreen()),
       GoRoute(path: RoutePaths.bracket,     builder: (_, __) => const BracketScreen()),

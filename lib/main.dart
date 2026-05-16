@@ -31,6 +31,12 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Edge-to-edge so the system nav bar doesn't paint a black band over the
+  // gradient backgrounds in our Pitch screens. Combined with `Scaffold`'s
+  // background colour painting under the system bars, the gesture pill /
+  // 3-button bar now floats on top of our content seamlessly.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   // Parallelise: Hive (local cache) and Firebase init are independent.
   // Cutting from serial ~250ms to ~max(50, 200) ≈ 200ms.
   await Future.wait([
