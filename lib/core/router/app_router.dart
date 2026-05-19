@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/album/presentation/screens/album_screen.dart';
 import '../../features/album/presentation/screens/card_detail_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_home_screen.dart';
+import '../../features/following/presentation/screens/team_picker_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
 import '../../features/fantasy/presentation/screens/lineup_builder_screen.dart';
 import '../../features/fantasy/presentation/screens/player_breakdown_screen.dart';
@@ -119,6 +120,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.standings,   builder: (_, __) => const StandingsScreen(competitionId: 'WC2026')),
       GoRoute(path: RoutePaths.topScorers,  builder: (_, __) => const TopScorersScreen()),
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
+      GoRoute(path: RoutePaths.teamPicker,  builder: (_, __) => const TeamPickerScreen()),
       GoRoute(
         path: RoutePaths.playerProfile,
         builder: (_, s) => PlayerProfileScreen(playerId: s.pathParameters['id']!),

@@ -589,7 +589,11 @@ as bool,
 /// @nodoc
 mixin _$PlayerValuationDto {
 
- String get id; String get playerId; double get price; double get recentForm; PlayerPosition get position; PlayerSummary get player;
+ String get id; String get playerId; double get price; double get recentForm; PlayerPosition get position; PlayerSummary get player;/// 0..10 — api-football season rating, populated by `npm run ingest:form`.
+/// Nullable: brand-new players or those without any league appearances
+/// have no rating yet. The picker UI treats null as "unknown" rather
+/// than 0 so we don't punish unseeded players.
+ double? get seasonRating; int get seasonAppearances; int get seasonGoals; int get seasonAssists; int get seasonMinutes;
 /// Create a copy of PlayerValuationDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -602,16 +606,16 @@ $PlayerValuationDtoCopyWith<PlayerValuationDto> get copyWith => _$PlayerValuatio
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PlayerValuationDto&&(identical(other.id, id) || other.id == id)&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.price, price) || other.price == price)&&(identical(other.recentForm, recentForm) || other.recentForm == recentForm)&&(identical(other.position, position) || other.position == position)&&(identical(other.player, player) || other.player == player));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PlayerValuationDto&&(identical(other.id, id) || other.id == id)&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.price, price) || other.price == price)&&(identical(other.recentForm, recentForm) || other.recentForm == recentForm)&&(identical(other.position, position) || other.position == position)&&(identical(other.player, player) || other.player == player)&&(identical(other.seasonRating, seasonRating) || other.seasonRating == seasonRating)&&(identical(other.seasonAppearances, seasonAppearances) || other.seasonAppearances == seasonAppearances)&&(identical(other.seasonGoals, seasonGoals) || other.seasonGoals == seasonGoals)&&(identical(other.seasonAssists, seasonAssists) || other.seasonAssists == seasonAssists)&&(identical(other.seasonMinutes, seasonMinutes) || other.seasonMinutes == seasonMinutes));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,playerId,price,recentForm,position,player);
+int get hashCode => Object.hash(runtimeType,id,playerId,price,recentForm,position,player,seasonRating,seasonAppearances,seasonGoals,seasonAssists,seasonMinutes);
 
 @override
 String toString() {
-  return 'PlayerValuationDto(id: $id, playerId: $playerId, price: $price, recentForm: $recentForm, position: $position, player: $player)';
+  return 'PlayerValuationDto(id: $id, playerId: $playerId, price: $price, recentForm: $recentForm, position: $position, player: $player, seasonRating: $seasonRating, seasonAppearances: $seasonAppearances, seasonGoals: $seasonGoals, seasonAssists: $seasonAssists, seasonMinutes: $seasonMinutes)';
 }
 
 
@@ -622,7 +626,7 @@ abstract mixin class $PlayerValuationDtoCopyWith<$Res>  {
   factory $PlayerValuationDtoCopyWith(PlayerValuationDto value, $Res Function(PlayerValuationDto) _then) = _$PlayerValuationDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String playerId, double price, double recentForm, PlayerPosition position, PlayerSummary player
+ String id, String playerId, double price, double recentForm, PlayerPosition position, PlayerSummary player, double? seasonRating, int seasonAppearances, int seasonGoals, int seasonAssists, int seasonMinutes
 });
 
 
@@ -639,7 +643,7 @@ class _$PlayerValuationDtoCopyWithImpl<$Res>
 
 /// Create a copy of PlayerValuationDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? playerId = null,Object? price = null,Object? recentForm = null,Object? position = null,Object? player = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? playerId = null,Object? price = null,Object? recentForm = null,Object? position = null,Object? player = null,Object? seasonRating = freezed,Object? seasonAppearances = null,Object? seasonGoals = null,Object? seasonAssists = null,Object? seasonMinutes = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,playerId: null == playerId ? _self.playerId : playerId // ignore: cast_nullable_to_non_nullable
@@ -647,7 +651,12 @@ as String,price: null == price ? _self.price : price // ignore: cast_nullable_to
 as double,recentForm: null == recentForm ? _self.recentForm : recentForm // ignore: cast_nullable_to_non_nullable
 as double,position: null == position ? _self.position : position // ignore: cast_nullable_to_non_nullable
 as PlayerPosition,player: null == player ? _self.player : player // ignore: cast_nullable_to_non_nullable
-as PlayerSummary,
+as PlayerSummary,seasonRating: freezed == seasonRating ? _self.seasonRating : seasonRating // ignore: cast_nullable_to_non_nullable
+as double?,seasonAppearances: null == seasonAppearances ? _self.seasonAppearances : seasonAppearances // ignore: cast_nullable_to_non_nullable
+as int,seasonGoals: null == seasonGoals ? _self.seasonGoals : seasonGoals // ignore: cast_nullable_to_non_nullable
+as int,seasonAssists: null == seasonAssists ? _self.seasonAssists : seasonAssists // ignore: cast_nullable_to_non_nullable
+as int,seasonMinutes: null == seasonMinutes ? _self.seasonMinutes : seasonMinutes // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 /// Create a copy of PlayerValuationDto
@@ -741,10 +750,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player,  double? seasonRating,  int seasonAppearances,  int seasonGoals,  int seasonAssists,  int seasonMinutes)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PlayerValuationDto() when $default != null:
-return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player);case _:
+return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player,_that.seasonRating,_that.seasonAppearances,_that.seasonGoals,_that.seasonAssists,_that.seasonMinutes);case _:
   return orElse();
 
 }
@@ -762,10 +771,10 @@ return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.posit
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player,  double? seasonRating,  int seasonAppearances,  int seasonGoals,  int seasonAssists,  int seasonMinutes)  $default,) {final _that = this;
 switch (_that) {
 case _PlayerValuationDto():
-return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player);case _:
+return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player,_that.seasonRating,_that.seasonAppearances,_that.seasonGoals,_that.seasonAssists,_that.seasonMinutes);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -782,10 +791,10 @@ return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.posit
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String playerId,  double price,  double recentForm,  PlayerPosition position,  PlayerSummary player,  double? seasonRating,  int seasonAppearances,  int seasonGoals,  int seasonAssists,  int seasonMinutes)?  $default,) {final _that = this;
 switch (_that) {
 case _PlayerValuationDto() when $default != null:
-return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player);case _:
+return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.position,_that.player,_that.seasonRating,_that.seasonAppearances,_that.seasonGoals,_that.seasonAssists,_that.seasonMinutes);case _:
   return null;
 
 }
@@ -797,7 +806,7 @@ return $default(_that.id,_that.playerId,_that.price,_that.recentForm,_that.posit
 @JsonSerializable()
 
 class _PlayerValuationDto implements PlayerValuationDto {
-  const _PlayerValuationDto({required this.id, required this.playerId, required this.price, required this.recentForm, required this.position, required this.player});
+  const _PlayerValuationDto({required this.id, required this.playerId, required this.price, required this.recentForm, required this.position, required this.player, this.seasonRating, this.seasonAppearances = 0, this.seasonGoals = 0, this.seasonAssists = 0, this.seasonMinutes = 0});
   factory _PlayerValuationDto.fromJson(Map<String, dynamic> json) => _$PlayerValuationDtoFromJson(json);
 
 @override final  String id;
@@ -806,6 +815,15 @@ class _PlayerValuationDto implements PlayerValuationDto {
 @override final  double recentForm;
 @override final  PlayerPosition position;
 @override final  PlayerSummary player;
+/// 0..10 — api-football season rating, populated by `npm run ingest:form`.
+/// Nullable: brand-new players or those without any league appearances
+/// have no rating yet. The picker UI treats null as "unknown" rather
+/// than 0 so we don't punish unseeded players.
+@override final  double? seasonRating;
+@override@JsonKey() final  int seasonAppearances;
+@override@JsonKey() final  int seasonGoals;
+@override@JsonKey() final  int seasonAssists;
+@override@JsonKey() final  int seasonMinutes;
 
 /// Create a copy of PlayerValuationDto
 /// with the given fields replaced by the non-null parameter values.
@@ -820,16 +838,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PlayerValuationDto&&(identical(other.id, id) || other.id == id)&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.price, price) || other.price == price)&&(identical(other.recentForm, recentForm) || other.recentForm == recentForm)&&(identical(other.position, position) || other.position == position)&&(identical(other.player, player) || other.player == player));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PlayerValuationDto&&(identical(other.id, id) || other.id == id)&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.price, price) || other.price == price)&&(identical(other.recentForm, recentForm) || other.recentForm == recentForm)&&(identical(other.position, position) || other.position == position)&&(identical(other.player, player) || other.player == player)&&(identical(other.seasonRating, seasonRating) || other.seasonRating == seasonRating)&&(identical(other.seasonAppearances, seasonAppearances) || other.seasonAppearances == seasonAppearances)&&(identical(other.seasonGoals, seasonGoals) || other.seasonGoals == seasonGoals)&&(identical(other.seasonAssists, seasonAssists) || other.seasonAssists == seasonAssists)&&(identical(other.seasonMinutes, seasonMinutes) || other.seasonMinutes == seasonMinutes));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,playerId,price,recentForm,position,player);
+int get hashCode => Object.hash(runtimeType,id,playerId,price,recentForm,position,player,seasonRating,seasonAppearances,seasonGoals,seasonAssists,seasonMinutes);
 
 @override
 String toString() {
-  return 'PlayerValuationDto(id: $id, playerId: $playerId, price: $price, recentForm: $recentForm, position: $position, player: $player)';
+  return 'PlayerValuationDto(id: $id, playerId: $playerId, price: $price, recentForm: $recentForm, position: $position, player: $player, seasonRating: $seasonRating, seasonAppearances: $seasonAppearances, seasonGoals: $seasonGoals, seasonAssists: $seasonAssists, seasonMinutes: $seasonMinutes)';
 }
 
 
@@ -840,7 +858,7 @@ abstract mixin class _$PlayerValuationDtoCopyWith<$Res> implements $PlayerValuat
   factory _$PlayerValuationDtoCopyWith(_PlayerValuationDto value, $Res Function(_PlayerValuationDto) _then) = __$PlayerValuationDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String playerId, double price, double recentForm, PlayerPosition position, PlayerSummary player
+ String id, String playerId, double price, double recentForm, PlayerPosition position, PlayerSummary player, double? seasonRating, int seasonAppearances, int seasonGoals, int seasonAssists, int seasonMinutes
 });
 
 
@@ -857,7 +875,7 @@ class __$PlayerValuationDtoCopyWithImpl<$Res>
 
 /// Create a copy of PlayerValuationDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? playerId = null,Object? price = null,Object? recentForm = null,Object? position = null,Object? player = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? playerId = null,Object? price = null,Object? recentForm = null,Object? position = null,Object? player = null,Object? seasonRating = freezed,Object? seasonAppearances = null,Object? seasonGoals = null,Object? seasonAssists = null,Object? seasonMinutes = null,}) {
   return _then(_PlayerValuationDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,playerId: null == playerId ? _self.playerId : playerId // ignore: cast_nullable_to_non_nullable
@@ -865,7 +883,12 @@ as String,price: null == price ? _self.price : price // ignore: cast_nullable_to
 as double,recentForm: null == recentForm ? _self.recentForm : recentForm // ignore: cast_nullable_to_non_nullable
 as double,position: null == position ? _self.position : position // ignore: cast_nullable_to_non_nullable
 as PlayerPosition,player: null == player ? _self.player : player // ignore: cast_nullable_to_non_nullable
-as PlayerSummary,
+as PlayerSummary,seasonRating: freezed == seasonRating ? _self.seasonRating : seasonRating // ignore: cast_nullable_to_non_nullable
+as double?,seasonAppearances: null == seasonAppearances ? _self.seasonAppearances : seasonAppearances // ignore: cast_nullable_to_non_nullable
+as int,seasonGoals: null == seasonGoals ? _self.seasonGoals : seasonGoals // ignore: cast_nullable_to_non_nullable
+as int,seasonAssists: null == seasonAssists ? _self.seasonAssists : seasonAssists // ignore: cast_nullable_to_non_nullable
+as int,seasonMinutes: null == seasonMinutes ? _self.seasonMinutes : seasonMinutes // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -885,7 +908,8 @@ $PlayerSummaryCopyWith<$Res> get player {
 /// @nodoc
 mixin _$PlayerSummary {
 
- String get id; String get name; int? get shirtNumber; String? get photoUrl; String? get position; TeamSummary get team;
+ String get id; String get name;// Backend Prisma model is `Int?` — keep it numeric here.
+ int? get shirtNumber; String? get photoUrl; String? get position; TeamSummary get team;
 /// Create a copy of PlayerSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1098,6 +1122,7 @@ class _PlayerSummary implements PlayerSummary {
 
 @override final  String id;
 @override final  String name;
+// Backend Prisma model is `Int?` — keep it numeric here.
 @override final  int? shirtNumber;
 @override final  String? photoUrl;
 @override final  String? position;

@@ -54,6 +54,15 @@ abstract class PlayerValuationDto with _$PlayerValuationDto {
     required double recentForm,
     required PlayerPosition position,
     required PlayerSummary player,
+    /// 0..10 — api-football season rating, populated by `npm run ingest:form`.
+    /// Nullable: brand-new players or those without any league appearances
+    /// have no rating yet. The picker UI treats null as "unknown" rather
+    /// than 0 so we don't punish unseeded players.
+    double? seasonRating,
+    @Default(0) int seasonAppearances,
+    @Default(0) int seasonGoals,
+    @Default(0) int seasonAssists,
+    @Default(0) int seasonMinutes,
   }) = _PlayerValuationDto;
 
   factory PlayerValuationDto.fromJson(Map<String, dynamic> json) =>

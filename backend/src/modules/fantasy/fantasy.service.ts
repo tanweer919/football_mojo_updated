@@ -43,6 +43,23 @@ export class FantasyService {
   }
 
   // ─── Selectable player pool ───────────────────────────────────────────────
+  /**
+   * Players eligible for this tournament. Filters strictly by the
+   * tournament's competition — World Cup tournaments only see players
+   * whose `Team.competitionId = 'WC2026'`, NEVER club-only players the
+   * ingest brought in for Big-5 / UCL form data.
+   *
+   * This invariant is load-bearing: `prisma/ingest-player-form.ts` with
+   * IMPORT_MISSING=1 creates thousands of additional Player rows for
+   * Real Madrid / PSG / Liverpool etc. None should appear in WC build-XI.
+   * The filter below is the only thing standing between
+   * "Vinícius Jr. as a Brazil pick" (fine — he's on team BRA) and
+   * "Vinícius Jr. + a duplicate Real Madrid row" (not fine).
+   *
+   * The asserting post-query check is defence in depth in case a future
+   * ingest accidentally re-points teamId on an existing player. Throws
+   * rather than returning bad data.
+   */
   async listSelectablePlayers(tournamentId: string) {
     const t = await this.prisma.fantasyTournament.findUnique({
       where: { id: tournamentId },
@@ -50,11 +67,24 @@ export class FantasyService {
     });
     if (!t) throw new NotFoundException('tournament_not_found');
 
-    return this.prisma.playerValuation.findMany({
+    const rows = await this.prisma.playerValuation.findMany({
       where: { player: { team: { competitionId: t.competitionId } } },
       include: { player: { include: { team: true } } },
       orderBy: [{ position: 'asc' }, { price: 'desc' }],
     });
+
+    // Sanity assert — every row must actually belong to the tournament's
+    // competition. If this trips, the Prisma filter regressed or the
+    // Team→Competition link drifted; fail loudly.
+    const leak = rows.find((r) => r.player.team.competitionId !== t.competitionId);
+    if (leak) {
+      throw new Error(
+        `selectable_pool_leak: player ${leak.playerId} (${leak.player.name}) ` +
+        `team ${leak.player.teamId} competition=${leak.player.team.competitionId} ` +
+        `expected=${t.competitionId}`,
+      );
+    }
+    return rows;
   }
 
   // ─── Lineup submission ────────────────────────────────────────────────────

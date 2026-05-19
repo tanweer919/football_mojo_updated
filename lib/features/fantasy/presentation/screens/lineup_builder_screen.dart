@@ -17,6 +17,7 @@ import '../../../album/data/models/card_models.dart' show CardRarity;
 import '../../data/models/fantasy_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
 import '../providers/fantasy_providers.dart';
+import 'player_picker_sheet.dart';
 
 /// Build XI — focused, single-screen flow:
 ///   - Sticky topbar (back / "Build XI · GW N" / reset)
@@ -46,14 +47,8 @@ extension on _Slot {
         _Slot.fwd => 'FWD',
         _Slot.sub => 'SUB',
       };
-  String get longLabel => switch (this) {
-        _Slot.gk => 'Goalkeeper',
-        _Slot.def => 'Defender',
-        _Slot.mid => 'Midfielder',
-        _Slot.utl => 'Utility (DEF/MID/FWD)',
-        _Slot.fwd => 'Forward',
-        _Slot.sub => 'Substitute',
-      };
+  // longLabel removed with the inline picker — the new picker computes
+  // its own header label from `allowedPositions`.
   List<PlayerPosition> get allowedPositions => switch (this) {
         _Slot.gk => [PlayerPosition.GK],
         _Slot.def => [PlayerPosition.DEF],
@@ -252,20 +247,17 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
   }
 
   Future<void> _openPicker(_Slot slot, Map<String, PlayerValuationDto> byId, double remaining) async {
-    final all = await ref.read(selectablePlayersProvider(widget.slug).future);
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PlayerPickerSheet(
-        slot: slot,
-        all: all,
-        used: _picks.values.whereType<String>().toSet(),
-        currentSlotId: _picks[slot],
-        remainingBudget: slot == _Slot.sub
-            ? double.infinity
-            : remaining + (byId[_picks[slot]]?.price ?? 0),
-      ),
+    // Add back the price of whoever's currently in this slot — the user
+    // is replacing them, so their cost frees up for the new pick.
+    final budget = slot == _Slot.sub
+        ? double.infinity
+        : remaining + (byId[_picks[slot]]?.price ?? 0);
+    final picked = await showPlayerPicker(
+      context,
+      tournamentSlug: widget.slug,
+      allowedPositions: slot.allowedPositions.toSet(),
+      excludePlayerIds: _picks.values.whereType<String>().toSet()..remove(_picks[slot] ?? ''),
+      remainingBudget: budget,
     );
     if (picked != null) setState(() => _picks[slot] = picked);
   }
@@ -902,280 +894,6 @@ class _SaveBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: GoldButton(label: _label, onPressed: onSave, expand: true)),
         ],
-      ),
-    );
-  }
-}
-
-// ─── PLAYER PICKER SHEET ───────────────────────────────────────────────────
-
-class _PlayerPickerSheet extends StatefulWidget {
-  const _PlayerPickerSheet({
-    required this.slot,
-    required this.all,
-    required this.used,
-    required this.currentSlotId,
-    required this.remainingBudget,
-  });
-  final _Slot slot;
-  final List<PlayerValuationDto> all;
-  final Set<String> used;
-  final String? currentSlotId;
-  final double remainingBudget;
-  @override
-  State<_PlayerPickerSheet> createState() => _PlayerPickerSheetState();
-}
-
-class _PlayerPickerSheetState extends State<_PlayerPickerSheet> {
-  PlayerPosition? _filterPos;
-  String _sort = 'form';
-  String _query = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _filterPos = widget.slot.allowedPositions.first;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cands = widget.all.where((p) {
-      final allowed = widget.slot.allowedPositions.contains(p.position);
-      final posMatch = _filterPos == null || p.position == _filterPos;
-      final q = _query.toLowerCase();
-      final matches = q.isEmpty || p.player.name.toLowerCase().contains(q) ||
-          (p.player.team.name.toLowerCase().contains(q));
-      return allowed && posMatch && matches;
-    }).toList();
-    cands.sort((a, b) => switch (_sort) {
-          'form' => b.recentForm.compareTo(a.recentForm),
-          'cost' => b.price.compareTo(a.price),
-          _ => 0,
-        });
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.78,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollCtrl) => Container(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 22),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1B1612), Color(0xFF120E0B)],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-          border: Border(top: BorderSide(color: AppColors.goldHairline)),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(child: Container(width: 38, height: 4, margin: const EdgeInsets.symmetric(vertical: 4), decoration: BoxDecoration(color: AppColors.muted, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 6),
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Eyebrow('Pick a ${widget.slot.longLabel.toLowerCase()}', gold: true, size: 10),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.slot.longLabel,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.45,
-                            color: AppColors.fg,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Eyebrow(
-                          widget.remainingBudget.isFinite
-                              ? 'Budget left · ${widget.remainingBudget.toStringAsFixed(0)} pts'
-                              : 'Free pick (not budgeted)',
-                          size: 11,
-                        ),
-                      ],
-                    ),
-                  ),
-                  CircleIconButton(icon: Icons.close, onPressed: () => Navigator.of(context).pop(), size: 32),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Search
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search players or teams',
-                hintStyle: const TextStyle(color: AppColors.muted2, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.muted),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                filled: true,
-                fillColor: AppColors.surface2,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
-                  borderSide: const BorderSide(color: AppColors.borderSoft),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
-                  borderSide: const BorderSide(color: AppColors.borderSoft),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
-                  borderSide: const BorderSide(color: AppColors.goldHairline),
-                ),
-              ),
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.fg),
-              onChanged: (v) => setState(() => _query = v),
-            ),
-            const SizedBox(height: 10),
-            // Position chips (only when slot allows multiple)
-            if (widget.slot.allowedPositions.length > 1)
-              SizedBox(
-                height: 30,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: widget.slot.allowedPositions.map((p) {
-                    final active = _filterPos == p;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _filterPos = p),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: active ? AppColors.goldHairline : AppColors.borderSoft),
-                            color: active ? const Color(0x4D33230D) : AppColors.surface,
-                          ),
-                          child: Eyebrow(p.name, color: active ? AppColors.gold : AppColors.muted, size: 10),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            const SizedBox(height: 8),
-            // Sort tabs
-            Row(
-              children: [
-                for (final s in const ['form', 'cost'])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 18),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _sort = s),
-                      child: Container(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: _sort == s ? AppColors.gold : Colors.transparent, width: 1.5)),
-                        ),
-                        child: Eyebrow(
-                          s == 'form' ? 'Form' : 'Cost',
-                          color: _sort == s ? AppColors.gold : AppColors.muted,
-                          size: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Container(height: 1, color: AppColors.borderSoft),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollCtrl,
-                itemCount: cands.length,
-                itemBuilder: (_, i) {
-                  final p = cands[i];
-                  final used = widget.used.contains(p.playerId) && p.playerId != widget.currentSlotId;
-                  final tooExpensive = widget.remainingBudget.isFinite && p.price > widget.remainingBudget;
-                  final disabled = used || tooExpensive;
-                  return Opacity(
-                    opacity: disabled ? 0.4 : 1,
-                    child: GestureDetector(
-                      onTap: disabled ? null : () => Navigator.of(context).pop(p.playerId),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.borderSoft)),
-                        ),
-                        child: Row(
-                          children: [
-                            ClipOval(
-                              child: SizedBox(
-                                width: 36, height: 36,
-                                child: p.player.photoUrl != null
-                                    ? PremiumImage(url: p.player.photoUrl, fit: BoxFit.cover)
-                                    : Container(
-                                        decoration: const BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [Color(0xFF3B2D1A), Color(0xFF1F1812)],
-                                            begin: Alignment.topLeft, end: Alignment.bottomRight,
-                                          ),
-                                        ),
-                                        child: const Center(child: Icon(Icons.person, color: AppColors.gold, size: 18)),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p.player.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.fg,
-                                      letterSpacing: -0.13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Eyebrow(
-                                    [
-                                      p.position.name,
-                                      p.player.team.shortName ?? p.player.team.name,
-                                      'form ${p.recentForm.toStringAsFixed(1)}',
-                                      if (used) 'in lineup',
-                                      if (tooExpensive) 'over budget',
-                                    ].join(' · '),
-                                    size: 9,
-                                    color: tooExpensive ? AppColors.live : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              widget.slot == _Slot.sub ? 'free' : '${p.price.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.gold,
-                                fontFeatures: [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

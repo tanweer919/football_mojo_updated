@@ -39,6 +39,9 @@ class RoutePaths {
   static const standings          = '/wc/standings';
   static const topScorers         = '/wc/top-scorers';
 
+  // Following
+  static const teamPicker         = '/following/pick';
+
   // IAP
   static const proPaywall         = '/pro';
 }

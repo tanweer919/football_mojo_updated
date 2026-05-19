@@ -1,11 +1,18 @@
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
+import { UsersService } from '../users/users.service';
 import { CompetitionsService } from './competitions.service';
 
 @Controller({ path: 'competitions', version: '1' })
 @UseInterceptors(CacheInterceptor)
 export class CompetitionsController {
-  constructor(private readonly competitions: CompetitionsService) {}
+  constructor(
+    private readonly competitions: CompetitionsService,
+    // Public team search lives on this controller because team belongs to
+    // competition. Reuses UsersService where the implementation already
+    // exists — no point duplicating the Prisma query.
+    private readonly users: UsersService,
+  ) {}
 
   /**
    * App startup call. Cached for 5 min on the server so a million clients
@@ -39,5 +46,17 @@ export class CompetitionsController {
   @CacheTTL(300_000)
   groups(@Param('id') id: string) {
     return this.competitions.groups(id);
+  }
+
+  /// `GET /v1/competitions/teams/search?q=arsenal&competitionId=PL_2025`
+  /// Public — drives the favourites picker. Both params optional; capped
+  /// at 50 hits by the service.
+  @Get('teams/search')
+  @CacheTTL(60_000)
+  searchTeams(
+    @Query('q') q?: string,
+    @Query('competitionId') competitionId?: string,
+  ) {
+    return this.users.searchTeams({ q, competitionId });
   }
 }

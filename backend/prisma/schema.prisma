@@ -479,6 +479,22 @@ model PlayerValuation {
   player       Player         @relation(fields: [playerId], references: [id], onDelete: Cascade)
   price        Float                                    // fraction of budget; e.g. 14.5
   recentForm   Float          @default(0)               // rolling avg fantasy points
+  /// 0..10 — api-football's `statistics[0].games.rating` averaged across the
+  /// last completed season. Populated by `npm run ingest:form` (see
+  /// `prisma/ingest-player-form.ts`). Drives the form-boost component of
+  /// the fantasy pricing model when no PlayerGameweekScore rows exist yet
+  /// (i.e. pre-WC and at the start of every new season).
+  seasonRating Float?
+  /// Aggregated counters from the same season payload — kept around for
+  /// future scoring rules + UI ("9 goals, 4 assists this season") even
+  /// though the pricer only reads `seasonRating` today.
+  seasonAppearances Int?
+  seasonGoals       Int?
+  seasonAssists     Int?
+  seasonMinutes     Int?
+  /// Season the rating was sampled from (e.g. 2024 for 2024/25). Lets us
+  /// invalidate when a new season starts.
+  seasonSampled     Int?
   position     PlayerPosition
   updatedAt    DateTime       @updatedAt
   @@index([position, price])

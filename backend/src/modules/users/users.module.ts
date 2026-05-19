@@ -9,5 +9,8 @@ import { UsersService } from './users.service';
   imports: [AuthModule],
   controllers: [UsersController],
   providers: [UsersService],
+  // Exported so CompetitionsModule can mount the public team-search endpoint
+  // on top of `UsersService.searchTeams` without duplicating the Prisma query.
+  exports: [UsersService],
 })
 export class UsersModule {}

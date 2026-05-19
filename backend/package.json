@@ -26,7 +26,8 @@
     "seed:cards": "tsx prisma/seed-wc-cards.ts",
     "refresh:photos": "tsx prisma/refresh-player-photos.ts",
     "admin:promote": "tsx prisma/promote-admin.ts",
-    "reprice:players": "tsx prisma/reprice-players.ts"
+    "reprice:players": "tsx prisma/reprice-players.ts",
+    "ingest:form": "tsx prisma/ingest-player-form.ts"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.2.2",

@@ -177,6 +177,69 @@ export class UsersService {
     });
   }
 
+  /// Add a team to the user's `favouriteTeams` list. We could use Postgres'
+  /// array-prepend operator for atomicity but Prisma's high-level API
+  /// reads cleanly enough at 5-team list sizes and the picker UI guards
+  /// against rapid double-tap, so a read-modify-write is fine here.
+  async followTeam(uid: string, teamId: string) {
+    if (!teamId.trim()) throw new BadRequestException('team_id_required');
+    const team = await this.prisma.team.findUnique({ where: { id: teamId }, select: { id: true } });
+    if (!team) throw new NotFoundException('team_not_found');
+    const u = await this.prisma.user.findUnique({
+      where: { id: uid },
+      select: { favouriteTeams: true },
+    });
+    if (!u) throw new NotFoundException('user_not_found');
+    if (u.favouriteTeams.includes(teamId)) return; // idempotent
+    await this.prisma.user.update({
+      where: { id: uid },
+      data: { favouriteTeams: { set: [...u.favouriteTeams, teamId] } },
+    });
+  }
+
+  /// Remove a team. Idempotent — missing team is not an error.
+  async unfollowTeam(uid: string, teamId: string) {
+    const u = await this.prisma.user.findUnique({
+      where: { id: uid },
+      select: { favouriteTeams: true },
+    });
+    if (!u) throw new NotFoundException('user_not_found');
+    const next = u.favouriteTeams.filter((id) => id !== teamId);
+    if (next.length === u.favouriteTeams.length) return;
+    await this.prisma.user.update({
+      where: { id: uid },
+      data: { favouriteTeams: { set: next } },
+    });
+  }
+
+  /// Public team-search for the favourites picker. Filters by name prefix
+  /// or contains-match, optionally scoped to a competition (so "Group A
+  /// teams only" works for the WC-focused onboarding). Capped at 50 hits.
+  async searchTeams(opts: { q?: string; competitionId?: string }) {
+    const q = opts.q?.trim();
+    return this.prisma.team.findMany({
+      where: {
+        AND: [
+          opts.competitionId ? { competitionId: opts.competitionId } : {},
+          q
+            ? {
+                OR: [
+                  { name: { contains: q, mode: 'insensitive' } },
+                  { shortName: { contains: q, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+        ],
+      },
+      select: {
+        id: true, name: true, shortName: true, crestUrl: true, countryCode: true,
+        competition: { select: { id: true, name: true } },
+      },
+      orderBy: [{ name: 'asc' }],
+      take: 50,
+    });
+  }
+
   /// Returns the user's signup-gift card with template details, or null.
   /// We pick the most-recent SIGNUP_GIFT acquisition so that a user who
   /// somehow accumulated multiple sees their newest one (in practice exactly

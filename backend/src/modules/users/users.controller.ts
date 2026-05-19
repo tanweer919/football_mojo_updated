@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -45,6 +46,25 @@ export class UsersController {
   @HttpCode(204)
   async dismissWelcome(@CurrentUser('uid') uid: string) {
     await this.users.dismissWelcomeCard(uid);
+  }
+
+  /// Follow a team. The mobile app calls this from the "pick your teams"
+  /// picker on first home-screen visit and any time the user toggles a
+  /// crest in the picker. Idempotent — re-following a team is a no-op.
+  @UseGuards(FirebaseAuthGuard)
+  @Post('me/follow/:teamId')
+  @HttpCode(204)
+  async follow(@CurrentUser('uid') uid: string, @Param('teamId') teamId: string) {
+    await this.users.followTeam(uid, teamId);
+  }
+
+  /// Unfollow a team. 204 whether the team was followed or not so the
+  /// client doesn't need to read state before toggling.
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('me/follow/:teamId')
+  @HttpCode(204)
+  async unfollow(@CurrentUser('uid') uid: string, @Param('teamId') teamId: string) {
+    await this.users.unfollowTeam(uid, teamId);
   }
 
   // ─── Public read routes ──────────────────────────────────────────────────

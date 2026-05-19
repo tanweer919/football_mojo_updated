@@ -52,20 +52,37 @@ export class FantasyPricingService {
 
     let updated = 0;
     for (const v of valuations) {
+      // formBoost has three possible sources, in priority order:
+      //   1. PlayerGameweekScore rows — most accurate (real fantasy points).
+      //   2. PlayerValuation.seasonRating — api-football's per-player rating
+      //      from the most recently completed league season. Set by
+      //      `npm run ingest:form`. Bridges the pre-WC gap when (1) is empty.
+      //   3. Nothing — only the player/team/position boosts fire.
+      let formBoost = 0;
+      let recentFormForLog = 0;
       const recent = await this.prisma.playerGameweekScore.findMany({
         where: { playerId: v.playerId },
         orderBy: { updatedAt: 'desc' },
         take: PRICING.formWindow,
         select: { totalPoints: true },
       });
-      const avgForm = recent.length
-        ? recent.reduce((s, r) => s + r.totalPoints, 0) / recent.length
-        : 0;
+      if (recent.length) {
+        const avgForm = recent.reduce((s, r) => s + r.totalPoints, 0) / recent.length;
+        recentFormForLog = avgForm;
+        formBoost = Math.max(0, Math.min(PRICING.formBoostMax, avgForm * PRICING.formWeight));
+      } else if (v.seasonRating != null) {
+        // Map a 0..10 rating to 0..PRICING.formBoostMax. The "useful" range
+        // for actual rotation players is ~6.4 (squad filler) → 7.6 (star).
+        // Anchor 6.4 at 0 and 8.4 at the cap so the gradient lands inside
+        // the data instead of squishing everyone into the lower band.
+        const norm = Math.max(0, Math.min(1, (v.seasonRating - 6.4) / 2.0));
+        formBoost = norm * PRICING.formBoostMax;
+        recentFormForLog = v.seasonRating; // surface in `recentForm` for the UI
+      }
 
       const floor = PRICING.floorByPosition[v.position];
       const teamBoost = this._teamBoost(v.player.team.competition?.id);
       const playerBoost = this._playerBoost(v.player.id, v.player.shirtNumber);
-      const formBoost = Math.max(0, Math.min(PRICING.formBoostMax, avgForm * PRICING.formWeight));
 
       const next = Math.max(
         PRICING.minPrice,
@@ -74,7 +91,7 @@ export class FantasyPricingService {
 
       await this.prisma.playerValuation.update({
         where: { id: v.id },
-        data: { recentForm: avgForm, price: Number(next.toFixed(1)) },
+        data: { recentForm: recentFormForLog, price: Number(next.toFixed(1)) },
       });
       updated++;
     }

@@ -74,6 +74,11 @@ _PlayerValuationDto _$PlayerValuationDtoFromJson(Map<String, dynamic> json) =>
       recentForm: (json['recentForm'] as num).toDouble(),
       position: $enumDecode(_$PlayerPositionEnumMap, json['position']),
       player: PlayerSummary.fromJson(json['player'] as Map<String, dynamic>),
+      seasonRating: (json['seasonRating'] as num?)?.toDouble(),
+      seasonAppearances: (json['seasonAppearances'] as num?)?.toInt() ?? 0,
+      seasonGoals: (json['seasonGoals'] as num?)?.toInt() ?? 0,
+      seasonAssists: (json['seasonAssists'] as num?)?.toInt() ?? 0,
+      seasonMinutes: (json['seasonMinutes'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$PlayerValuationDtoToJson(_PlayerValuationDto instance) =>
@@ -84,6 +89,11 @@ Map<String, dynamic> _$PlayerValuationDtoToJson(_PlayerValuationDto instance) =>
       'recentForm': instance.recentForm,
       'position': _$PlayerPositionEnumMap[instance.position]!,
       'player': instance.player,
+      'seasonRating': instance.seasonRating,
+      'seasonAppearances': instance.seasonAppearances,
+      'seasonGoals': instance.seasonGoals,
+      'seasonAssists': instance.seasonAssists,
+      'seasonMinutes': instance.seasonMinutes,
     };
 
 const _$PlayerPositionEnumMap = {

@@ -76,20 +76,31 @@ async function main() {
 
   let updated = 0;
   for (const v of valuations) {
+    // Mirror the priority order in `pricing.service.ts`:
+    //   1. PlayerGameweekScore — real fantasy points (best).
+    //   2. PlayerValuation.seasonRating — api-football 0..10 (bridge).
+    //   3. Nothing (formBoost = 0).
+    let fb = 0;
+    let recentFormForLog = 0;
     const recent = await prisma.playerGameweekScore.findMany({
       where: { playerId: v.playerId },
       orderBy: { updatedAt: 'desc' },
       take: PRICING.formWindow,
       select: { totalPoints: true },
     });
-    const avgForm = recent.length
-      ? recent.reduce((s, r) => s + r.totalPoints, 0) / recent.length
-      : 0;
+    if (recent.length) {
+      const avg = recent.reduce((s, r) => s + r.totalPoints, 0) / recent.length;
+      recentFormForLog = avg;
+      fb = Math.max(0, Math.min(PRICING.formBoostMax, avg * PRICING.formWeight));
+    } else if (v.seasonRating != null) {
+      const norm = Math.max(0, Math.min(1, (v.seasonRating - 6.4) / 2.0));
+      fb = norm * PRICING.formBoostMax;
+      recentFormForLog = v.seasonRating;
+    }
 
     const floor = PRICING.floorByPosition[v.position];
     const tb = teamBoost(v.player.team.competition?.id);
     const pb = playerBoost(v.player.id, v.player.shirtNumber);
-    const fb = Math.max(0, Math.min(PRICING.formBoostMax, avgForm * PRICING.formWeight));
 
     const next = Math.max(
       PRICING.minPrice,
@@ -98,7 +109,7 @@ async function main() {
 
     await prisma.playerValuation.update({
       where: { id: v.id },
-      data: { recentForm: avgForm, price: Number(next.toFixed(1)) },
+      data: { recentForm: recentFormForLog, price: Number(next.toFixed(1)) },
     });
     updated++;
   }
