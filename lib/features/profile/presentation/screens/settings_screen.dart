@@ -11,7 +11,12 @@ class SettingsScreen extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: CenteredContent(
+      // AppBar already handles the top inset; SafeArea(bottom: true) keeps
+      // the list from sliding under the system nav bar when edge-to-edge
+      // is on (see SystemUiMode.edgeToEdge in main.dart).
+      body: SafeArea(
+        top: false,
+        child: CenteredContent(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -50,6 +55,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -92,26 +92,43 @@ class _MarketFilterSheetState extends ConsumerState<_MarketFilterSheet> {
               ),
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewPaddingOf(context).bottom + 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GhostButton(
-                    label: 'Cancel',
-                    onPressed: () => Navigator.pop(context),
-                    expand: true,
+          // Sticky save bar — sits above the system safe area so it's
+          // always reachable without scrolling. The bar has its own
+          // background + top hairline so it visually detaches from the
+          // scrolling chip area above when there are lots of filters.
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.borderSoft)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewPaddingOf(context).bottom + 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: GhostButton(
+                      label: 'Cancel',
+                      onPressed: () => Navigator.pop(context),
+                      expand: true,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: GoldButton(
-                    label: 'Apply',
-                    onPressed: () => Navigator.pop(context, _draft),
-                    expand: true,
+                  const SizedBox(width: 10),
+                  // Save filters is the primary action — give it 2× the
+                  // ghost button's width and an unmistakable label.
+                  Expanded(
+                    flex: 2,
+                    child: GoldButton(
+                      label: _draft.isPristine
+                          ? 'Show all cards'
+                          : 'Save filters · ${_draft.activeCount} active',
+                      icon: Icons.check_circle_outline,
+                      onPressed: () => Navigator.pop(context, _draft),
+                      expand: true,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

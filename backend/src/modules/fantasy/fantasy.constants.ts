@@ -84,10 +84,48 @@ export const CAPTAIN_MULTIPLIER = 2;
 export const SCORE_FLOOR = -20;
 export const SCORE_CEILING = 100;
 
+/// Pricing model for a 100-pt, 5-player budget.
+///
+/// Final price = positionFloor + teamBoost + playerBoost + formBoost, clamped
+/// to [minPrice, maxPrice]. Each boost contributes independently so even
+/// pre-season (no PlayerGameweekScore rows) prices spread realistically
+/// — top-tier league players land near the cap, lower-league players near
+/// the floor.
+///
+/// Targets:
+///   - All-min squad ≈ 57 pts (1 GK at 10 + DEF/MID/UTL/FWD = 11+12+11+13)
+///   - All-mid-tier squad ≈ 80-90 pts → leaves room for one or two stars.
+///   - One ICONIC + 4 budget squad ≈ 100 pts.
 export const PRICING = {
-  defaultPrice: 5.0,
-  minPrice:     4.0,
-  maxPrice:    14.5,
-  formWindow:   5,
-  formWeight:   0.7,
+  minPrice: 4.0,
+  maxPrice: 26.0,
+  /// Position-specific base price (cheapest player at that position).
+  floorByPosition: { GK: 10, DEF: 11, MID: 12, FWD: 13 } as Record<PlayerPosition, number>,
+  /// 0..teamBoostMax based on the team's competition tier.
+  teamBoostMax: 6,
+  /// 0..playerBoostMax derived from a stable hash of player id + shirt-number
+  /// nudge. Keeps the spread inside a position consistent across reseeds.
+  playerBoostMax: 6,
+  /// 0..formBoostMax from the rolling average of recent fantasy points.
+  /// Zero pre-season; ramps up once PlayerGameweekScore rows exist.
+  formBoostMax: 8,
+  formWindow: 5,
+  formWeight: 0.5,
+  /// Used by seed scripts that bootstrap PlayerValuation before the first
+  /// repricer run — gets overwritten as soon as `repriceAll` runs.
+  defaultPrice: 14.0,
+};
+
+/// Competition-strength → team boost. Lookup keys are the seeded
+/// Competition.id values; anything unknown defaults to a tepid 2.
+export const TEAM_BOOST_BY_COMPETITION: Record<string, number> = {
+  WC2026: 6.0,           // tournament context — every starter matters
+  PREMIER_LEAGUE: 6.0,
+  LA_LIGA: 5.5,
+  BUNDESLIGA: 5.0,
+  SERIE_A: 5.0,
+  LIGUE_1: 4.5,
+  UCL: 6.0,
+  UEL: 4.0,
+  EUROPA_CONFERENCE: 3.0,
 };

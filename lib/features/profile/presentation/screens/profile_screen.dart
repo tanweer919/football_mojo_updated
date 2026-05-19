@@ -59,89 +59,77 @@ class _SignedOutAccount extends ConsumerWidget {
   const _SignedOutAccount();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Sized to fill the PitchScreen body, minus the header & bottom inset
-    // reserved by the parent. LayoutBuilder lets the hero stack scale with
-    // available space on smaller phones.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final h = constraints.maxHeight;
-        final cardW = (constraints.maxWidth * 0.46).clamp(140.0, 180.0);
-        final stackH = (h * 0.42).clamp(220.0, 360.0);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            // Full-bleed grid background for premium feel.
-            const PitchGridBackground(),
+    final screenH = MediaQuery.sizeOf(context).height;
+    final screenW = MediaQuery.sizeOf(context).width;
+    final cardW = (screenW * 0.46).clamp(140.0, 180.0);
+    final stackH = (screenH * 0.30).clamp(220.0, 360.0);
 
-            // 3D card stack sitting in the top half.
-            Positioned(
-              top: h * 0.04, left: 0, right: 0,
-              child: PitchHeroStack(height: stackH, cardWidth: cardW),
-            ),
-
-            // Bottom block — copy + CTA.
-            Positioned(
-              left: 20, right: 20, bottom: 16,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Eyebrow('Your account', gold: true, size: 11),
-                  const SizedBox(height: 12),
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: const TextSpan(
+    return Column(
+      children: [
+        const SizedBox(height: 16),
+        // 3D card stack.
+        PitchHeroStack(height: stackH, cardWidth: cardW),
+        const SizedBox(height: 32),
+        // Bottom block — copy + CTA.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Eyebrow('Your account', gold: true, size: 11),
+              const SizedBox(height: 12),
+              RichText(
+                textAlign: TextAlign.center,
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.12,
+                    color: AppColors.fg,
+                    height: 1.05,
+                  ),
+                  children: [
+                    TextSpan(text: 'Sign in to claim\nyour '),
+                    TextSpan(
+                      text: 'collection',
                       style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1.12,
-                        color: AppColors.fg,
-                        height: 1.05,
+                        fontFamily: 'IowanOldStyle',
+                        fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.gold,
                       ),
-                      children: [
-                        TextSpan(text: 'Sign in to claim\nyour '),
-                        TextSpan(
-                          text: 'collection',
-                          style: TextStyle(
-                            fontFamily: 'IowanOldStyle',
-                            fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                            fontStyle: FontStyle.italic,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.gold,
-                          ),
-                        ),
-                        TextSpan(text: '.'),
-                      ],
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Save your XI, mint cards from prize finishes, and sync your collection across devices.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: AppColors.muted,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  GoldButton(
-                    label: 'Continue with Google',
-                    icon: Icons.g_mobiledata,
-                    expand: true,
-                    // One-tap — opens Google directly, no intermediate sheet.
-                    onPressed: () async {
-                      final user = await quickSignIn(context, ref);
-                      if (user != null) ref.invalidate(myProfileProvider);
-                    },
-                  ),
-                ],
+                    TextSpan(text: '.'),
+                  ],
+                ),
               ),
-            ),
-          ],
-        );
-      },
+              const SizedBox(height: 10),
+              const Text(
+                'Save your XI, mint cards from prize finishes, and sync your collection across devices.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.muted,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 18),
+              GoldButton(
+                label: 'Continue with Google',
+                icon: Icons.g_mobiledata,
+                expand: true,
+                onPressed: () async {
+                  final user = await quickSignIn(context, ref);
+                  if (user != null) ref.invalidate(myProfileProvider);
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -248,6 +236,7 @@ class _ProfileBody extends ConsumerWidget {
                   onPressed: () async {
                     await ref.read(authRepositoryProvider).signOut();
                     ref.invalidate(myProfileProvider);
+                    if (context.mounted) context.go('/home');
                   },
                 ),
               ),

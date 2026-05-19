@@ -29,7 +29,12 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
       appBar: AppBar(
         title: const Text('Matches'),
       ),
-      body: CenteredContent(
+      // SafeArea(bottom: true) keeps the day-strip + match list off the
+      // system gesture pill on edge-to-edge devices. Top is handled by
+      // the AppBar.
+      body: SafeArea(
+        top: false,
+        child: CenteredContent(
         child: Column(
           children: [
             const CompetitionChipSelector(),
@@ -100,6 +105,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

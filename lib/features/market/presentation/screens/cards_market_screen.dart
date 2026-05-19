@@ -113,14 +113,13 @@ class _CardsMarketScreenState extends ConsumerState<CardsMarketScreen> {
 
     return PitchScreen(
       title: 'Market',
-      // Browsing the market is the catalogue's "home" — back goes to the
-      // tab home rather than popping into an empty stack.
-      onBack: context.canPop() ? () => context.pop() : null,
+      onBack: () => context.canPop() ? context.pop() : context.go('/home'),
       trailing: CircleIconButton(
         icon: Icons.collections_outlined,
         onPressed: () => context.go('/album'),
       ),
       scrollable: false,
+      withinTabShell: false,
       child: Column(
         children: [
           _SearchAndFilterBar(
@@ -420,9 +419,7 @@ class _MarketGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final viewBottom = MediaQuery.viewPaddingOf(context).bottom;
-    // The PitchScreen wrapper extends body under the floating tabbar; leave
-    // ~110px so the last row clears the pill.
-    final bottomPad = 110.0 + viewBottom + 16;
+    final bottomPad = viewBottom + 24;
     return CustomScrollView(
       controller: scroll,
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -448,9 +445,9 @@ class _MarketGrid extends StatelessWidget {
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.62, // pcard 0.66 + chrome below
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.58, // pcard 0.66 + supply bar below
             ),
             delegate: SliverChildBuilderDelegate(
               (ctx, i) => _MarketTile(card: cards[i], onTap: () => onTap(cards[i])),
@@ -478,6 +475,14 @@ class _MarketTile extends StatelessWidget {
         CardRarity.ICONIC => 95,
       };
 
+  /// Edition slugs like "WC2026-BASE" / "EUROPA-LEAGUE" are server-side
+  /// product codes. The card's top-left tag shows only the *competition*
+  /// prefix so we don't waste pixels with redundant suffixes.
+  static String _shortEdition(String edition) {
+    final dash = edition.indexOf('-');
+    return dash < 0 ? edition : edition.substring(0, dash);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = card.player;
@@ -491,35 +496,66 @@ class _MarketTile extends StatelessWidget {
           Expanded(
             child: Stack(
               children: [
-                PCard(
-                  rarity: card.rarity,
-                  rating: _ratingFor(card.rarity),
-                  name: (p?.name ?? card.edition).toUpperCase(),
-                  position: (p?.position ?? '—').toUpperCase(),
-                  country: (p?.country ?? p?.team?.countryCode ?? '—').toUpperCase(),
-                  photoUrl: p?.photoUrl ?? card.artUrl,
-                  heroTag: 'market-${card.id}',
+                // Wrap the PCard in a Container so we can paint a thick
+                // pitch-green frame + outer glow around cards the user
+                // already owns. Reads at-a-glance across a dense grid —
+                // the previous tiny corner pill was too easy to miss.
+                Container(
+                  decoration: ownedBadge
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(color: AppColors.pitchGlow, blurRadius: 16, spreadRadius: 2),
+                          ],
+                        )
+                      : null,
+                  foregroundDecoration: ownedBadge
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.pitch, width: 2.5),
+                        )
+                      : null,
+                  child: PCard(
+                    rarity: card.rarity,
+                    rating: _ratingFor(card.rarity),
+                    name: p?.name,
+                    position: p?.position,
+                    country: p?.country ?? p?.team?.countryCode,
+                    photoUrl: p?.photoUrl ?? card.artUrl,
+                    clubCrestUrl: p?.team?.crestUrl,
+                    leagueLabel: _shortEdition(card.edition),
+                    editionLabel: card.edition,
+                    heroTag: 'market-${card.id}',
+                  ),
                 ),
                 if (ownedBadge)
                   Positioned(
-                    top: 8, right: 8,
+                    top: 10, left: 10,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.pitch,
                         borderRadius: BorderRadius.circular(99),
-                        boxShadow: const [BoxShadow(color: AppColors.pitchGlow, blurRadius: 8)],
+                        border: Border.all(color: const Color(0xFF0B1A0E), width: 1.5),
+                        boxShadow: const [BoxShadow(color: AppColors.pitchGlow, blurRadius: 10)],
                       ),
-                      child: Text(
-                        card.ownedByMe == 1 ? 'OWNED' : '${card.ownedByMe}×',
-                        style: const TextStyle(
-                          fontFamily: 'JetBrainsMono',
-                          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                          fontSize: 8,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0B1A0E),
-                          letterSpacing: 0.8,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check, size: 11, color: Color(0xFF0B1A0E)),
+                          const SizedBox(width: 3),
+                          Text(
+                            card.ownedByMe == 1 ? 'OWNED' : 'OWNED · ${card.ownedByMe}×',
+                            style: const TextStyle(
+                              fontFamily: 'JetBrainsMono',
+                              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0B1A0E),
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -629,9 +665,9 @@ class _GridSkeleton extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.62,
+        mainAxisSpacing: 20,
+        crossAxisSpacing: 16,
+        childAspectRatio: 0.58,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const Skeleton(height: double.infinity, radius: 16),

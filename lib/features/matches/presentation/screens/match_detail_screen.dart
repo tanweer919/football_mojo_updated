@@ -151,11 +151,19 @@ class _Topbar extends StatelessWidget {
 
 // ─── HERO ──────────────────────────────────────────────────────────────────
 
-class _Hero extends StatelessWidget {
+class _Hero extends ConsumerWidget {
   const _Hero({required this.match});
   final MatchDto match;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Goalscorers chip-row. Render only when there's at least one goal so
+    // pre-match / 0-0 heroes don't grow an empty band. Pulled from the
+    // same events provider the Events tab uses — Riverpod dedupes, so we
+    // pay one fetch even though it's referenced twice on the page.
+    final goalscorers = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) => es.where(_isGoalEvent).toList(),
+          orElse: () => const <MatchEventDto>[],
+        );
     final showScore = match.isLive || match.isFinished;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
@@ -270,6 +278,13 @@ class _Hero extends StatelessWidget {
                     Expanded(child: _Side(team: match.awayTeam, alignEnd: true)),
                   ],
                 ),
+                if (goalscorers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _HeroGoalscorers(
+                    events: goalscorers,
+                    homeTeamId: match.homeTeam.id,
+                  ),
+                ],
                 if (match.venue != null) ...[
                   const SizedBox(height: 18),
                   Container(height: 1, color: AppColors.borderSoft),
@@ -288,6 +303,106 @@ class _Hero extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Goal events only — own-goals and penalties count, missed penalties don't.
+bool _isGoalEvent(MatchEventDto e) =>
+    e.kind == EventKind.goal ||
+    e.kind == EventKind.ownGoal ||
+    e.kind == EventKind.penalty;
+
+/// Two-column scorer strip rendered under the score in the hero. Each side
+/// lists the team's scorers with minute marks (`Mbappé 23'`, `Yamal 67'`).
+/// Own-goals are intentionally credited to the *opposite* side so the
+/// scoreboard reads correctly.
+class _HeroGoalscorers extends StatelessWidget {
+  const _HeroGoalscorers({required this.events, required this.homeTeamId});
+  final List<MatchEventDto> events;
+  final String homeTeamId;
+
+  @override
+  Widget build(BuildContext context) {
+    final home = <MatchEventDto>[];
+    final away = <MatchEventDto>[];
+    for (final e in events) {
+      // Own goals score for the opposing side — flip the bucket they land in.
+      final scoresForHome = e.kind == EventKind.ownGoal
+          ? e.teamId != homeTeamId
+          : e.teamId == homeTeamId;
+      (scoresForHome ? home : away).add(e);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _ScorerColumn(events: home, alignEnd: false)),
+        const SizedBox(width: 12),
+        Expanded(child: _ScorerColumn(events: away, alignEnd: true)),
+      ],
+    );
+  }
+}
+
+class _ScorerColumn extends StatelessWidget {
+  const _ScorerColumn({required this.events, required this.alignEnd});
+  final List<MatchEventDto> events;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        for (final e in events)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!alignEnd) ...[_ballIcon(e), const SizedBox(width: 6)],
+                Flexible(
+                  child: Text(
+                    _label(e),
+                    textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fg,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                if (alignEnd) ...[const SizedBox(width: 6), _ballIcon(e)],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _ballIcon(MatchEventDto e) {
+    // Different glyphs so own-goals stand out from regular tallies — the
+    // user can scan the row and immediately see which were unfortunate.
+    final icon = e.kind == EventKind.ownGoal
+        ? Icons.cancel_outlined
+        : e.kind == EventKind.penalty
+            ? Icons.adjust
+            : Icons.sports_soccer;
+    final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
+    return Icon(icon, size: 12, color: color);
+  }
+
+  String _label(MatchEventDto e) {
+    final name = e.playerName ?? 'Unknown';
+    final extra = e.kind == EventKind.ownGoal
+        ? ' (OG)'
+        : e.kind == EventKind.penalty
+            ? ' (P)'
+            : '';
+    return '$name$extra · ${e.displayMinute}';
   }
 }
 
@@ -649,16 +764,24 @@ Widget _eventSide({
 
 // ─── LINEUPS ───────────────────────────────────────────────────────────────
 
-class _LineupsBlock extends ConsumerWidget {
+class _LineupsBlock extends ConsumerStatefulWidget {
   const _LineupsBlock({required this.matchId});
   final String matchId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(matchLineupsProvider(matchId));
+  ConsumerState<_LineupsBlock> createState() => _LineupsBlockState();
+}
+
+/// Tabbed pitch view. One tab per team; selected tab paints the 11-on-a-
+/// pitch view + bench list below.
+class _LineupsBlockState extends ConsumerState<_LineupsBlock> {
+  int _tab = 0;
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(matchLineupsProvider(widget.matchId));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: async.when(
-        loading: () => const Skeleton(height: 220, radius: 16),
+        loading: () => const Skeleton(height: 320, radius: 16),
         error: (_, __) => const _SectionEmpty(text: 'Line-ups temporarily unavailable.'),
         data: (lineups) {
           if (lineups.isEmpty) {
@@ -666,12 +789,19 @@ class _LineupsBlock extends ConsumerWidget {
               text: 'Line-ups confirmed about an hour before kickoff.',
             );
           }
+          // api-football returns [home, away]. Clamp the tab in case the
+          // upstream payload is missing one side.
+          final selected = _tab.clamp(0, lineups.length - 1);
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final l in lineups) ...[
-                _LineupCard(lineup: l),
-                const SizedBox(height: 10),
-              ],
+              _LineupTabs(
+                lineups: lineups,
+                selectedIndex: selected,
+                onSelect: (i) => setState(() => _tab = i),
+              ),
+              const SizedBox(height: 10),
+              _LineupPitchCard(lineup: lineups[selected]),
             ],
           );
         },
@@ -680,8 +810,79 @@ class _LineupsBlock extends ConsumerWidget {
   }
 }
 
-class _LineupCard extends StatelessWidget {
-  const _LineupCard({required this.lineup});
+/// Pill segmented control — one tab per team. Crest + short name keeps the
+/// affordance scannable without breaking the dark luxe theme.
+class _LineupTabs extends StatelessWidget {
+  const _LineupTabs({
+    required this.lineups,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+  final List<LineupDto> lineups;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < lineups.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onSelect(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex ? AppColors.gold.withValues(alpha: 0.18) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadii.r3),
+                    border: i == selectedIndex
+                        ? Border.all(color: AppColors.goldHairline)
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (lineups[i].teamLogo != null) ...[
+                        SizedBox(width: 18, height: 18, child: PremiumImage(url: lineups[i].teamLogo, fit: BoxFit.contain)),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          lineups[i].teamName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: i == selectedIndex ? AppColors.gold : AppColors.fgSoft,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LineupPitchCard extends StatelessWidget {
+  const _LineupPitchCard({required this.lineup});
   final LineupDto lineup;
   @override
   Widget build(BuildContext context) {
@@ -697,50 +898,79 @@ class _LineupCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              if (lineup.teamLogo != null) ...[
-                SizedBox(
-                  width: 22, height: 22,
-                  child: PremiumImage(url: lineup.teamLogo, fit: BoxFit.contain),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Text(
-                  lineup.teamName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Eyebrow(
+                lineup.formation.isEmpty ? 'Formation' : 'Formation · ${lineup.formation}',
+                gold: true,
+                size: 10,
+              ),
+              const Spacer(),
+              if (lineup.coachName != null)
+                Text(
+                  lineup.coachName!,
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.fg,
+                    fontSize: 11,
+                    color: AppColors.muted,
                   ),
                 ),
-              ),
-              if (lineup.formation.isNotEmpty) Eyebrow(lineup.formation, gold: true, size: 10),
             ],
           ),
           const SizedBox(height: 10),
-          if (lineup.startXI.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: lineup.startXI
-                  .map((p) => _PlayerChip(name: p.name, number: p.number ?? 0, position: p.pos))
-                  .toList(),
-            )
-          else
-            const _SectionEmpty(text: 'Line-up not announced yet.'),
+          // Aspect-ratioed pitch container — keeps positions consistent
+          // across phones. 0.72 ≈ half-pitch portrait, which is what
+          // every football tactic board uses.
+          AspectRatio(
+            aspectRatio: 0.72,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.r3),
+              child: _Pitch(players: lineup.startXI),
+            ),
+          ),
           if (lineup.substitutes.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Eyebrow('Substitutes', size: 9),
-            const SizedBox(height: 6),
+            const SizedBox(height: 14),
+            const Eyebrow('Substitutes', size: 10),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: lineup.substitutes
-                  .map((p) => _PlayerChip(name: p.name, number: p.number ?? 0, position: p.pos, sub: true))
-                  .toList(),
+              children: [
+                for (final s in lineup.substitutes)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      border: Border.all(color: AppColors.borderSoft),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (s.number != null) ...[
+                          Text(
+                            '${s.number}',
+                            style: const TextStyle(
+                              fontFamily: 'JetBrainsMono',
+                              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          s.displayName,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.fgSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ],
         ],
@@ -749,53 +979,214 @@ class _LineupCard extends StatelessWidget {
   }
 }
 
-class _PlayerChip extends StatelessWidget {
-  const _PlayerChip({required this.name, required this.number, required this.position, this.sub = false});
-  final String name;
-  final int number;
-  final String position;
-  final bool sub;
+/// The painted pitch + positioned player chips.
+///
+/// Positioning: api-football's `grid = "row:col"` puts row 1 at the goal
+/// line. We map row → vertical fraction (GK ~10% from top, last outfield
+/// row ~85%) and col → horizontal fraction within that row. When the grid
+/// is missing for any player, we fall back to grouping by position and
+/// distributing evenly.
+class _Pitch extends StatelessWidget {
+  const _Pitch({required this.players});
+  final List<LineupPlayer> players;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(99),
-        color: sub ? AppColors.surface2 : AppColors.surface3,
-        border: Border.all(color: sub ? AppColors.borderSoft : AppColors.goldHairline.withValues(alpha: 0.6)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 18,
-            child: Text(
-              '$number',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: sub ? AppColors.muted : AppColors.gold,
-              ),
+    final positioned = _layout(players);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Pitch surface — green gradient + mowing stripes + lines.
+        const Positioned.fill(child: CustomPaint(painter: _PitchPainter())),
+        for (final p in positioned)
+          Align(
+            alignment: Alignment(p.x * 2 - 1, p.y * 2 - 1),
+            child: FractionallySizedBox(
+              widthFactor: 0.20,
+              child: _PitchChip(player: p.player),
             ),
           ),
-          const SizedBox(width: 4),
-          Text(
-            name,
+      ],
+    );
+  }
+
+  /// Map every player to a normalized (x, y) in [0,1] within the pitch.
+  /// Prefers the grid attribute when present, falls back to position rows.
+  static List<_Placed> _layout(List<LineupPlayer> players) {
+    final hasGrid = players.any((p) => p.row != null && p.col != null);
+    if (hasGrid) {
+      // Group by row to size columns row-by-row (formations vary the
+      // column count per row — 4-3-3 has 4 then 3 then 3).
+      final byRow = <int, List<LineupPlayer>>{};
+      for (final p in players) {
+        final r = p.row ?? 1;
+        byRow.putIfAbsent(r, () => []).add(p);
+      }
+      final rows = byRow.keys.toList()..sort();
+      final maxRow = rows.last;
+      final placed = <_Placed>[];
+      for (final r in rows) {
+        final rowPlayers = byRow[r]!..sort((a, b) => (a.col ?? 0).compareTo(b.col ?? 0));
+        // y: row 1 → 0.10, maxRow → 0.85, linear interp.
+        final y = maxRow <= 1 ? 0.5 : 0.10 + ((r - 1) / (maxRow - 1)) * 0.75;
+        for (var i = 0; i < rowPlayers.length; i++) {
+          final n = rowPlayers.length;
+          // Evenly distribute across 90% of pitch width.
+          final x = n == 1 ? 0.5 : 0.05 + (i / (n - 1)) * 0.90;
+          placed.add(_Placed(rowPlayers[i], x, y));
+        }
+      }
+      return placed;
+    }
+
+    // No grid → group by position letter (G/D/M/F) and lay out by line.
+    final order = ['G', 'D', 'M', 'F'];
+    final byPos = {for (final p in order) p: <LineupPlayer>[]};
+    for (final p in players) {
+      final k = p.pos.isNotEmpty ? p.pos[0].toUpperCase() : 'M';
+      (byPos[k] ?? byPos['M']!).add(p);
+    }
+    final activeLines = order.where((k) => byPos[k]!.isNotEmpty).toList();
+    final placed = <_Placed>[];
+    for (var i = 0; i < activeLines.length; i++) {
+      final line = byPos[activeLines[i]]!;
+      final y = activeLines.length <= 1
+          ? 0.5
+          : 0.10 + (i / (activeLines.length - 1)) * 0.75;
+      for (var j = 0; j < line.length; j++) {
+        final n = line.length;
+        final x = n == 1 ? 0.5 : 0.05 + (j / (n - 1)) * 0.90;
+        placed.add(_Placed(line[j], x, y));
+      }
+    }
+    return placed;
+  }
+}
+
+class _Placed {
+  const _Placed(this.player, this.x, this.y);
+  final LineupPlayer player;
+  final double x;
+  final double y;
+}
+
+class _PitchChip extends StatelessWidget {
+  const _PitchChip({required this.player});
+  final LineupPlayer player;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEFD8A1), Color(0xFFC99A3D)],
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))],
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            player.number != null ? '${player.number}' : (player.pos.isNotEmpty ? player.pos[0] : '?'),
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.fg,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E1810),
+              height: 1.0,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Text(
+            player.displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
+
+/// Pitch surface — dark green gradient with alternating mowing stripes,
+/// halfway line, centre circle, and 18-yard boxes. Bottom half of the
+/// pitch only is drawn because lineups are portrait. (Full top-to-bottom
+/// pitch read-out — both halves — fits the data better than a half pitch.)
+class _PitchPainter extends CustomPainter {
+  const _PitchPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    // Base gradient.
+    final base = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF1F4F31), Color(0xFF153A24)],
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    // Mowing stripes — 8 alternating bands.
+    final stripe = Paint()..color = Colors.white.withValues(alpha: 0.04);
+    final bandH = size.height / 8;
+    for (int i = 0; i < 8; i += 2) {
+      canvas.drawRect(Rect.fromLTWH(0, i * bandH, size.width, bandH), stripe);
+    }
+
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.32)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    // Outer frame.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(8, 8, size.width - 16, size.height - 16),
+        const Radius.circular(4),
+      ),
+      line,
+    );
+    // Halfway line + centre circle + spot.
+    canvas.drawLine(Offset(8, size.height / 2), Offset(size.width - 8, size.height / 2), line);
+    canvas.drawCircle(size.center(Offset.zero), size.width * 0.13, line);
+    canvas.drawCircle(size.center(Offset.zero), 2, Paint()..color = Colors.white.withValues(alpha: 0.5));
+    // 18-yard boxes (top + bottom).
+    final boxW = size.width * 0.52;
+    final boxH = size.height * 0.12;
+    final boxX = (size.width - boxW) / 2;
+    canvas.drawRect(Rect.fromLTWH(boxX, 8, boxW, boxH), line);
+    canvas.drawRect(Rect.fromLTWH(boxX, size.height - 8 - boxH, boxW, boxH), line);
+    // 6-yard boxes.
+    final smallW = size.width * 0.28;
+    final smallH = size.height * 0.05;
+    final smallX = (size.width - smallW) / 2;
+    canvas.drawRect(Rect.fromLTWH(smallX, 8, smallW, smallH), line);
+    canvas.drawRect(Rect.fromLTWH(smallX, size.height - 8 - smallH, smallW, smallH), line);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// (_LineupCard + _PlayerChip removed — replaced by _LineupPitchCard above.)
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 

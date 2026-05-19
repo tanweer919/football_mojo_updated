@@ -10,8 +10,10 @@ import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
+import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/premium_image.dart';
+import '../../../album/data/models/card_models.dart' show CardRarity;
 import '../../data/models/fantasy_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
 import '../providers/fantasy_providers.dart';
@@ -298,14 +300,53 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
             captainId: captainId,
           );
       if (!mounted) return;
+      // Without these invalidations the user returns to the fantasy home
+      // and still sees the cached "no lineup yet" — the save succeeded but
+      // the UI doesn't reflect it. Same for the leaderboard, which now
+      // includes their row.
+      final key = (slug: widget.slug, gameweekId: widget.gameweekId);
+      ref.invalidate(myLineupProvider(key));
+      ref.invalidate(leaderboardProvider(key));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lineup saved · GW ready')),
       );
       context.pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      // Surface the backend's actual error code (e.g. "over_budget: 105/100")
+      // for long enough to read — the previous 4-second default disappeared
+      // before the user could parse it.
+      final msg = _formatSaveError(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          duration: const Duration(seconds: 6),
+          backgroundColor: AppColors.surface3,
+        ),
+      );
     }
+  }
+
+  /// Map the backend's machine-readable error codes (`over_budget`,
+  /// `bad_gk_count`, `gameweek_locked`, etc.) to short human strings.
+  /// Falls back to the raw error so we never hide a useful signal.
+  String _formatSaveError(Object e) {
+    final raw = e.toString();
+    if (raw.contains('over_budget')) {
+      return 'Over budget — drop a premium pick to fit your XI.';
+    }
+    if (raw.contains('gameweek_locked')) {
+      return 'Gameweek deadline has passed — picks are locked.';
+    }
+    if (raw.contains('bad_gk_count')) return 'Pick exactly 1 goalkeeper.';
+    if (raw.contains('need_at_least_1_def')) return 'Need at least 1 defender.';
+    if (raw.contains('need_at_least_1_mid')) return 'Need at least 1 midfielder.';
+    if (raw.contains('need_at_least_1_fwd')) return 'Need at least 1 forward.';
+    if (raw.contains('captain_not_in_squad')) return 'Captain must be one of your 5 picks.';
+    if (raw.contains('duplicate_player')) return 'Each player can only appear once.';
+    if (raw.contains('position_mismatch')) return 'A pick is in the wrong slot — rebuild and retry.';
+    if (raw.contains('squad_must_have')) return 'Pick exactly 5 players.';
+    return 'Could not save: $e';
   }
 }
 
@@ -650,36 +691,37 @@ class _Chip extends StatelessWidget {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Container(
-                width: 76,
-                height: filled ? 96 : 86,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: filled
-                      ? Border.all(color: const Color(0xFF55462E), width: 1.5)
-                      : Border.all(color: AppColors.goldHairline, width: 1.5),
-                  gradient: filled
-                      ? const LinearGradient(
-                          colors: [Color(0xFF3A2C1A), Color(0xFF1F1812)],
-                          begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                        )
-                      : null,
-                  color: filled ? null : const Color(0x8C261F18),
-                  boxShadow: captain
-                      ? [
-                          BoxShadow(color: AppColors.goldGlow, blurRadius: 18, spreadRadius: 1),
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 12, offset: const Offset(0, 6)),
-                        ]
-                      : [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 12, offset: const Offset(0, 6)),
-                        ],
+            if (filled)
+              MiniPCard(
+                rarity: _rarityFromPrice(player!.price),
+                photoUrl: player!.player.photoUrl,
+                lastName: player!.player.name.split(' ').last,
+                position: player!.position.name,
+                country: null,
+                clubCrestUrl: player!.player.team.crestUrl,
+                onTap: onTap,
+                height: 104,
+                glow: captain,
+                heroTag: 'lineup-${slot.name}-${player!.playerId}',
+              )
+            else
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: Container(
+                  width: 76,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.goldHairline, width: 1.5),
+                    color: const Color(0x8C261F18),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 12, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: _emptyContent(),
                 ),
-                child: filled ? _filledContent(player!) : _emptyContent(),
               ),
-            ),
             if (filled)
               Positioned(
                 top: -6, right: -6,
@@ -736,47 +778,17 @@ class _Chip extends StatelessWidget {
         child: Text('+', style: TextStyle(fontFamily: 'Inter', fontSize: 28, fontWeight: FontWeight.w300, color: AppColors.gold, height: 1.0)),
       );
 
-  Widget _filledContent(PlayerValuationDto p) {
-    final lastName = p.player.name.split(' ').last;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-      child: Column(
-        children: [
-          Expanded(
-            child: ClipOval(
-              child: SizedBox(
-                width: 40, height: 40,
-                child: PremiumImage(url: p.player.photoUrl, fit: BoxFit.cover),
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            lastName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.fg,
-            ),
-          ),
-          Text(
-            '${p.price.toStringAsFixed(0)} pts',
-            style: const TextStyle(
-              fontFamily: 'JetBrainsMono',
-              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: AppColors.gold,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
+  /// Map a player valuation price to a card rarity so the pitch tile inherits
+  /// a visual tier. The bands are deliberately wide — we want consistent
+  /// "feel" across leagues with different price ranges, not pixel-perfect
+  /// rarity boundaries. Tier doesn't affect scoring; it's purely cosmetic.
+  CardRarity _rarityFromPrice(double price) {
+    if (price >= 130) return CardRarity.ICONIC;
+    if (price >= 110) return CardRarity.LEGENDARY;
+    if (price >=  90) return CardRarity.EPIC;
+    if (price >=  70) return CardRarity.RARE;
+    if (price >=  55) return CardRarity.UNCOMMON;
+    return CardRarity.COMMON;
   }
 }
 

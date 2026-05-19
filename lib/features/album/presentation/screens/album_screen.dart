@@ -30,8 +30,9 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
     final album = ref.watch(albumProvider);
     return PitchScreen(
       title: 'Your Collection',
-      onBack: context.canPop() ? () => context.pop() : null,
+      onBack: () => context.canPop() ? context.pop() : context.go('/home'),
       trailing: CircleIconButton(icon: Icons.swap_horiz, onPressed: () {}),
+      scrollable: false,
       child: RefreshIndicator(
         onRefresh: () async => ref.invalidate(albumProvider),
         color: AppColors.gold,
@@ -48,9 +49,14 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
             ),
             itemBuilder: (_, __) => const PCardSkeleton(),
           ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text('$e', style: const TextStyle(color: AppColors.live)),
+          error: (e, _) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('$e', style: const TextStyle(color: AppColors.live)),
+              ),
+            ],
           ),
           data: (sets) {
             final allEntries = sets.expand((s) => s.entries).toList();
@@ -61,7 +67,10 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
             // signed-out (auth required to claim).
             if (allEntries.isEmpty) {
               final authed = ref.watch(authStateProvider).valueOrNull;
-              return _EmptyCollection(signedIn: authed != null && !authed.isAnonymous);
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                children: [_EmptyCollection(signedIn: authed != null && !authed.isAnonymous)],
+              );
             }
 
             final featured = ownedEntries.firstWhere(
@@ -75,6 +84,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
             filtered.sort((a, b) => b.template.rarity.index.compareTo(a.template.rarity.index));
 
             return ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
               children: [
                 Padding(

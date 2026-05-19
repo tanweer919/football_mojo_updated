@@ -26,8 +26,13 @@ class OnboardingScreen extends ConsumerWidget {
       ref.read(onboardingCompleteProvider.notifier).markCompleted();
     }
 
+    // One-tap: skip the intermediate showSignInSheet (which would require a
+    // second "Continue with Google" tap inside the sheet) and trigger the
+    // Google chooser directly. quickSignIn also runs the welcome-card peek
+    // on success — without this, first-time signups never saw the reveal
+    // because showSignInSheet doesn't call _maybeShowWelcomeCard itself.
     Future<void> signInThenComplete() async {
-      final user = await showSignInSheet(context);
+      final user = await quickSignIn(context, ref);
       if (user != null) complete();
     }
 

@@ -13,6 +13,8 @@ export class CardsService {
   // ─── Album view ────────────────────────────────────────────────────────────
   // Returns the user's full sticker-album: every template grouped by set,
   // with owned-count + duplicate-count so the UI can show "owned / needed / dupes".
+  // If there are owned cards whose templates aren't in any CardSet, they appear
+  // in a synthetic "My Cards" set so the album is never empty when the user owns cards.
   async getAlbum(userId: string) {
     const [sets, owned] = await Promise.all([
       this.prisma.cardSet.findMany({
@@ -20,7 +22,7 @@ export class CardsService {
       }),
       this.prisma.ownedCard.findMany({
         where: { ownerId: userId },
-        select: { id: true, templateId: true, mintedAt: true },
+        include: { template: { include: { player: { include: { team: true } } } } },
         orderBy: { mintedAt: 'asc' },
       }),
     ]);
@@ -32,7 +34,27 @@ export class CardsService {
       if (!firstOwnedByTemplate.has(o.templateId)) firstOwnedByTemplate.set(o.templateId, o.id);
     }
 
-    return sets.map((s) => ({
+    // Template IDs that belong to at least one CardSet.
+    const setTemplateIds = new Set(
+      sets.flatMap((s) => s.entries.map((e) => e.templateId)),
+    );
+
+    // Flatten player/team data into the template object so the client gets
+    // `playerName`, `teamName`, `teamCrestUrl` at the template level.
+    const flattenTemplate = (t: any) => ({
+      id: t.id,
+      edition: t.edition,
+      rarity: t.rarity,
+      totalSupply: t.totalSupply,
+      mintedCount: t.mintedCount,
+      artUrl: t.artUrl,
+      frameStyle: t.frameStyle,
+      playerName: t.player?.name ?? null,
+      teamName: t.player?.team?.name ?? null,
+      teamCrestUrl: t.player?.team?.crestUrl ?? null,
+    });
+
+    const result = sets.map((s) => ({
       id: s.id,
       name: s.name,
       description: s.description,
@@ -40,11 +62,39 @@ export class CardsService {
       completedCount: s.entries.filter((e) => (ownedCount.get(e.templateId) ?? 0) > 0).length,
       entries: s.entries.map((e) => ({
         templateId: e.templateId,
-        template: e.template,
+        template: flattenTemplate(e.template),
         owned: ownedCount.get(e.templateId) ?? 0,
         firstOwnedCardId: firstOwnedByTemplate.get(e.templateId) ?? null,
       })),
     }));
+
+    // Collect owned cards not in any set into a virtual "My Cards" set.
+    const uncategorized = owned.filter((o) => !setTemplateIds.has(o.templateId));
+    if (uncategorized.length > 0) {
+      // Deduplicate by templateId — show each template once.
+      const seen = new Set<string>();
+      const entries: Array<any> = [];
+      for (const o of uncategorized) {
+        if (seen.has(o.templateId)) continue;
+        seen.add(o.templateId);
+        entries.push({
+          templateId: o.templateId,
+          template: flattenTemplate(o.template),
+          owned: ownedCount.get(o.templateId) ?? 0,
+          firstOwnedCardId: firstOwnedByTemplate.get(o.templateId) ?? null,
+        });
+      }
+      result.unshift({
+        id: '__my_cards__',
+        name: 'My Cards',
+        description: 'Cards you own',
+        total: entries.length,
+        completedCount: entries.length,
+        entries,
+      });
+    }
+
+    return result;
   }
 
   async listOwned(userId: string) {

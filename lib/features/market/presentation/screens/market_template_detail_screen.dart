@@ -63,10 +63,13 @@ class _DetailBody extends ConsumerWidget {
             child: PCard(
               rarity: card.rarity,
               rating: _ratingFor(card.rarity),
-              name: (p?.name ?? card.edition).toUpperCase(),
-              position: (p?.position ?? '—').toUpperCase(),
-              country: (p?.country ?? p?.team?.countryCode ?? '—').toUpperCase(),
+              name: p?.name,
+              position: p?.position,
+              country: p?.country ?? p?.team?.countryCode,
               photoUrl: p?.photoUrl ?? card.artUrl,
+              clubCrestUrl: p?.team?.crestUrl,
+              leagueLabel: _shortEdition(card.edition),
+              editionLabel: card.edition,
               heroTag: 'market-${card.id}',
             ),
           ),
@@ -117,6 +120,13 @@ class _DetailBody extends ConsumerWidget {
         CardRarity.LEGENDARY => 92,
         CardRarity.ICONIC => 95,
       };
+
+  /// "WC2026-BASE" → "WC2026". Keep only the leading competition prefix for
+  /// the card's compact top-left tag.
+  static String _shortEdition(String edition) {
+    final dash = edition.indexOf('-');
+    return dash < 0 ? edition : edition.substring(0, dash);
+  }
 }
 
 class _NameBlock extends StatelessWidget {

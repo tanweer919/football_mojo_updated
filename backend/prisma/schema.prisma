@@ -155,10 +155,21 @@ enum EventType {
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Authorization tier. USER is the default for every account created via
+/// Firebase sign-in on the mobile app. ADMIN / SUPERADMIN are granted
+/// out-of-band by the `admin:promote` script and gate access to the
+/// Next.js admin panel.
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
 model User {
-  id              String   @id              // Firebase UID
+  id              String   @id              // Firebase UID, or cuid for admins promoted via script
   email           String?  @unique
   displayName     String?
+  role            UserRole @default(USER)
   /// Public handle other users search/follow by — e.g. "jordan42".
   /// Lowercase letters/numbers/`_`/`.`, 3–20 chars. Optional until claimed.
   /// Stored already-lowercased so the unique constraint is case-insensitive.

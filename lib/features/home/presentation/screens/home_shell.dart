@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/bootstrap/deferred_bootstrap.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/responsive/breakpoints.dart';
+import '../../../../core/router/route_paths.dart';
 import '../widgets/pitch_tabbar.dart';
 
 /// Shell that overlays the floating PITCH tabbar on top of the routed screen.
@@ -25,6 +27,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = GoRouterState.of(context).matchedLocation;
+    final hideTabbar = loc == RoutePaths.market || loc == RoutePaths.fantasyHome;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       extendBody: true,
@@ -38,10 +43,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               child: widget.child,
             ),
           ),
-          const Positioned(
-            left: 0, right: 0, bottom: 0,
-            child: PitchTabbar(),
-          ),
+          if (!hideTabbar)
+            const Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: PitchTabbar(),
+            ),
         ],
       ),
     );

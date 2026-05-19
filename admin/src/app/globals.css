@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-bg-deep text-fg antialiased;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse 800px 600px at 20% -10%, rgba(229,194,107,0.06), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 110%, rgba(76,130,210,0.04), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  ::selection {
+    background: rgba(229,194,107,0.30);
+    color: #F5EFE2;
+  }
+  /* Scrollbar — subtle, fits the dark theme */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+}
+
+@layer components {
+  /* Frosted-glass panel — used for the sidebar, topbar, cards. */
+  .panel {
+    @apply bg-surface-1/70 backdrop-blur border border-border rounded-lg;
+  }
+  .panel-strong {
+    @apply bg-surface-1 border border-border rounded-lg;
+  }
+  /* Eyebrow — small uppercase label. */
+  .eyebrow {
+    @apply text-[10px] font-semibold tracking-[0.16em] uppercase font-mono text-fg-muted;
+  }
+  .eyebrow-gold { @apply eyebrow text-gold; }
+  /* Sidebar link states. */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-md text-fg-soft hover:bg-surface-2 hover:text-fg transition-colors text-sm font-medium;
+  }
+  .nav-link-active {
+    @apply nav-link bg-surface-2 text-gold;
+    box-shadow: inset 3px 0 0 #E5C26B;
+  }
+}
