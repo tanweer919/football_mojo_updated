@@ -185,6 +185,67 @@ export class MarketService {
           .sort((a, b) => a.serialNumber - b.serialNumber)
       : [];
 
+    // Player form data — last scores + averages. Uses PlayerGameweekScore
+    // when available (post-WC), falls back to seasonRating from PlayerValuation
+    // (pre-WC, populated by `npm run ingest:form`).
+    const playerId = t.player?.id;
+    let playerForm: Record<string, unknown> | null = null;
+    if (playerId) {
+      const avg = (arr: number[]) =>
+        arr.length ? Math.round((arr.reduce((s, x) => s + x, 0) / arr.length) * 10) / 10 : 0;
+
+      const lastScores = await this.prisma.playerGameweekScore.findMany({
+        where: { playerId },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+        include: { gameweek: { select: { number: true } } },
+      });
+
+      const last40 = await this.prisma.playerGameweekScore.findMany({
+        where: { playerId },
+        orderBy: { updatedAt: 'desc' },
+        take: 40,
+        select: { totalPoints: true },
+      });
+      const pts40 = last40.map((s) => s.totalPoints);
+
+      if (pts40.length > 0) {
+        playerForm = {
+          formStats: {
+            last5:  { avg: avg(pts40.slice(0, 5)),  n: Math.min(5,  pts40.length) },
+            last10: { avg: avg(pts40.slice(0, 10)), n: Math.min(10, pts40.length) },
+            last40: { avg: avg(pts40),              n: pts40.length },
+          },
+          lastScores: lastScores.map((s) => ({
+            gameweekId: s.gameweekId,
+            gameweekNumber: s.gameweek?.number ?? null,
+            totalPoints: s.totalPoints,
+            breakdown: s.breakdown,
+            updatedAt: s.updatedAt,
+          })),
+        };
+      } else {
+        // Pre-WC fallback: use seasonRating from PlayerValuation
+        const val = await this.prisma.playerValuation.findUnique({
+          where: { playerId },
+          select: { seasonRating: true, seasonGoals: true, seasonAssists: true, seasonAppearances: true },
+        });
+        if (val?.seasonRating != null) {
+          // Convert 0–10 rating to a 0–100 score for consistent display
+          const score = Math.round(val.seasonRating! * 10);
+          const apps = val.seasonAppearances ?? 0;
+          playerForm = {
+            formStats: {
+              last5:  { avg: score, n: Math.min(5, apps) },
+              last10: { avg: score, n: Math.min(10, apps) },
+              last40: { avg: score, n: Math.min(40, apps) },
+            },
+            lastScores: [],
+          };
+        }
+      }
+    }
+
     return {
       template: {
         id: t.id,
@@ -223,6 +284,7 @@ export class MarketService {
         ownedByMe: myCopies.length,
       },
       myCopies,
+      playerForm,
     };
   }
 

@@ -88,6 +88,15 @@ export class FantasyController {
     return this.fantasy.getMyLineup(uid, gwId);
   }
 
+  /// Owned-card multipliers keyed by playerId for the signed-in user.
+  /// Drives the "+25%" / "+60%" badge in the player picker + lineup builder.
+  /// Returns `{}` for users with no cards.
+  @UseGuards(FirebaseAuthGuard)
+  @Get('me/owned-multipliers')
+  ownedMultipliers(@CurrentUser('uid') uid: string) {
+    return this.fantasy.ownedCardMultipliers(uid);
+  }
+
   @Get('rules')
   rules() {
     return { squad: SQUAD };

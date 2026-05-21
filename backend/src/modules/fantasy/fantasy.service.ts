@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlayerPosition } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
-import { SQUAD } from './fantasy.constants';
+import { OWNED_CARD_MULTIPLIER, OWNED_CARD_RARITY_ORDER, SQUAD } from './fantasy.constants';
 
 export interface LineupPick {
   playerId: string;
@@ -163,6 +163,44 @@ export class FantasyService {
     return this.prisma.fantasyLineup.findUnique({
       where: { userId_gameweekId: { userId, gameweekId } },
     });
+  }
+
+  /**
+   * For each player the user owns a card of, return the highest-rarity
+   * card + the matching scoring multiplier. The player picker uses this
+   * map to render the "+25%" badge next to ownable picks; the lineup
+   * builder uses it to project a card-aware total before kickoff.
+   *
+   * Shape: `{ "playerId1": { rarity: "ICONIC", multiplier: 1.6 }, … }`.
+   * Empty object when the user has no cards — picker simply skips badges.
+   */
+  async ownedCardMultipliers(userId: string) {
+    const owned = await this.prisma.ownedCard.findMany({
+      where: { ownerId: userId },
+      select: {
+        template: { select: { rarity: true, playerId: true } },
+      },
+    });
+    const rarityRank = new Map<string, number>(
+      OWNED_CARD_RARITY_ORDER.map((r, i) => [r, OWNED_CARD_RARITY_ORDER.length - i]),
+    );
+    const bestByPlayer = new Map<string, string>();
+    for (const c of owned) {
+      const playerId = c.template.playerId;
+      if (!playerId) continue;
+      const current = bestByPlayer.get(playerId);
+      if (!current || (rarityRank.get(c.template.rarity) ?? 0) > (rarityRank.get(current) ?? 0)) {
+        bestByPlayer.set(playerId, c.template.rarity);
+      }
+    }
+    const out: Record<string, { rarity: string; multiplier: number }> = {};
+    for (const [playerId, rarity] of bestByPlayer) {
+      out[playerId] = {
+        rarity,
+        multiplier: OWNED_CARD_MULTIPLIER[rarity] ?? 1,
+      };
+    }
+    return out;
   }
 
   async leaderboard(gameweekId: string, limit = 100) {

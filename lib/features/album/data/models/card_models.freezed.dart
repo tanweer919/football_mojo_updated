@@ -879,7 +879,9 @@ as List<AlbumEntryDto>,
 /// @nodoc
 mixin _$OwnedCardDto {
 
- String get id; String get templateId; int get serialNumber; CardTemplateDto get template; DateTime get mintedAt;
+ String get id; String get templateId; int get serialNumber; CardTemplateDto get template; DateTime get mintedAt;/// Identity & progression — populated server-side. Defaulted so older
+/// /v1/cards/owned responses still parse.
+ String? get mintReason; String get acquiredVia; int get lifetimeGoals; int get lifetimeAssists; int get lifetimeMinutes; int get lifetimeApps; int get xp; int get level; List<String> get trophies;
 /// Create a copy of OwnedCardDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -892,16 +894,16 @@ $OwnedCardDtoCopyWith<OwnedCardDto> get copyWith => _$OwnedCardDtoCopyWithImpl<O
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is OwnedCardDto&&(identical(other.id, id) || other.id == id)&&(identical(other.templateId, templateId) || other.templateId == templateId)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.template, template) || other.template == template)&&(identical(other.mintedAt, mintedAt) || other.mintedAt == mintedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is OwnedCardDto&&(identical(other.id, id) || other.id == id)&&(identical(other.templateId, templateId) || other.templateId == templateId)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.template, template) || other.template == template)&&(identical(other.mintedAt, mintedAt) || other.mintedAt == mintedAt)&&(identical(other.mintReason, mintReason) || other.mintReason == mintReason)&&(identical(other.acquiredVia, acquiredVia) || other.acquiredVia == acquiredVia)&&(identical(other.lifetimeGoals, lifetimeGoals) || other.lifetimeGoals == lifetimeGoals)&&(identical(other.lifetimeAssists, lifetimeAssists) || other.lifetimeAssists == lifetimeAssists)&&(identical(other.lifetimeMinutes, lifetimeMinutes) || other.lifetimeMinutes == lifetimeMinutes)&&(identical(other.lifetimeApps, lifetimeApps) || other.lifetimeApps == lifetimeApps)&&(identical(other.xp, xp) || other.xp == xp)&&(identical(other.level, level) || other.level == level)&&const DeepCollectionEquality().equals(other.trophies, trophies));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,templateId,serialNumber,template,mintedAt);
+int get hashCode => Object.hash(runtimeType,id,templateId,serialNumber,template,mintedAt,mintReason,acquiredVia,lifetimeGoals,lifetimeAssists,lifetimeMinutes,lifetimeApps,xp,level,const DeepCollectionEquality().hash(trophies));
 
 @override
 String toString() {
-  return 'OwnedCardDto(id: $id, templateId: $templateId, serialNumber: $serialNumber, template: $template, mintedAt: $mintedAt)';
+  return 'OwnedCardDto(id: $id, templateId: $templateId, serialNumber: $serialNumber, template: $template, mintedAt: $mintedAt, mintReason: $mintReason, acquiredVia: $acquiredVia, lifetimeGoals: $lifetimeGoals, lifetimeAssists: $lifetimeAssists, lifetimeMinutes: $lifetimeMinutes, lifetimeApps: $lifetimeApps, xp: $xp, level: $level, trophies: $trophies)';
 }
 
 
@@ -912,7 +914,7 @@ abstract mixin class $OwnedCardDtoCopyWith<$Res>  {
   factory $OwnedCardDtoCopyWith(OwnedCardDto value, $Res Function(OwnedCardDto) _then) = _$OwnedCardDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String templateId, int serialNumber, CardTemplateDto template, DateTime mintedAt
+ String id, String templateId, int serialNumber, CardTemplateDto template, DateTime mintedAt, String? mintReason, String acquiredVia, int lifetimeGoals, int lifetimeAssists, int lifetimeMinutes, int lifetimeApps, int xp, int level, List<String> trophies
 });
 
 
@@ -929,14 +931,23 @@ class _$OwnedCardDtoCopyWithImpl<$Res>
 
 /// Create a copy of OwnedCardDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? templateId = null,Object? serialNumber = null,Object? template = null,Object? mintedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? templateId = null,Object? serialNumber = null,Object? template = null,Object? mintedAt = null,Object? mintReason = freezed,Object? acquiredVia = null,Object? lifetimeGoals = null,Object? lifetimeAssists = null,Object? lifetimeMinutes = null,Object? lifetimeApps = null,Object? xp = null,Object? level = null,Object? trophies = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,templateId: null == templateId ? _self.templateId : templateId // ignore: cast_nullable_to_non_nullable
 as String,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
 as int,template: null == template ? _self.template : template // ignore: cast_nullable_to_non_nullable
 as CardTemplateDto,mintedAt: null == mintedAt ? _self.mintedAt : mintedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,mintReason: freezed == mintReason ? _self.mintReason : mintReason // ignore: cast_nullable_to_non_nullable
+as String?,acquiredVia: null == acquiredVia ? _self.acquiredVia : acquiredVia // ignore: cast_nullable_to_non_nullable
+as String,lifetimeGoals: null == lifetimeGoals ? _self.lifetimeGoals : lifetimeGoals // ignore: cast_nullable_to_non_nullable
+as int,lifetimeAssists: null == lifetimeAssists ? _self.lifetimeAssists : lifetimeAssists // ignore: cast_nullable_to_non_nullable
+as int,lifetimeMinutes: null == lifetimeMinutes ? _self.lifetimeMinutes : lifetimeMinutes // ignore: cast_nullable_to_non_nullable
+as int,lifetimeApps: null == lifetimeApps ? _self.lifetimeApps : lifetimeApps // ignore: cast_nullable_to_non_nullable
+as int,xp: null == xp ? _self.xp : xp // ignore: cast_nullable_to_non_nullable
+as int,level: null == level ? _self.level : level // ignore: cast_nullable_to_non_nullable
+as int,trophies: null == trophies ? _self.trophies : trophies // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
 /// Create a copy of OwnedCardDto
@@ -1030,10 +1041,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt,  String? mintReason,  String acquiredVia,  int lifetimeGoals,  int lifetimeAssists,  int lifetimeMinutes,  int lifetimeApps,  int xp,  int level,  List<String> trophies)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _OwnedCardDto() when $default != null:
-return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt);case _:
+return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt,_that.mintReason,_that.acquiredVia,_that.lifetimeGoals,_that.lifetimeAssists,_that.lifetimeMinutes,_that.lifetimeApps,_that.xp,_that.level,_that.trophies);case _:
   return orElse();
 
 }
@@ -1051,10 +1062,10 @@ return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt,  String? mintReason,  String acquiredVia,  int lifetimeGoals,  int lifetimeAssists,  int lifetimeMinutes,  int lifetimeApps,  int xp,  int level,  List<String> trophies)  $default,) {final _that = this;
 switch (_that) {
 case _OwnedCardDto():
-return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt);case _:
+return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt,_that.mintReason,_that.acquiredVia,_that.lifetimeGoals,_that.lifetimeAssists,_that.lifetimeMinutes,_that.lifetimeApps,_that.xp,_that.level,_that.trophies);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1071,10 +1082,10 @@ return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String templateId,  int serialNumber,  CardTemplateDto template,  DateTime mintedAt,  String? mintReason,  String acquiredVia,  int lifetimeGoals,  int lifetimeAssists,  int lifetimeMinutes,  int lifetimeApps,  int xp,  int level,  List<String> trophies)?  $default,) {final _that = this;
 switch (_that) {
 case _OwnedCardDto() when $default != null:
-return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt);case _:
+return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_that.mintedAt,_that.mintReason,_that.acquiredVia,_that.lifetimeGoals,_that.lifetimeAssists,_that.lifetimeMinutes,_that.lifetimeApps,_that.xp,_that.level,_that.trophies);case _:
   return null;
 
 }
@@ -1086,7 +1097,7 @@ return $default(_that.id,_that.templateId,_that.serialNumber,_that.template,_tha
 @JsonSerializable()
 
 class _OwnedCardDto implements OwnedCardDto {
-  const _OwnedCardDto({required this.id, required this.templateId, required this.serialNumber, required this.template, required this.mintedAt});
+  const _OwnedCardDto({required this.id, required this.templateId, required this.serialNumber, required this.template, required this.mintedAt, this.mintReason = null, this.acquiredVia = 'SIGNUP_GIFT', this.lifetimeGoals = 0, this.lifetimeAssists = 0, this.lifetimeMinutes = 0, this.lifetimeApps = 0, this.xp = 0, this.level = 0, final  List<String> trophies = const <String>[]}): _trophies = trophies;
   factory _OwnedCardDto.fromJson(Map<String, dynamic> json) => _$OwnedCardDtoFromJson(json);
 
 @override final  String id;
@@ -1094,6 +1105,23 @@ class _OwnedCardDto implements OwnedCardDto {
 @override final  int serialNumber;
 @override final  CardTemplateDto template;
 @override final  DateTime mintedAt;
+/// Identity & progression — populated server-side. Defaulted so older
+/// /v1/cards/owned responses still parse.
+@override@JsonKey() final  String? mintReason;
+@override@JsonKey() final  String acquiredVia;
+@override@JsonKey() final  int lifetimeGoals;
+@override@JsonKey() final  int lifetimeAssists;
+@override@JsonKey() final  int lifetimeMinutes;
+@override@JsonKey() final  int lifetimeApps;
+@override@JsonKey() final  int xp;
+@override@JsonKey() final  int level;
+ final  List<String> _trophies;
+@override@JsonKey() List<String> get trophies {
+  if (_trophies is EqualUnmodifiableListView) return _trophies;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_trophies);
+}
+
 
 /// Create a copy of OwnedCardDto
 /// with the given fields replaced by the non-null parameter values.
@@ -1108,16 +1136,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _OwnedCardDto&&(identical(other.id, id) || other.id == id)&&(identical(other.templateId, templateId) || other.templateId == templateId)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.template, template) || other.template == template)&&(identical(other.mintedAt, mintedAt) || other.mintedAt == mintedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _OwnedCardDto&&(identical(other.id, id) || other.id == id)&&(identical(other.templateId, templateId) || other.templateId == templateId)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.template, template) || other.template == template)&&(identical(other.mintedAt, mintedAt) || other.mintedAt == mintedAt)&&(identical(other.mintReason, mintReason) || other.mintReason == mintReason)&&(identical(other.acquiredVia, acquiredVia) || other.acquiredVia == acquiredVia)&&(identical(other.lifetimeGoals, lifetimeGoals) || other.lifetimeGoals == lifetimeGoals)&&(identical(other.lifetimeAssists, lifetimeAssists) || other.lifetimeAssists == lifetimeAssists)&&(identical(other.lifetimeMinutes, lifetimeMinutes) || other.lifetimeMinutes == lifetimeMinutes)&&(identical(other.lifetimeApps, lifetimeApps) || other.lifetimeApps == lifetimeApps)&&(identical(other.xp, xp) || other.xp == xp)&&(identical(other.level, level) || other.level == level)&&const DeepCollectionEquality().equals(other._trophies, _trophies));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,templateId,serialNumber,template,mintedAt);
+int get hashCode => Object.hash(runtimeType,id,templateId,serialNumber,template,mintedAt,mintReason,acquiredVia,lifetimeGoals,lifetimeAssists,lifetimeMinutes,lifetimeApps,xp,level,const DeepCollectionEquality().hash(_trophies));
 
 @override
 String toString() {
-  return 'OwnedCardDto(id: $id, templateId: $templateId, serialNumber: $serialNumber, template: $template, mintedAt: $mintedAt)';
+  return 'OwnedCardDto(id: $id, templateId: $templateId, serialNumber: $serialNumber, template: $template, mintedAt: $mintedAt, mintReason: $mintReason, acquiredVia: $acquiredVia, lifetimeGoals: $lifetimeGoals, lifetimeAssists: $lifetimeAssists, lifetimeMinutes: $lifetimeMinutes, lifetimeApps: $lifetimeApps, xp: $xp, level: $level, trophies: $trophies)';
 }
 
 
@@ -1128,7 +1156,7 @@ abstract mixin class _$OwnedCardDtoCopyWith<$Res> implements $OwnedCardDtoCopyWi
   factory _$OwnedCardDtoCopyWith(_OwnedCardDto value, $Res Function(_OwnedCardDto) _then) = __$OwnedCardDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String templateId, int serialNumber, CardTemplateDto template, DateTime mintedAt
+ String id, String templateId, int serialNumber, CardTemplateDto template, DateTime mintedAt, String? mintReason, String acquiredVia, int lifetimeGoals, int lifetimeAssists, int lifetimeMinutes, int lifetimeApps, int xp, int level, List<String> trophies
 });
 
 
@@ -1145,14 +1173,23 @@ class __$OwnedCardDtoCopyWithImpl<$Res>
 
 /// Create a copy of OwnedCardDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? templateId = null,Object? serialNumber = null,Object? template = null,Object? mintedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? templateId = null,Object? serialNumber = null,Object? template = null,Object? mintedAt = null,Object? mintReason = freezed,Object? acquiredVia = null,Object? lifetimeGoals = null,Object? lifetimeAssists = null,Object? lifetimeMinutes = null,Object? lifetimeApps = null,Object? xp = null,Object? level = null,Object? trophies = null,}) {
   return _then(_OwnedCardDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,templateId: null == templateId ? _self.templateId : templateId // ignore: cast_nullable_to_non_nullable
 as String,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
 as int,template: null == template ? _self.template : template // ignore: cast_nullable_to_non_nullable
 as CardTemplateDto,mintedAt: null == mintedAt ? _self.mintedAt : mintedAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as DateTime,mintReason: freezed == mintReason ? _self.mintReason : mintReason // ignore: cast_nullable_to_non_nullable
+as String?,acquiredVia: null == acquiredVia ? _self.acquiredVia : acquiredVia // ignore: cast_nullable_to_non_nullable
+as String,lifetimeGoals: null == lifetimeGoals ? _self.lifetimeGoals : lifetimeGoals // ignore: cast_nullable_to_non_nullable
+as int,lifetimeAssists: null == lifetimeAssists ? _self.lifetimeAssists : lifetimeAssists // ignore: cast_nullable_to_non_nullable
+as int,lifetimeMinutes: null == lifetimeMinutes ? _self.lifetimeMinutes : lifetimeMinutes // ignore: cast_nullable_to_non_nullable
+as int,lifetimeApps: null == lifetimeApps ? _self.lifetimeApps : lifetimeApps // ignore: cast_nullable_to_non_nullable
+as int,xp: null == xp ? _self.xp : xp // ignore: cast_nullable_to_non_nullable
+as int,level: null == level ? _self.level : level // ignore: cast_nullable_to_non_nullable
+as int,trophies: null == trophies ? _self._trophies : trophies // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
 

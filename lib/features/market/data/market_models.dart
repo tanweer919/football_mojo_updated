@@ -91,6 +91,7 @@ class MarketCard {
     required this.ownedByMe,
     this.gemPrice,
     this.player,
+    this.formScore,
   });
   final String id;
   final String edition;
@@ -108,7 +109,21 @@ class MarketCard {
   /// 0 when anonymous or not held. Powers the "in collection" badge.
   final int ownedByMe;
 
+  /// Last-5 average score — shown as hex badge on the grid tile.
+  /// Null when the backend hasn't shipped the form fields yet.
+  final double? formScore;
+
   bool get isSoldOut => remaining <= 0;
+
+  /// Rarity bonus percentage for fantasy scoring.
+  int get bonusPct => switch (rarity) {
+        CardRarity.COMMON    => 0,
+        CardRarity.UNCOMMON  => 2,
+        CardRarity.RARE      => 5,
+        CardRarity.EPIC      => 10,
+        CardRarity.LEGENDARY => 15,
+        CardRarity.ICONIC    => 20,
+      };
 
   factory MarketCard.fromJson(Map<String, dynamic> j) => MarketCard(
         id: j['id'] as String,
@@ -123,6 +138,7 @@ class MarketCard {
         purchasable:  (j['purchasable']  as bool?) ?? false,
         gemPrice: (j['gemPrice'] as num?)?.toInt(),
         ownedByMe: (j['ownedByMe'] as num?)?.toInt() ?? 0,
+        formScore: (j['formScore'] as num?)?.toDouble(),
         player: j['player'] == null ? null : MarketPlayer.fromJson((j['player'] as Map).cast<String, dynamic>()),
       );
 }
@@ -363,8 +379,53 @@ bool _setEq<T>(Set<T> a, Set<T> b) {
   return true;
 }
 
+// ─── Player form stats (for market detail) ────────────────────────────────
+
+/// Per-bucket form average — parallel to the album's OwnedCardFormBucket
+/// but kept separate to avoid cross-feature coupling.
+class MarketFormBucket {
+  const MarketFormBucket({required this.avg, required this.n});
+  final double avg;
+  final int n;
+  factory MarketFormBucket.fromJson(Map<String, dynamic> j) => MarketFormBucket(
+        avg: ((j['avg'] as num?) ?? 0).toDouble(),
+        n: (j['n'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class MarketFormStats {
+  const MarketFormStats({required this.last5, required this.last10, required this.last40});
+  final MarketFormBucket last5;
+  final MarketFormBucket last10;
+  final MarketFormBucket last40;
+  factory MarketFormStats.fromJson(Map<String, dynamic> j) => MarketFormStats(
+        last5: MarketFormBucket.fromJson((j['last5'] as Map).cast<String, dynamic>()),
+        last10: MarketFormBucket.fromJson((j['last10'] as Map).cast<String, dynamic>()),
+        last40: MarketFormBucket.fromJson((j['last40'] as Map).cast<String, dynamic>()),
+      );
+}
+
+class MarketPlayerScore {
+  const MarketPlayerScore({
+    required this.gameweekId,
+    required this.totalPoints,
+    this.gameweekNumber,
+    this.breakdown,
+  });
+  final String gameweekId;
+  final int? gameweekNumber;
+  final double totalPoints;
+  final dynamic breakdown;
+  factory MarketPlayerScore.fromJson(Map<String, dynamic> j) => MarketPlayerScore(
+        gameweekId: j['gameweekId'] as String,
+        gameweekNumber: (j['gameweekNumber'] as num?)?.toInt(),
+        totalPoints: ((j['totalPoints'] as num?) ?? 0).toDouble(),
+        breakdown: j['breakdown'],
+      );
+}
+
 /// Detail payload for the template page — supply economics + collection
-/// holdings.
+/// holdings + player form data.
 class MarketTemplateDetail {
   const MarketTemplateDetail({
     required this.template,
@@ -372,12 +433,16 @@ class MarketTemplateDetail {
     required this.sets,
     required this.myCopies,
     this.player,
+    this.formStats,
+    this.lastScores = const [],
   });
   final MarketCard template;        // re-uses tile DTO (superset of fields we need)
   final MarketTemplateStats stats;
   final List<MarketSetRef> sets;
   final List<MarketOwnedCopy> myCopies;
   final MarketPlayer? player;
+  final MarketFormStats? formStats;
+  final List<MarketPlayerScore> lastScores;
 
   factory MarketTemplateDetail.fromJson(Map<String, dynamic> j) {
     final tj = (j['template'] as Map).cast<String, dynamic>();
@@ -406,6 +471,21 @@ class MarketTemplateDetail {
         },
       },
     };
+
+    // Parse player form data if present.
+    final formJson = j['playerForm'] as Map<String, dynamic>?;
+    MarketFormStats? formStats;
+    List<MarketPlayerScore> lastScores = const [];
+    if (formJson != null) {
+      if (formJson['formStats'] != null) {
+        formStats = MarketFormStats.fromJson((formJson['formStats'] as Map).cast<String, dynamic>());
+      }
+      lastScores = ((formJson['lastScores'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(MarketPlayerScore.fromJson)
+          .toList();
+    }
+
     return MarketTemplateDetail(
       template: MarketCard.fromJson(templateJson),
       stats: MarketTemplateStats.fromJson((j['stats'] as Map).cast<String, dynamic>()),
@@ -418,6 +498,8 @@ class MarketTemplateDetail {
           .map(MarketOwnedCopy.fromJson)
           .toList(),
       player: player,
+      formStats: formStats,
+      lastScores: lastScores,
     );
   }
 }

@@ -181,6 +181,13 @@ model User {
   proExpiresAt    DateTime?
   fcmTokens       String[] @default([])
   favouriteTeams  String[] @default([])
+
+  /// Showcase slot — the user's pinned card on their profile. Public
+  /// flex. Nullable: most users haven't pinned anything yet.
+  /// onDelete: SetNull because the user shouldn't lose their profile if
+  /// the pinned card is ever deleted (it can't be today, but defensive).
+  pinnedCardId    String?
+  pinnedCard      OwnedCard? @relation("UserPinnedCard", fields: [pinnedCardId], references: [id], onDelete: SetNull)
   /// Set to `now()` once the user dismisses the signup-gift reveal screen.
   /// While null, /v1/users/me surfaces the welcome card so the client can
   /// re-show the reveal after a reinstall (until the user actually sees it).
@@ -258,6 +265,9 @@ model CardTemplate {
   setMemberships CardSetEntry[]
   ownedCards    OwnedCard[]
   globalCupPrizes GlobalCupPrize[]
+  /// Inverse for `CardSet.masterTemplate` — the set(s) this template
+  /// serves as the completion reward for. Almost always 0 or 1.
+  setMastersFor  CardSet[]   @relation("SetMasterTemplate")
   createdAt     DateTime    @default(now())
   @@index([edition, rarity])
 }
@@ -282,6 +292,36 @@ model OwnedCard {
   acquiredVia   AcquisitionSource
   mintedAt      DateTime     @default(now())
   cosmeticFrame String?                          // user-upgraded cosmetic
+
+  // ─── Identity & progression ────────────────────────────────────────────
+  // These columns turn a static sticker into something that grows with
+  // the user. All optional/defaulted so existing OwnedCard rows still
+  // work unchanged; the live "increment on real match" worker fills them
+  // in over time.
+  //
+  /// Free-form context for *why* this card was minted, surfaced on the
+  /// card detail. e.g. "Predicted France 3-1 Brazil correctly" — far
+  /// more resonant than the bare `acquiredVia = PREDICTION_REWARD` enum.
+  mintReason       String?
+  /// Lifetime aggregates — incremented every time the real-world player
+  /// scores / assists / plays while this card is owned. The numbers
+  /// never decrement, even on trade (the new owner starts adding from
+  /// where the previous left off).
+  lifetimeGoals    Int       @default(0)
+  lifetimeAssists  Int       @default(0)
+  lifetimeMinutes  Int       @default(0)
+  lifetimeApps     Int       @default(0)
+  /// XP-based card level. Earned from being held while the real player
+  /// performs well. Mapped to 0..5 stars on the card chrome at render time.
+  xp               Int       @default(0)
+  /// Trophies etched into the card frame — populated when a card is
+  /// used in a winning Global Cup XI, completes a set, etc. Stored as a
+  /// list of stable string codes ("GC_WIN:wc2026:GW42", "SET:argentina").
+  trophies         String[]  @default([])
+
+  /// Inverse relation for `User.pinnedCard` (showcase slot).
+  pinnedBy         User[]    @relation("UserPinnedCard")
+
   @@unique([templateId, serialNumber])
   @@index([ownerId])
   @@index([templateId])
@@ -306,6 +346,12 @@ model CardSet {
   description  String
   rewardCoins  Int             @default(0)
   rewardFrame  String?                             // cosmetic unlock on completion
+  /// When set, completing the set mints a copy of this template for the
+  /// user — the "Set Master" card. Idempotent (we check existing copies
+  /// before re-minting). The template should be `giftableOnly: true` so
+  /// it can't leak into the regular market.
+  masterTemplateId String?
+  masterTemplate   CardTemplate? @relation("SetMasterTemplate", fields: [masterTemplateId], references: [id])
   entries      CardSetEntry[]
   completions  SetCompletion[]
 }

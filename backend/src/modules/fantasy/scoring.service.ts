@@ -9,6 +9,8 @@ import {
   APPEARANCE_POINTS,
   BreakdownEntry,
   CAPTAIN_MULTIPLIER,
+  OWNED_CARD_MULTIPLIER,
+  OWNED_CARD_RARITY_ORDER,
   DECISIVE,
   POSITION_RULES,
   SCORE_CEILING,
@@ -323,6 +325,53 @@ export class FantasyScoringService {
     return count;
   }
 
+  /**
+   * For every (userId, playerId) pair in the lineups being scored, find
+   * the user's highest-rarity owned card of that player and map it to its
+   * multiplier. Pairs without a matching card return 1 (no bonus).
+   *
+   * One query: groups OwnedCard rows by (ownerId, player), pulls
+   * template rarity for each, then picks the highest tier per pair.
+   * Cheaper than N round-trips even at 10k+ lineups per gameweek.
+   */
+  private async _buildOwnedCardBonusMap(
+    pairs: Array<{ userId: string; playerId: string }>,
+  ): Promise<Map<string, number>> {
+    if (!pairs.length) return new Map();
+    const userIds = [...new Set(pairs.map((p) => p.userId))];
+    const playerIds = [...new Set(pairs.map((p) => p.playerId))];
+    const owned = await this.prisma.ownedCard.findMany({
+      where: {
+        ownerId: { in: userIds },
+        template: { player: { id: { in: playerIds } } },
+      },
+      select: {
+        ownerId: true,
+        template: { select: { rarity: true, playerId: true } },
+      },
+    });
+    // Group: pick the best rarity per (user, player).
+    const rarityRank = new Map<string, number>(
+      OWNED_CARD_RARITY_ORDER.map((r, i) => [r, OWNED_CARD_RARITY_ORDER.length - i]),
+    );
+    const best = new Map<string, string>();
+    for (const c of owned) {
+      const playerId = c.template.playerId;
+      if (!playerId) continue;
+      const key = `${c.ownerId}:${playerId}`;
+      const current = best.get(key);
+      if (!current || (rarityRank.get(c.template.rarity) ?? 0) > (rarityRank.get(current) ?? 0)) {
+        best.set(key, c.template.rarity);
+      }
+    }
+    // Materialise into a multiplier-by-key map for O(1) lookup.
+    const out = new Map<string, number>();
+    for (const [key, rarity] of best) {
+      out.set(key, OWNED_CARD_MULTIPLIER[rarity] ?? 1);
+    }
+    return out;
+  }
+
   async rollupLineups(gameweekId: string) {
     const lineups = await this.prisma.fantasyLineup.findMany({ where: { gameweekId } });
     if (!lineups.length) return;
@@ -334,13 +383,26 @@ export class FantasyScoringService {
     });
     const scoreMap = new Map(scores.map((s) => [s.playerId, s.totalPoints]));
 
+    // Owned-card bonus index: for each (userId, playerId) pair represented
+    // in this gameweek's lineups, find the highest-rarity card the user
+    // owns of that player. One grouped query per (user, player) pair.
+    // The result feeds a per-pick multiplier in the rollup loop.
+    const userPlayerPairs = lineups.flatMap((l) =>
+      (l.picks as Array<{ playerId: string }>).map((p) => ({ userId: l.userId, playerId: p.playerId })),
+    );
+    const cardBonusMap = await this._buildOwnedCardBonusMap(userPlayerPairs);
+
     const totals = lineups.map((l) => {
       const picks = l.picks as Array<{ playerId: string; isCaptain?: boolean }>;
       let total = 0;
       for (const p of picks) {
         const base = scoreMap.get(p.playerId) ?? 0;
         const captained = p.isCaptain || p.playerId === l.captainId;
-        total += captained ? base * CAPTAIN_MULTIPLIER : base;
+        // Multiplicative stack: captain × ownedCard. An Iconic-card
+        // captain on 30 raw points → 30 × 2 × 1.6 = 96.
+        const captainMul = captained ? CAPTAIN_MULTIPLIER : 1;
+        const cardMul = cardBonusMap.get(`${l.userId}:${p.playerId}`) ?? 1;
+        total += base * captainMul * cardMul;
       }
       return { id: l.id, total: round1(total) };
     });

@@ -10,6 +10,7 @@ import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
+import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
 import '../../../album/data/models/card_models.dart';
 import '../../../competitions/data/competitions_repository.dart';
@@ -68,6 +69,13 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
     return PitchScreen(
       title: 'Fantasy',
       onBack: () => context.canPop() ? context.pop() : context.go('/home'),
+      // Quick access to the scoring breakdown — was orphaned in the route
+      // table before, no one could find it. Living up here keeps the
+      // "how does this game work?" answer one tap away.
+      trailing: CircleIconButton(
+        icon: Icons.help_outline,
+        onPressed: () => context.push(RoutePaths.scoringRules),
+      ),
       child: tournament.when(
         loading: () => const _LoadingState(),
         error: (e, _) => Padding(

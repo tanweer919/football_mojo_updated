@@ -27,6 +27,18 @@ export class CardsController {
     return this.cards.getOwnedCard(uid, id);
   }
 
+  /// Pin a card to the user's profile showcase. Pass an empty string /
+  /// null body to clear. Server validates the card belongs to the caller.
+  @Post('owned/:id/pin')
+  pin(@CurrentUser('uid') uid: string, @Param('id') id: string) {
+    return this.cards.setPinnedCard(uid, id);
+  }
+
+  @Post('owned/pin/clear')
+  clearPin(@CurrentUser('uid') uid: string) {
+    return this.cards.setPinnedCard(uid, null);
+  }
+
   @Post('claim/daily')
   claimDaily(@CurrentUser('uid') uid: string) {
     return this.cards.claimDailyLogin(uid);

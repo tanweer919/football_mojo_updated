@@ -30,6 +30,21 @@ export class CompetitionsController {
     return this.competitions.primary();
   }
 
+  // Specific routes BEFORE the `:id` catch-all. NestJS uses Express
+  // route ordering under the hood — if `:id` came first it would match
+  // `teams` as an id, and `teams/search` would 404.
+  /// `GET /v1/competitions/teams/search?q=arsenal&competitionId=PL_2025`
+  /// Public — drives the favourites picker. Both params optional; capped
+  /// at 50 hits by the service.
+  @Get('teams/search')
+  @CacheTTL(60_000)
+  searchTeams(
+    @Query('q') q?: string,
+    @Query('competitionId') competitionId?: string,
+  ) {
+    return this.users.searchTeams({ q, competitionId });
+  }
+
   @Get(':id')
   @CacheTTL(300_000)
   get(@Param('id') id: string) {
@@ -46,17 +61,5 @@ export class CompetitionsController {
   @CacheTTL(300_000)
   groups(@Param('id') id: string) {
     return this.competitions.groups(id);
-  }
-
-  /// `GET /v1/competitions/teams/search?q=arsenal&competitionId=PL_2025`
-  /// Public — drives the favourites picker. Both params optional; capped
-  /// at 50 hits by the service.
-  @Get('teams/search')
-  @CacheTTL(60_000)
-  searchTeams(
-    @Query('q') q?: string,
-    @Query('competitionId') competitionId?: string,
-  ) {
-    return this.users.searchTeams({ q, competitionId });
   }
 }

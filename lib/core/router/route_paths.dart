@@ -18,6 +18,7 @@ class RoutePaths {
   static const matchDetail = '/matches/:id';
   static const newsReader  = '/news/:id';
   static const cardDetail  = '/album/:id';
+  static const cardStats   = '/album/:id/stats';
   static const marketCard  = '/market/:templateId';
   static const settings    = '/settings';
   static const bracket     = '/tournament/bracket';

@@ -15,6 +15,7 @@ import '../../../album/data/models/card_models.dart';
 import '../../data/market_models.dart';
 import '../../data/market_repository.dart';
 import '../widgets/market_filter_sheet.dart';
+import '../widgets/player_form_widgets.dart';
 
 /// `CardsMarketScreen` — public, anonymous-friendly browse of every minted
 /// template in the catalogue. Two-column grid of `PCard`s with a sticky
@@ -447,7 +448,7 @@ class _MarketGrid extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 20,
               crossAxisSpacing: 16,
-              childAspectRatio: 0.58, // pcard 0.66 + supply bar below
+              childAspectRatio: 0.50, // pcard 0.66 + badges + price below
             ),
             delegate: SliverChildBuilderDelegate(
               (ctx, i) => _MarketTile(card: cards[i], onTap: () => onTap(cards[i])),
@@ -475,9 +476,6 @@ class _MarketTile extends StatelessWidget {
         CardRarity.ICONIC => 95,
       };
 
-  /// Edition slugs like "WC2026-BASE" / "EUROPA-LEAGUE" are server-side
-  /// product codes. The card's top-left tag shows only the *competition*
-  /// prefix so we don't waste pixels with redundant suffixes.
   static String _shortEdition(String edition) {
     final dash = edition.indexOf('-');
     return dash < 0 ? edition : edition.substring(0, dash);
@@ -496,10 +494,6 @@ class _MarketTile extends StatelessWidget {
           Expanded(
             child: Stack(
               children: [
-                // Wrap the PCard in a Container so we can paint a thick
-                // pitch-green frame + outer glow around cards the user
-                // already owns. Reads at-a-glance across a dense grid —
-                // the previous tiny corner pill was too easy to miss.
                 Container(
                   decoration: ownedBadge
                       ? BoxDecoration(
@@ -585,70 +579,96 @@ class _MarketTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          _SupplyBar(minted: card.mintedCount, total: card.totalSupply),
+          // Sorare-style stat badges + supply info
+          _TileBadgeRow(card: card),
         ],
       ),
     );
   }
 }
 
-class _SupplyBar extends StatelessWidget {
-  const _SupplyBar({required this.minted, required this.total});
-  final int minted;
-  final int total;
+/// Sorare-style info block below each card:
+///   Row 1: [ScoreHex] [+N% bonus] [#minted/total]
+///   Row 2: Gem price (if purchasable)
+///   Row 3: "Collect" button (if purchasable and available)
+class _TileBadgeRow extends StatelessWidget {
+  const _TileBadgeRow({required this.card});
+  final MarketCard card;
+
   @override
   Widget build(BuildContext context) {
-    final pct = total == 0 ? 0.0 : (minted / total).clamp(0.0, 1.0);
+    final hasForm = card.formScore != null;
+    final bonus = card.bonusPct;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Badge row
         Row(
           children: [
-            Text(
-              '#$minted',
-              style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppColors.gold,
+            if (hasForm) ...[
+              ScoreHexBadge(score: card.formScore!, size: 26),
+              const SizedBox(width: 4),
+            ],
+            if (bonus > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.muted2.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Text(
+                  '+$bonus%',
+                  style: const TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.muted,
+                  ),
+                ),
               ),
-            ),
             const Spacer(),
             Text(
-              '/ $total',
+              '${card.mintedCount}/${card.totalSupply}',
               style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
                 color: AppColors.muted,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 3),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: SizedBox(
-            height: 3,
-            child: Stack(
-              children: [
-                Container(color: AppColors.surface3),
-                FractionallySizedBox(
-                  widthFactor: pct,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.goldDeep, AppColors.gold],
-                      ),
-                    ),
-                  ),
+        // Gem price
+        if (card.gemPrice != null && card.purchasable) ...[
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(Icons.diamond_outlined, size: 13, color: AppColors.gold),
+              const SizedBox(width: 3),
+              Text(
+                '${card.gemPrice}',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.fg,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'gems',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  color: AppColors.muted,
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
       ],
     );
   }
@@ -667,7 +687,7 @@ class _GridSkeleton extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 20,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.58,
+        childAspectRatio: 0.54,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const Skeleton(height: double.infinity, radius: 16),

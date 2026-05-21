@@ -83,16 +83,26 @@ Map<String, dynamic> _$AlbumSetDtoToJson(_AlbumSetDto instance) =>
       'entries': instance.entries,
     };
 
-_OwnedCardDto _$OwnedCardDtoFromJson(Map<String, dynamic> json) =>
-    _OwnedCardDto(
-      id: json['id'] as String,
-      templateId: json['templateId'] as String,
-      serialNumber: (json['serialNumber'] as num).toInt(),
-      template: CardTemplateDto.fromJson(
-        json['template'] as Map<String, dynamic>,
-      ),
-      mintedAt: DateTime.parse(json['mintedAt'] as String),
-    );
+_OwnedCardDto _$OwnedCardDtoFromJson(
+  Map<String, dynamic> json,
+) => _OwnedCardDto(
+  id: json['id'] as String,
+  templateId: json['templateId'] as String,
+  serialNumber: (json['serialNumber'] as num).toInt(),
+  template: CardTemplateDto.fromJson(json['template'] as Map<String, dynamic>),
+  mintedAt: DateTime.parse(json['mintedAt'] as String),
+  mintReason: json['mintReason'] as String? ?? null,
+  acquiredVia: json['acquiredVia'] as String? ?? 'SIGNUP_GIFT',
+  lifetimeGoals: (json['lifetimeGoals'] as num?)?.toInt() ?? 0,
+  lifetimeAssists: (json['lifetimeAssists'] as num?)?.toInt() ?? 0,
+  lifetimeMinutes: (json['lifetimeMinutes'] as num?)?.toInt() ?? 0,
+  lifetimeApps: (json['lifetimeApps'] as num?)?.toInt() ?? 0,
+  xp: (json['xp'] as num?)?.toInt() ?? 0,
+  level: (json['level'] as num?)?.toInt() ?? 0,
+  trophies:
+      (json['trophies'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const <String>[],
+);
 
 Map<String, dynamic> _$OwnedCardDtoToJson(_OwnedCardDto instance) =>
     <String, dynamic>{
@@ -101,4 +111,13 @@ Map<String, dynamic> _$OwnedCardDtoToJson(_OwnedCardDto instance) =>
       'serialNumber': instance.serialNumber,
       'template': instance.template,
       'mintedAt': instance.mintedAt.toIso8601String(),
+      'mintReason': instance.mintReason,
+      'acquiredVia': instance.acquiredVia,
+      'lifetimeGoals': instance.lifetimeGoals,
+      'lifetimeAssists': instance.lifetimeAssists,
+      'lifetimeMinutes': instance.lifetimeMinutes,
+      'lifetimeApps': instance.lifetimeApps,
+      'xp': instance.xp,
+      'level': instance.level,
+      'trophies': instance.trophies,
     };

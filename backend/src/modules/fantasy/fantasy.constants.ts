@@ -81,6 +81,30 @@ export const APPEARANCE_POINTS = {
 
 export const CAPTAIN_MULTIPLIER = 2;
 
+/// Owned-card bonus — applied per pick when the user owns a card of that
+/// player. Stacks multiplicatively with the captain multiplier, so an
+/// Iconic-card captain scores ×2 × ×1.6 = ×3.2.
+///
+/// Mirrored in the Flutter scoring guide (`_BonusGrid` in
+/// scoring_rules_screen.dart) — keep the two tables in lock-step.
+///
+/// Why these tiers: the lift has to be (a) meaningful enough to make
+/// users want cards but (b) not so dominant that a casual user with no
+/// cards can never win. +10% baseline keeps cards a sweetener, not a
+/// requirement; +60% Iconic is the chase target.
+export const OWNED_CARD_MULTIPLIER: Record<string, number> = {
+  COMMON:    1.10,
+  UNCOMMON:  1.12,
+  RARE:      1.15,
+  EPIC:      1.25,
+  LEGENDARY: 1.40,
+  ICONIC:    1.60,
+};
+
+/// When a user owns multiple copies of the same player, only the highest-
+/// rarity copy counts toward the bonus. Sorted high → low for `_pickBestRarity`.
+export const OWNED_CARD_RARITY_ORDER = ['ICONIC', 'LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON'] as const;
+
 export const SCORE_FLOOR = -20;
 export const SCORE_CEILING = 100;
 
@@ -97,35 +121,58 @@ export const SCORE_CEILING = 100;
 ///   - All-mid-tier squad ≈ 80-90 pts → leaves room for one or two stars.
 ///   - One ICONIC + 4 budget squad ≈ 100 pts.
 export const PRICING = {
+  /// Minimum legal price. Players with effectively zero minutes still need
+  /// a positive number so they're selectable as throwaway bench filler.
   minPrice: 4.0,
   maxPrice: 26.0,
-  /// Position-specific base price (cheapest player at that position).
-  floorByPosition: { GK: 10, DEF: 11, MID: 12, FWD: 13 } as Record<PlayerPosition, number>,
-  /// 0..teamBoostMax based on the team's competition tier.
-  teamBoostMax: 6,
-  /// 0..playerBoostMax derived from a stable hash of player id + shirt-number
-  /// nudge. Keeps the spread inside a position consistent across reseeds.
+  /// Position-specific base. Lowered from the previous (10/11/12/13) so
+  /// the cheapest legal 5-a-side lands around 50 instead of 57 — leaves
+  /// real headroom for a star or two within a 100-budget.
+  floorByPosition: { GK: 8, DEF: 9, MID: 10, FWD: 11 } as Record<PlayerPosition, number>,
+  /// 0..teamBoostMax based on the team's competition tier. Lowered from 6
+  /// → 4 because previously every Real Madrid / Bayern player got +5.5
+  /// for the badge alone, inflating mid-rotation squad fillers.
+  teamBoostMax: 4,
+  /// 0..playerBoostMax derived from a stable hash of player id + shirt-
+  /// number nudge. Kept high so the in-position spread stays interesting.
   playerBoostMax: 6,
-  /// 0..formBoostMax from the rolling average of recent fantasy points.
-  /// Zero pre-season; ramps up once PlayerGameweekScore rows exist.
+  /// 0..formBoostMax from rolling fantasy points OR seasonRating. Zero
+  /// when no signal exists.
   formBoostMax: 8,
   formWindow: 5,
   formWeight: 0.5,
+  /// **Pricing gate**: a player needs at least this many appearances last
+  /// season for their seasonRating to count toward form. Without it, a
+  /// fringe Real Madrid academy player with 2 appearances at 8.0 rating
+  /// would price out at the cap alongside Bellingham, which was the bug
+  /// the previous repricer shipped with.
+  minAppearancesForForm: 5,
+  /// **Hard caps by appearances tier** — applied AFTER all boosts. A
+  /// player who barely played simply cannot rise to a top-tier price tag
+  /// no matter how flattering their hash or team is.
+  ///   < 5 apps  → capped at floor + 4   (max ~17 for a FWD)
+  ///   < 15 apps → capped at floor + 7   (max ~20)
+  ///   ≥ 15 apps → full maxPrice
+  appearanceTierCap: {
+    benchwarmer: { maxApps: 5,  capOver: 4 },
+    rotation:    { maxApps: 15, capOver: 7 },
+  },
   /// Used by seed scripts that bootstrap PlayerValuation before the first
-  /// repricer run — gets overwritten as soon as `repriceAll` runs.
-  defaultPrice: 14.0,
+  /// repricer run — gets overwritten the moment `repriceAll` runs.
+  defaultPrice: 12.0,
 };
 
 /// Competition-strength → team boost. Lookup keys are the seeded
-/// Competition.id values; anything unknown defaults to a tepid 2.
+/// Competition.id values. Maxed at PRICING.teamBoostMax (4). Anything
+/// unknown defaults to 1.5.
 export const TEAM_BOOST_BY_COMPETITION: Record<string, number> = {
-  WC2026: 6.0,           // tournament context — every starter matters
-  PREMIER_LEAGUE: 6.0,
-  LA_LIGA: 5.5,
-  BUNDESLIGA: 5.0,
-  SERIE_A: 5.0,
-  LIGUE_1: 4.5,
-  UCL: 6.0,
-  UEL: 4.0,
-  EUROPA_CONFERENCE: 3.0,
+  WC2026: 4.0,
+  PREMIER_LEAGUE: 4.0,
+  LA_LIGA: 3.8,
+  BUNDESLIGA: 3.5,
+  SERIE_A: 3.5,
+  LIGUE_1: 3.0,
+  UCL: 4.0,
+  UEL: 2.5,
+  EUROPA_CONFERENCE: 1.8,
 };

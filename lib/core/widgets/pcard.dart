@@ -41,6 +41,16 @@ class PCard extends StatelessWidget {
     this.clubCrestUrl,
     this.leagueLabel,
     this.editionLabel,
+    // Owned-card identity. When both `serialNumber` and `totalSupply` are
+    // set, a `#42 / 250` chip renders on the bottom-right of the card —
+    // the most-loved Sorare touch, makes every owned copy feel unique.
+    this.serialNumber,
+    this.totalSupply,
+    // Card level (0..5 stars). Earned from XP — see OwnedCard.xp. Zero
+    // hides the row entirely so unowned templates don't show fake stars.
+    this.level = 0,
+    // Trophy count badge — rendered top-left when > 0.
+    this.trophies = 0,
     this.width,
     this.onTap,
     this.heroTag,
@@ -61,6 +71,13 @@ class PCard extends StatelessWidget {
   final String? clubCrestUrl;
   final String? leagueLabel;
   final String? editionLabel;
+  /// Owned-card identity — surfaces `#42 / 250` when both are non-null.
+  final int? serialNumber;
+  final int? totalSupply;
+  /// 0..5 — 5 stars next to the name once enough XP is accumulated.
+  final int level;
+  /// Trophy count — rendered as a small medal badge top-left.
+  final int trophies;
   final double? width;
   final VoidCallback? onTap;
   final Object? heroTag;
@@ -176,6 +193,22 @@ class PCard extends StatelessWidget {
                   top: rating > 0 ? 50 : 12,
                   child: _LeagueTag(label: leagueLabel!),
                 ),
+              // Trophy badge under the league tag, when this card has
+              // been used in a winning XI / completed a set / etc.
+              if (trophies > 0)
+                Positioned(
+                  left: 8,
+                  top: rating > 0 ? 76 : 38,
+                  child: _TrophyBadge(count: trophies),
+                ),
+              // Serial-of-N chip, bottom-right of the card. The most-
+              // loved Sorare touch — makes #5 of 100 different from #94
+              // even though they share the same template art.
+              if (serialNumber != null && totalSupply != null)
+                Positioned(
+                  right: 8, bottom: 90,
+                  child: _SerialChip(serial: serialNumber!, total: totalSupply!, theme: theme),
+                ),
               // 8. bottom dark block — meta strip + name + edition footer
               Positioned(
                 left: 0, right: 0, bottom: 0,
@@ -186,6 +219,7 @@ class PCard extends StatelessWidget {
                   firstName: first,
                   lastName: last,
                   editionLabel: editionLabel,
+                  level: level,
                   accent: theme.ratingColor,
                 ),
               ),
@@ -515,6 +549,98 @@ class _LeagueTag extends StatelessWidget {
   }
 }
 
+/// Serial-of-N chip floating above the bottom info band. Two-line layout
+/// (#42 over "OF 250") keeps the eye on the unique number while still
+/// signalling rarity. Border tinted by rarity so an iconic feels gilded.
+class _SerialChip extends StatelessWidget {
+  const _SerialChip({required this.serial, required this.total, required this.theme});
+  final int serial;
+  final int total;
+  final RarityTheme theme;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: theme.accentTint.withValues(alpha: 0.7), width: 1),
+        boxShadow: [
+          BoxShadow(color: theme.accentTint.withValues(alpha: 0.3), blurRadius: 8, spreadRadius: -2),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '#$serial',
+            style: TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: theme.ratingColor,
+              height: 1.0,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            'OF $total',
+            style: TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 6.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: theme.ratingColor.withValues(alpha: 0.7),
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Trophy count badge — small circle with a medal icon + the count. Shown
+/// only when count > 0. Sits below the league tag on the top-left rail.
+class _TrophyBadge extends StatelessWidget {
+  const _TrophyBadge({required this.count});
+  final int count;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.40),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: AppColors.goldHairline),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.emoji_events, size: 9, color: AppColors.gold),
+          const SizedBox(width: 3),
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Crest extends StatelessWidget {
   const _Crest({required this.url});
   final String url;
@@ -633,6 +759,7 @@ class _BottomBlock extends StatelessWidget {
     required this.firstName,
     required this.lastName,
     required this.editionLabel,
+    required this.level,
     required this.accent,
   });
   final String country;
@@ -641,6 +768,7 @@ class _BottomBlock extends StatelessWidget {
   final String firstName;
   final String lastName;
   final String? editionLabel;
+  final int level;
   final Color accent;
 
   @override
@@ -690,6 +818,25 @@ class _BottomBlock extends StatelessWidget {
               height: 1.1,
             ),
           ),
+          // 0..5 star row, right after the name. Hidden at level 0 so
+          // unowned templates (no XP yet) don't show empty pips.
+          if (level > 0) ...[
+            const SizedBox(height: 3),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < 5; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 2),
+                    child: Icon(
+                      i < level ? Icons.star : Icons.star_outline,
+                      size: 9,
+                      color: i < level ? AppColors.gold : Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (editionLabel != null) ...[
             const SizedBox(height: 3),
             Text(

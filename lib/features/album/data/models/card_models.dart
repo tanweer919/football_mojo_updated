@@ -57,6 +57,17 @@ abstract class OwnedCardDto with _$OwnedCardDto {
     required int serialNumber,
     required CardTemplateDto template,
     required DateTime mintedAt,
+    /// Identity & progression — populated server-side. Defaulted so older
+    /// /v1/cards/owned responses still parse.
+    @Default(null) String? mintReason,
+    @Default('SIGNUP_GIFT') String acquiredVia,
+    @Default(0) int lifetimeGoals,
+    @Default(0) int lifetimeAssists,
+    @Default(0) int lifetimeMinutes,
+    @Default(0) int lifetimeApps,
+    @Default(0) int xp,
+    @Default(0) int level,
+    @Default(<String>[]) List<String> trophies,
   }) = _OwnedCardDto;
 
   factory OwnedCardDto.fromJson(Map<String, dynamic> json) => _$OwnedCardDtoFromJson(json);

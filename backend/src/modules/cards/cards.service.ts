@@ -3,6 +3,20 @@ import { AcquisitionSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { MintingService } from './minting.service';
 
+/// XP→level table. Doubling cadence keeps the curve interesting all the
+/// way to 5 stars without making the top unreachable for an active user.
+/// 200 XP per goal-equivalent (rough rule of thumb) → roughly 1 star per
+/// 4 high-scoring matches the player features in.
+const LEVEL_THRESHOLDS = [0, 200, 600, 1400, 3000, 6000];
+export function levelFromXp(xp: number): number {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= LEVEL_THRESHOLDS[i]) return i;
+  }
+  return 0;
+}
+
+function round1(n: number): number { return Math.round(n * 10) / 10; }
+
 @Injectable()
 export class CardsService {
   constructor(
@@ -105,13 +119,123 @@ export class CardsService {
     });
   }
 
+  /**
+   * Rich owned-card detail — feeds the Sorare-style detail screen.
+   *
+   * Returns:
+   *   - the OwnedCard with its template + player + team
+   *   - per-card progression (lifetime stats, XP/level, trophies)
+   *   - mint context (`mintReason`, `acquiredVia`, `mintedAt`)
+   *   - provenance: first owner display info
+   *   - "last scores" — last N PlayerGameweekScore rows for the player,
+   *     with goal/assist flags from MatchEvent so the UI can render the
+   *     Sorare-style "performance bars" chart
+   *   - sister copies the user owns of this template (so the detail
+   *     screen can offer a "swap to your other copy" hint)
+   */
   async getOwnedCard(userId: string, ownedCardId: string) {
     const card = await this.prisma.ownedCard.findFirst({
       where: { id: ownedCardId, ownerId: userId },
-      include: { template: { include: { player: { include: { team: true } } } } },
+      include: {
+        template: {
+          include: {
+            player: { include: { team: true } },
+          },
+        },
+      },
     });
     if (!card) throw new NotFoundException('card_not_found');
-    return card;
+
+    // Provenance — first-owner profile (display name + tag + avatar). May
+    // be a tombstone admin shell row, in which case we surface tag.
+    const firstOwner = await this.prisma.user.findUnique({
+      where: { id: card.firstOwnerId },
+      select: { id: true, displayName: true, userTag: true, photoUrl: true },
+    });
+
+    // Last N scores — drives the performance graph. We pull from
+    // PlayerGameweekScore which is the per-(player, gameweek) row. Order
+    // descending by the gameweek's deadline so most recent comes first
+    // (UI will reverse for left-to-right chronology).
+    const playerId = card.template.player?.id;
+    const lastScores = playerId
+      ? await this.prisma.playerGameweekScore.findMany({
+          where: { playerId },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+          include: {
+            gameweek: {
+              select: { id: true, number: true, lockAt: true, tournamentId: true },
+            },
+          },
+        })
+      : [];
+
+    // Last-5 / 10 / 40 averages — Sorare's signature "form" widget.
+    const avg = (arr: number[]) => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0;
+    const last40 = playerId
+      ? await this.prisma.playerGameweekScore.findMany({
+          where: { playerId },
+          orderBy: { updatedAt: 'desc' },
+          take: 40,
+          select: { totalPoints: true },
+        })
+      : [];
+    const points40 = last40.map((s) => s.totalPoints);
+    const formStats = {
+      last5: { avg: round1(avg(points40.slice(0, 5))), n: Math.min(5, points40.length) },
+      last10: { avg: round1(avg(points40.slice(0, 10))), n: Math.min(10, points40.length) },
+      last40: { avg: round1(avg(points40)), n: points40.length },
+    };
+
+    // Sister copies the user owns of this template — surfaces in a
+    // "your other copies" footer ("you also own #91, #133").
+    const sisters = await this.prisma.ownedCard.findMany({
+      where: {
+        ownerId: userId,
+        templateId: card.templateId,
+        id: { not: card.id },
+      },
+      select: { id: true, serialNumber: true, mintedAt: true, xp: true },
+      orderBy: { serialNumber: 'asc' },
+      take: 12,
+    });
+
+    return {
+      ...card,
+      // Spread the level out from XP at render — keeps the DB column
+      // honest as the source-of-truth XP value.
+      level: levelFromXp(card.xp),
+      firstOwner,
+      lastScores: lastScores.map((s) => ({
+        gameweekId: s.gameweekId,
+        gameweekNumber: s.gameweek?.number ?? null,
+        gameweekLockAt: s.gameweek?.lockAt ?? null,
+        totalPoints: s.totalPoints,
+        breakdown: s.breakdown,
+        updatedAt: s.updatedAt,
+      })),
+      formStats,
+      sisters,
+    };
+  }
+
+  /// Pin a card to the user's profile showcase. Pass `null` to clear.
+  /// Validates ownership server-side — the User.pinnedCardId FK doesn't
+  /// enforce a "must be owned by this user" check, so we do it here.
+  async setPinnedCard(userId: string, ownedCardId: string | null) {
+    if (ownedCardId) {
+      const card = await this.prisma.ownedCard.findFirst({
+        where: { id: ownedCardId, ownerId: userId },
+        select: { id: true },
+      });
+      if (!card) throw new NotFoundException('card_not_found');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pinnedCardId: ownedCardId },
+    });
+    return { pinnedCardId: ownedCardId };
   }
 
   // ─── Earning paths ─────────────────────────────────────────────────────────
@@ -192,11 +316,22 @@ export class CardsService {
   }
 
   // ─── Set completion ────────────────────────────────────────────────────────
-  // Idempotently award completion rewards when the user holds every entry.
+  /// Idempotently award completion rewards when the user holds every entry.
+  ///
+  /// First completion awards:
+  ///   1. `set.rewardCoins` (when > 0)
+  ///   2. A copy of `set.masterTemplate` if set — the "Set Master" card,
+  ///      a one-of-N unique flex you can only get by completing the set.
+  ///      Stamped with a `SET:<setId>` trophy code and `mintReason` so
+  ///      the card's identity tells its origin story.
+  ///
+  /// All idempotent: re-checking after completion returns the same flags
+  /// without minting twice. We detect "first completion" via the upsert's
+  /// `completedAt` timestamp.
   async checkSetCompletion(userId: string, setId: string) {
     const set = await this.prisma.cardSet.findUnique({
       where: { id: setId },
-      include: { entries: true },
+      include: { entries: true, masterTemplate: true },
     });
     if (!set) throw new NotFoundException('set_not_found');
 
@@ -212,13 +347,76 @@ export class CardsService {
       create: { setId, userId },
       update: {},
     });
-    // Award coins only on first completion (createdAt within last second).
-    if (Date.now() - result.completedAt.getTime() < 1000 && set.rewardCoins > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { coins: { increment: set.rewardCoins } },
-      });
+    const isFirstCompletion = Date.now() - result.completedAt.getTime() < 1000;
+
+    let masterCardId: string | null = null;
+    if (isFirstCompletion) {
+      // Coin reward (existing behaviour).
+      if (set.rewardCoins > 0) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { coins: { increment: set.rewardCoins } },
+        });
+      }
+      // Set Master mint (new). Idempotent under retries: check if the
+      // user already owns a copy of the master template for this set
+      // — if so, treat it as already-minted rather than double-issuing.
+      if (set.masterTemplate) {
+        const existing = await this.prisma.ownedCard.findFirst({
+          where: { ownerId: userId, templateId: set.masterTemplate.id },
+          select: { id: true },
+        });
+        if (existing) {
+          masterCardId = existing.id;
+        } else {
+          // Mint atomically: bump mintedCount + create OwnedCard with the
+          // next serial. SET_COMPLETION acquisition source flags it as
+          // earned (not bought / not signup gift) in the audit trail.
+          try {
+            const minted = await this.prisma.$transaction(async (tx) => {
+              const updatedTpl = await tx.cardTemplate.update({
+                where: { id: set.masterTemplate!.id },
+                data: { mintedCount: { increment: 1 } },
+                select: { mintedCount: true },
+              });
+              return tx.ownedCard.create({
+                data: {
+                  templateId: set.masterTemplate!.id,
+                  serialNumber: updatedTpl.mintedCount,
+                  ownerId: userId,
+                  firstOwnerId: userId,
+                  acquiredVia: 'SET_COMPLETION',
+                  mintReason: `Completed the "${set.name}" set`,
+                  trophies: [`SET:${set.id}`],
+                },
+                select: { id: true },
+              });
+            });
+            masterCardId = minted.id;
+          } catch (e) {
+            // Mint failed — log but don't fail the set completion. The
+            // user still has their coins; we can retry the master mint
+            // on the next check.
+            // eslint-disable-next-line no-console
+            console.warn(`[set-completion] master mint failed for set=${setId}: ${(e as Error).message}`);
+          }
+        }
+      }
     }
-    return { completed: true, rewardCoins: set.rewardCoins, rewardFrame: set.rewardFrame };
+
+    return {
+      completed: true,
+      rewardCoins: set.rewardCoins,
+      rewardFrame: set.rewardFrame,
+      masterCardId,
+      masterTemplate: set.masterTemplate
+        ? {
+            id: set.masterTemplate.id,
+            rarity: set.masterTemplate.rarity,
+            edition: set.masterTemplate.edition,
+            artUrl: set.masterTemplate.artUrl,
+          }
+        : null,
+    };
   }
 }

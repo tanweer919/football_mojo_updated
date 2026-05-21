@@ -81,6 +81,21 @@ export class UsersService {
       }
     }
 
+    // Pinned-card showcase. Pull the full template + player so the
+    // profile screen can render the card without an extra round-trip.
+    const pinnedCard = user.pinnedCardId
+      ? await this.prisma.ownedCard.findFirst({
+          where: { id: user.pinnedCardId, ownerId: uid },
+          include: {
+            template: {
+              include: {
+                player: { include: { team: { select: { id: true, name: true, shortName: true, crestUrl: true, countryCode: true } } } },
+              },
+            },
+          },
+        })
+      : null;
+
     return {
       id: user.id,
       email: user.email,
@@ -93,6 +108,7 @@ export class UsersService {
       proExpiresAt: user.proExpiresAt,
       memberSince: user.createdAt,
       welcomeCard,
+      pinnedCard,
       stats: {
         ownedCards: ownedCount,
         totalFantasyPoints: totalPoints._sum.totalPoints ?? 0,

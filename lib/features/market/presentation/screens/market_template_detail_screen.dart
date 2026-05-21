@@ -8,17 +8,16 @@ import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
+import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../album/data/models/card_models.dart';
 import '../../data/market_models.dart';
 import '../../data/market_repository.dart';
+import '../widgets/player_form_widgets.dart';
 
-/// Detail / "lot" page for a single card template. Shows:
-///   - hero PCard with rarity glow
-///   - supply economics (minted / remaining / unique owners / serial range)
-///   - player + team meta
-///   - the caller's own copies (when signed in)
-///   - full chain-of-custody timeline (mints + accepted trades)
+/// Sorare-style card detail page. Layout:
+///   Hero PCard → Score + Level → Last scores (form stats) → Performance bars
+///   → Card details table → Supply stats → My copies → Sets → History
 class MarketTemplateDetailScreen extends ConsumerWidget {
   const MarketTemplateDetailScreen({super.key, required this.templateId});
   final String templateId;
@@ -51,15 +50,16 @@ class _DetailBody extends ConsumerWidget {
     final p = detail.player;
     final s = detail.stats;
     final card = detail.template;
+    final form = detail.formStats;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 4),
-        // Hero card — fixed width so the rarity glow has breathing room and
-        // small phones don't overflow.
+        // ─── 1. Hero PCard ───────────────────────────────────────────
         Center(
           child: SizedBox(
-            width: 220,
+            width: 240,
             child: PCard(
               rarity: card.rarity,
               rating: _ratingFor(card.rarity),
@@ -74,27 +74,83 @@ class _DetailBody extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+
+        // ─── 2. Score + Level block ──────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _ScoreLevelBlock(card: card, form: form),
+        ),
+        const SizedBox(height: 16),
+
+        // ─── 3. Name + edition + team ────────────────────────────────
         _NameBlock(detail: detail),
+
+        // ─── 4. Last scores — form stats panel ───────────────────────
+        if (form != null) ...[
+          const _SectionTitle(title: 'Last scores'),
+          const _SubTitle(title: 'Stats'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: PlayerFormPanel(
+              last5Avg: form.last5.avg,
+              last5N: form.last5.n,
+              last10Avg: form.last10.avg,
+              last10N: form.last10.n,
+              last40Avg: form.last40.avg,
+              last40N: form.last40.n,
+            ),
+          ),
+        ],
+
+        // ─── 5. Performance bars ─────────────────────────────────────
+        if (detail.lastScores.isNotEmpty) ...[
+          const _SubTitle(title: 'Performance'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: PerformanceBarsPanel(
+              scores: detail.lastScores
+                  .map((s) => PerformanceBarData(
+                        totalPoints: s.totalPoints,
+                        gameweekNumber: s.gameweekNumber,
+                        breakdown: s.breakdown,
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
+
+        // ─── 6. Card details table ───────────────────────────────────
+        const _SectionTitle(title: 'Card details'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _CardDetailsTable(detail: detail),
+        ),
+
+        // ─── 7. Supply stats ─────────────────────────────────────────
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: _SupplyHero(stats: s),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _StatsGrid(stats: s, edition: card.edition),
+          child: _StatsGrid(stats: s),
         ),
+
+        // ─── 8. My copies ────────────────────────────────────────────
         if (detail.myCopies.isNotEmpty) ...[
-          const SectionHead(title: 'Your copies'),
+          const _SectionTitle(title: 'Your copies'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _MyCopiesList(copies: detail.myCopies, total: s.totalSupply),
           ),
         ],
+
+        // ─── 9. Sets ─────────────────────────────────────────────────
         if (detail.sets.isNotEmpty) ...[
-          const SectionHead(title: 'Sets'),
+          const _SectionTitle(title: 'Sets'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(
@@ -105,7 +161,9 @@ class _DetailBody extends ConsumerWidget {
             ),
           ),
         ],
-        const SectionHead(title: 'History'),
+
+        // ─── 10. History ─────────────────────────────────────────────
+        const _SectionTitle(title: 'History'),
         _HistorySection(templateId: templateId),
         SizedBox(height: 32 + MediaQuery.viewPaddingOf(context).bottom),
       ],
@@ -121,13 +179,105 @@ class _DetailBody extends ConsumerWidget {
         CardRarity.ICONIC => 95,
       };
 
-  /// "WC2026-BASE" → "WC2026". Keep only the leading competition prefix for
-  /// the card's compact top-left tag.
   static String _shortEdition(String edition) {
     final dash = edition.indexOf('-');
     return dash < 0 ? edition : edition.substring(0, dash);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION HEADERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.36,
+          color: AppColors.fg,
+        ),
+      ),
+    );
+  }
+}
+
+class _SubTitle extends StatelessWidget {
+  const _SubTitle({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: AppColors.fgSoft,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORE + LEVEL BLOCK — Sorare hex + XP bar under the hero card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ScoreLevelBlock extends StatelessWidget {
+  const _ScoreLevelBlock({required this.card, this.form});
+  final MarketCard card;
+  final MarketFormStats? form;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasScore = form != null && form!.last5.n > 0;
+    final bonus = card.bonusPct;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (hasScore) ...[
+          ScoreHexBadge(score: form!.last5.avg, size: 36),
+          const SizedBox(width: 8),
+        ],
+        if (bonus > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.muted2.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Text(
+              '+$bonus%',
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAME BLOCK
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _NameBlock extends StatelessWidget {
   const _NameBlock({required this.detail});
@@ -140,28 +290,44 @@ class _NameBlock extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          Eyebrow(detail.template.edition, gold: true, size: 10),
+          Eyebrow(
+            '${rarityLabel(detail.template.rarity)} · ${detail.template.edition}',
+            gold: true,
+            size: 10,
+          ),
           const SizedBox(height: 4),
           Text(
             p?.name ?? 'Untitled card',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.44,
+              letterSpacing: -0.48,
               color: AppColors.fg,
             ),
           ),
           if (t != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              t.name,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: AppColors.muted,
-              ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (t.crestUrl != null) ...[
+                  SizedBox(
+                    width: 18, height: 18,
+                    child: PremiumImage(url: t.crestUrl!, fit: BoxFit.contain),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  t.name,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -169,6 +335,165 @@ class _NameBlock extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARD DETAILS TABLE — Sorare-style key-value rows
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CardDetailsTable extends StatelessWidget {
+  const _CardDetailsTable({required this.detail});
+  final MarketTemplateDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = detail.player;
+    final t = p?.team;
+    final card = detail.template;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+        color: AppColors.surface2,
+      ),
+      child: Column(
+        children: [
+          if (t != null) _DetailRow(
+            label: 'Team',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (t.crestUrl != null) ...[
+                  SizedBox(
+                    width: 20, height: 20,
+                    child: PremiumImage(url: t.crestUrl!, fit: BoxFit.contain),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  t.name,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.fg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (p?.position != null)
+            _DetailRow(label: 'Position', value: _formatPosition(p!.position!)),
+          if (p?.country != null)
+            _DetailRow(label: 'Country', value: p!.country!),
+          _DetailRow(
+            label: 'Rarity',
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _rarityColor(card.rarity).withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _rarityColor(card.rarity).withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                rarityLabel(card.rarity),
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _rarityColor(card.rarity),
+                ),
+              ),
+            ),
+          ),
+          _DetailRow(label: 'Edition', value: card.edition),
+          _DetailRow(label: 'Supply', value: '${card.totalSupply}'),
+          if (card.gemPrice != null)
+            _DetailRow(
+              label: 'Price',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.diamond_outlined, size: 14, color: AppColors.gold),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${card.gemPrice}',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static Color _rarityColor(CardRarity r) => switch (r) {
+        CardRarity.COMMON    => AppColors.rCommon,
+        CardRarity.UNCOMMON  => AppColors.rCommon,
+        CardRarity.RARE      => AppColors.rRare,
+        CardRarity.EPIC      => AppColors.rEpic,
+        CardRarity.LEGENDARY => AppColors.rLegendary,
+        CardRarity.ICONIC    => AppColors.rIconicA,
+      };
+
+  static String _formatPosition(String p) => switch (p) {
+        'GK' => 'Goalkeeper',
+        'DF' => 'Defender',
+        'MF' => 'Midfielder',
+        'FW' => 'Forward',
+        _ => p,
+      };
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, this.value, this.trailing});
+  final String label;
+  final String? value;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: AppColors.muted,
+            ),
+          ),
+          const Spacer(),
+          if (trailing != null)
+            trailing!
+          else
+            Text(
+              value ?? '—',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.fg,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPLY HERO
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _SupplyHero extends StatelessWidget {
   const _SupplyHero({required this.stats});
@@ -288,10 +613,13 @@ class _SupplyHero extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS GRID
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.stats, required this.edition});
+  const _StatsGrid({required this.stats});
   final MarketTemplateStats stats;
-  final String edition;
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat.yMMMd();
@@ -374,6 +702,10 @@ class _StatTile extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY COPIES
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _MyCopiesList extends StatelessWidget {
   const _MyCopiesList({required this.copies, required this.total});
@@ -459,6 +791,10 @@ class _CopyRow extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SETS
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _SetChip extends StatelessWidget {
   const _SetChip({required this.set});
   final MarketSetRef set;
@@ -491,7 +827,9 @@ class _SetChip extends StatelessWidget {
   }
 }
 
-// ─── History ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// HISTORY
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _HistorySection extends ConsumerWidget {
   const _HistorySection({required this.templateId});
@@ -513,7 +851,7 @@ class _HistorySection extends ConsumerWidget {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
-                'No history yet — this card hasn’t been minted.',
+                'No history yet — this card hasn\'t been minted.',
                 style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.45),
               ),
             );
@@ -527,20 +865,14 @@ class _HistorySection extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Column(
               children: [
-                for (int i = 0; i < page.events.length; i++) ...[
+                for (int i = 0; i < page.events.length; i++)
                   _HistoryRow(event: page.events[i], isLast: i == page.events.length - 1),
-                ],
                 if (page.nextCursor != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: GhostButton(
                       label: 'Load more',
-                      onPressed: () {
-                        // Simple invalidate — most templates have <50 events,
-                        // so re-fetching the head is acceptable. Full
-                        // pagination can land when supply scales.
-                        ref.invalidate(marketHistoryProvider(templateId));
-                      },
+                      onPressed: () => ref.invalidate(marketHistoryProvider(templateId)),
                     ),
                   ),
               ],
@@ -650,21 +982,14 @@ class _HistoryRow extends StatelessWidget {
             const TextSpan(text: ' minted'),
             if (source != '—') ...[
               const TextSpan(text: ' via '),
-              TextSpan(
-                text: source,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              TextSpan(text: source, style: const TextStyle(fontWeight: FontWeight.w700)),
             ],
             const TextSpan(text: ' → '),
-            TextSpan(
-              text: actor,
-              style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.fg),
-            ),
+            TextSpan(text: actor, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.fg)),
           ],
         ),
       );
     }
-    // TRADE
     final from = event.fromUser?.handle ?? '?';
     final to = event.toUser?.handle ?? '?';
     final serials = event.serialNumbers ?? const [];
@@ -680,25 +1005,20 @@ class _HistoryRow extends StatelessWidget {
           height: 1.4,
         ),
         children: [
-          TextSpan(
-            text: serialLabel,
-            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.info),
-          ),
+          TextSpan(text: serialLabel, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.info)),
           const TextSpan(text: ' traded '),
-          TextSpan(
-            text: from,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+          TextSpan(text: from, style: const TextStyle(fontWeight: FontWeight.w700)),
           const TextSpan(text: ' → '),
-          TextSpan(
-            text: to,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+          TextSpan(text: to, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────────────────────────
 
 String _prettySource(String s) {
   switch (s) {
@@ -726,7 +1046,9 @@ String _relative(DateTime at) {
   return '${(diff.inDays / 365).floor()}y ago';
 }
 
-// ─── Skeletons ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SKELETONS
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();
@@ -736,11 +1058,17 @@ class _DetailSkeleton extends StatelessWidget {
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
-          Center(child: Skeleton(height: 320, width: 220, radius: 16)),
+          Center(child: Skeleton(height: 340, width: 240, radius: 16)),
+          SizedBox(height: 14),
+          Skeleton(height: 36, radius: 8),
+          SizedBox(height: 16),
+          Skeleton(height: 60, radius: 12),
+          SizedBox(height: 16),
+          Skeleton(height: 100, radius: 16),
+          SizedBox(height: 16),
+          Skeleton(height: 160, radius: 16),
           SizedBox(height: 16),
           Skeleton(height: 90, radius: 16),
-          SizedBox(height: 16),
-          Skeleton(height: 140, radius: 16),
         ],
       ),
     );

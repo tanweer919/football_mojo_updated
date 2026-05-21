@@ -107,6 +107,60 @@ class WelcomeCard {
   }
 }
 
+/// Subset of OwnedCard fields needed to render the profile showcase tile.
+/// Smaller than OwnedCardDto on purpose — keeps the /me response light.
+class PinnedCardSummary {
+  PinnedCardSummary({
+    required this.id,
+    required this.serialNumber,
+    required this.rarity,
+    required this.totalSupply,
+    required this.level,
+    required this.trophies,
+    this.artUrl,
+    this.editionLabel,
+    this.playerName,
+    this.playerPosition,
+    this.playerCountry,
+    this.teamCrestUrl,
+    this.teamShortName,
+  });
+  final String id;
+  final int serialNumber;
+  final String rarity;
+  final int totalSupply;
+  final int level;
+  final List<String> trophies;
+  final String? artUrl;
+  final String? editionLabel;
+  final String? playerName;
+  final String? playerPosition;
+  final String? playerCountry;
+  final String? teamCrestUrl;
+  final String? teamShortName;
+
+  factory PinnedCardSummary.fromJson(Map<String, dynamic> j) {
+    final t = (j['template'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final p = (t['player'] as Map?)?.cast<String, dynamic>();
+    final team = (p?['team'] as Map?)?.cast<String, dynamic>();
+    return PinnedCardSummary(
+      id: j['id'] as String,
+      serialNumber: (j['serialNumber'] as num).toInt(),
+      level: (j['level'] as num?)?.toInt() ?? 0,
+      trophies: ((j['trophies'] as List?) ?? const []).cast<String>(),
+      rarity: (t['rarity'] as String?) ?? 'COMMON',
+      totalSupply: (t['totalSupply'] as num?)?.toInt() ?? 0,
+      artUrl: t['artUrl'] as String?,
+      editionLabel: t['edition'] as String?,
+      playerName: p?['name'] as String?,
+      playerPosition: p?['position'] as String?,
+      playerCountry: p?['nationality'] as String?,
+      teamCrestUrl: team?['crestUrl'] as String?,
+      teamShortName: team?['shortName'] as String?,
+    );
+  }
+}
+
 class Profile {
   Profile({
     required this.id,
@@ -123,6 +177,7 @@ class Profile {
     required this.achievements,
     required this.followedTeams,
     this.welcomeCard,
+    this.pinnedCard,
   });
   final String id;
   final String? email;
@@ -141,6 +196,10 @@ class Profile {
   /// Set when the server has minted a signup gift the user hasn't seen yet.
   /// Triggers the full-screen reveal animation on next sign-in.
   final WelcomeCard? welcomeCard;
+  /// Card the user has pinned to their profile showcase. Public flex.
+  /// Null when the user hasn't pinned anything yet — the profile screen
+  /// renders a "pin your best card" prompt in that case.
+  final PinnedCardSummary? pinnedCard;
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
         id: j['id'] as String,
@@ -154,6 +213,7 @@ class Profile {
         proExpiresAt: j['proExpiresAt'] == null ? null : DateTime.parse(j['proExpiresAt'] as String),
         memberSince: DateTime.parse(j['memberSince'] as String),
         welcomeCard: j['welcomeCard'] == null ? null : WelcomeCard.fromJson(j['welcomeCard'] as Map<String, dynamic>),
+        pinnedCard: j['pinnedCard'] == null ? null : PinnedCardSummary.fromJson((j['pinnedCard'] as Map).cast<String, dynamic>()),
         stats: ProfileStats.fromJson(j['stats'] as Map<String, dynamic>),
         achievements: ((j['achievements'] as List?) ?? const [])
             .map((a) => ProfileAchievement.fromJson(a as Map<String, dynamic>))

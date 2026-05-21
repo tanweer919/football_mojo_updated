@@ -52,12 +52,14 @@ export class FantasyPricingService {
 
     let updated = 0;
     for (const v of valuations) {
-      // formBoost has three possible sources, in priority order:
+      // formBoost priority order:
       //   1. PlayerGameweekScore rows — most accurate (real fantasy points).
-      //   2. PlayerValuation.seasonRating — api-football's per-player rating
-      //      from the most recently completed league season. Set by
-      //      `npm run ingest:form`. Bridges the pre-WC gap when (1) is empty.
-      //   3. Nothing — only the player/team/position boosts fire.
+      //   2. PlayerValuation.seasonRating — api-football season rating
+      //      (set by `npm run ingest:form`). Only counted when the
+      //      player actually played a meaningful number of games — see
+      //      PRICING.minAppearancesForForm. Otherwise their rating is
+      //      noise on a tiny sample.
+      //   3. Nothing — only player/team/position boosts fire.
       let formBoost = 0;
       let recentFormForLog = 0;
       const recent = await this.prisma.playerGameweekScore.findMany({
@@ -70,23 +72,30 @@ export class FantasyPricingService {
         const avgForm = recent.reduce((s, r) => s + r.totalPoints, 0) / recent.length;
         recentFormForLog = avgForm;
         formBoost = Math.max(0, Math.min(PRICING.formBoostMax, avgForm * PRICING.formWeight));
-      } else if (v.seasonRating != null) {
-        // Map a 0..10 rating to 0..PRICING.formBoostMax. The "useful" range
-        // for actual rotation players is ~6.4 (squad filler) → 7.6 (star).
-        // Anchor 6.4 at 0 and 8.4 at the cap so the gradient lands inside
-        // the data instead of squishing everyone into the lower band.
+      } else if (
+        v.seasonRating != null &&
+        (v.seasonAppearances ?? 0) >= PRICING.minAppearancesForForm
+      ) {
+        // Map a 0..10 rating to 0..formBoostMax. Anchored at the realistic
+        // 6.4 → 8.4 range so the gradient lands inside actual data
+        // instead of squishing everyone into the lower band.
         const norm = Math.max(0, Math.min(1, (v.seasonRating - 6.4) / 2.0));
         formBoost = norm * PRICING.formBoostMax;
-        recentFormForLog = v.seasonRating; // surface in `recentForm` for the UI
+        recentFormForLog = v.seasonRating;
       }
 
       const floor = PRICING.floorByPosition[v.position];
       const teamBoost = this._teamBoost(v.player.team.competition?.id);
       const playerBoost = this._playerBoost(v.player.id, v.player.shirtNumber);
+      const apps = v.seasonAppearances ?? 0;
 
+      // Apply appearance-tier cap on top of the global maxPrice. A player
+      // who barely featured can't price out next to a starter no matter
+      // how strong their team or hash is.
+      const tierCap = this._tierCap(floor, apps);
       const next = Math.max(
         PRICING.minPrice,
-        Math.min(PRICING.maxPrice, floor + teamBoost + playerBoost + formBoost),
+        Math.min(tierCap, floor + teamBoost + playerBoost + formBoost),
       );
 
       await this.prisma.playerValuation.update({
@@ -101,7 +110,18 @@ export class FantasyPricingService {
   // ─── Boosts ──────────────────────────────────────────────────────────────
 
   private _teamBoost(competitionId: string | null | undefined): number {
-    return TEAM_BOOST_BY_COMPETITION[competitionId ?? ''] ?? 2;
+    return TEAM_BOOST_BY_COMPETITION[competitionId ?? ''] ?? 1.5;
+  }
+
+  /// Hard ceiling driven by minutes played last season. Without this
+  /// the previous repricer let fringe academy players price out alongside
+  /// established starters because their team + hash boosts compounded
+  /// over a small appearances sample.
+  private _tierCap(floor: number, apps: number): number {
+    const { benchwarmer, rotation } = PRICING.appearanceTierCap;
+    if (apps < benchwarmer.maxApps) return Math.min(PRICING.maxPrice, floor + benchwarmer.capOver);
+    if (apps < rotation.maxApps)    return Math.min(PRICING.maxPrice, floor + rotation.capOver);
+    return PRICING.maxPrice;
   }
 
   /// Stable per-player variance. Uses FNV-1a over the player id to map

@@ -126,6 +126,14 @@ class _TeamPickerScreenState extends ConsumerState<TeamPickerScreen> {
     return PitchScreen(
       title: 'Follow teams',
       onBack: () => context.canPop() ? context.pop() : context.go('/home'),
+      // The screen has its own internal Expanded(list) — passing
+      // scrollable:false stops PitchScreen from wrapping the body in a
+      // SingleChildScrollView, which would collapse the Expanded to zero
+      // height and render a blank picker.
+      scrollable: false,
+      // Picker manages its own bottom inset (the list pads its own
+      // bottom) — disable the tabbar reserve to avoid a visible gap.
+      withinTabShell: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

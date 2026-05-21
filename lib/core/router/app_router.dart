@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/album/presentation/screens/album_screen.dart';
 import '../../features/album/presentation/screens/card_detail_screen.dart';
+import '../../features/album/presentation/screens/owned_card_stats_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_home_screen.dart';
 import '../../features/following/presentation/screens/team_picker_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
@@ -75,6 +76,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.matchDetail, builder: (_, s) => MatchDetailScreen(matchId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.newsReader,  builder: (_, s) => NewsReaderScreen(articleId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.cardDetail,  builder: (_, s) => CardDetailScreen(ownedCardId: s.pathParameters['id']!)),
+      GoRoute(path: RoutePaths.cardStats,   builder: (_, s) => OwnedCardStatsScreen(ownedCardId: s.pathParameters['id']!)),
       GoRoute(
         path: RoutePaths.marketCard,
         builder: (_, s) => MarketTemplateDetailScreen(templateId: s.pathParameters['templateId']!),
