@@ -1,0 +1,1275 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/widgets/eyebrow.dart';
+import '../../../../core/widgets/live_dot.dart';
+import '../../../../core/widgets/pitch_buttons.dart';
+import '../../../../core/widgets/premium_image.dart';
+import '../../../../core/widgets/score_flip.dart';
+import '../../../../core/widgets/skeleton.dart';
+import '../../../insights/data/insights_repository.dart';
+import '../../../insights/data/models/lineup_dto.dart';
+import '../../../insights/data/models/match_event_dto.dart';
+import '../../../insights/data/models/match_stats_dto.dart';
+import '../../../scores/data/models/match_dto.dart';
+import '../../../scores/data/repositories/scores_repository.dart';
+
+/// Match detail — single scrollable page with hero + stats + events + lineups
+/// stacked vertically. Each section handles its own loading/error/empty
+/// state, so partial failures (e.g. lineups not yet announced) never blank
+/// the whole screen.
+class MatchDetailScreen extends ConsumerStatefulWidget {
+  const MatchDetailScreen({super.key, required this.matchId});
+  final String matchId;
+  @override
+  ConsumerState<MatchDetailScreen> createState() => _MatchDetailScreenState();
+}
+
+class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
+  late final Future<MatchDto?> _matchFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    final repo = ref.read(scoresRepositoryProvider);
+    _matchFuture = repo.fetchMatch(widget.matchId);
+    repo.subscribeMatch(widget.matchId);
+  }
+
+  @override
+  void dispose() {
+    ref.read(scoresRepositoryProvider).unsubscribeMatch(widget.matchId);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: FutureBuilder<MatchDto?>(
+        future: _matchFuture,
+        builder: (_, snap) {
+          final topInset = MediaQuery.viewPaddingOf(context).top;
+          if (snap.connectionState != ConnectionState.done) {
+            return _LoadingState(topInset: topInset);
+          }
+          if (snap.hasError) {
+            return _NotFound(
+              topInset: topInset,
+              title: 'Match unavailable',
+              detail: '${snap.error}',
+            );
+          }
+          final match = snap.data;
+          if (match == null) {
+            return _NotFound(
+              topInset: topInset,
+              title: 'Match details not yet available',
+              detail:
+                  'This fixture is from a league we don’t track in detail. Tap the back arrow to return to scores.',
+            );
+          }
+          return _MatchBody(match: match, topInset: topInset);
+        },
+      ),
+    );
+  }
+}
+
+// ─── BODY ──────────────────────────────────────────────────────────────────
+
+class _MatchBody extends StatelessWidget {
+  const _MatchBody({required this.match, required this.topInset});
+  final MatchDto match;
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        SliverToBoxAdapter(child: SizedBox(height: topInset + 6)),
+        SliverToBoxAdapter(child: _Topbar(match: match)),
+        SliverToBoxAdapter(child: _Hero(match: match)),
+        SliverToBoxAdapter(child: _SectionHead(title: 'Stats', icon: Icons.bar_chart)),
+        SliverToBoxAdapter(child: _StatsBlock(matchId: match.id)),
+        SliverToBoxAdapter(child: _SectionHead(title: 'Key moments', icon: Icons.timeline)),
+        SliverToBoxAdapter(child: _EventsBlock(matchId: match.id, homeTeamId: match.homeTeam.id)),
+        SliverToBoxAdapter(child: _SectionHead(title: 'Line-ups', icon: Icons.group)),
+        SliverToBoxAdapter(child: _LineupsBlock(matchId: match.id)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
+    );
+  }
+}
+
+class _LoadingState extends StatelessWidget {
+  const _LoadingState({required this.topInset});
+  final double topInset;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, topInset + 60, 16, 16),
+      child: const Skeleton(height: 240, radius: 20),
+    );
+  }
+}
+
+// ─── TOPBAR ────────────────────────────────────────────────────────────────
+
+class _Topbar extends StatelessWidget {
+  const _Topbar({required this.match});
+  final MatchDto match;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          CircleIconButton(icon: Icons.chevron_left, onPressed: () => context.pop()),
+          Expanded(
+            child: Center(
+              child: Eyebrow(match.stage ?? 'Match', gold: true, size: 11),
+            ),
+          ),
+          CircleIconButton(
+            icon: Icons.share_outlined,
+            onPressed: () => SharePlus.instance.share(
+              ShareParams(text: '${match.homeTeam.name} vs ${match.awayTeam.name}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── HERO ──────────────────────────────────────────────────────────────────
+
+class _Hero extends ConsumerWidget {
+  const _Hero({required this.match});
+  final MatchDto match;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Goalscorers chip-row. Render only when there's at least one goal so
+    // pre-match / 0-0 heroes don't grow an empty band. Pulled from the
+    // same events provider the Events tab uses — Riverpod dedupes, so we
+    // pay one fetch even though it's referenced twice on the page.
+    final goalscorers = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) => es.where(_isGoalEvent).toList(),
+          orElse: () => const <MatchEventDto>[],
+        );
+    final showScore = match.isLive || match.isFinished;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r5),
+          border: Border.all(color: AppColors.borderSoft),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A1714), Color(0xFF0F0D0B)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.r5),
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [Color(0x33A0E1B5), Colors.transparent],
+                      center: Alignment(0, -1),
+                      radius: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                if (match.isLive)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const LiveDot(),
+                      const SizedBox(width: 6),
+                      Text(
+                        match.status == MatchStatus.HALF_TIME ? 'HT' : "${match.minute ?? 0}'",
+                        style: const TextStyle(
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.live,
+                          letterSpacing: 1.65,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Eyebrow(
+                    match.isFinished
+                        ? 'Full time'
+                        : DateFormat('EEE d MMM · HH:mm').format(match.kickoffAt.toLocal()),
+                    gold: true,
+                    size: 10,
+                  ),
+                const SizedBox(height: 18),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: _Side(team: match.homeTeam, alignEnd: false)),
+                    if (showScore)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ScoreFlip(
+                              value: match.homeScore,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 48,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.92,
+                                color: AppColors.fg,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.muted2, shape: BoxShape.circle)),
+                            const SizedBox(width: 10),
+                            ScoreFlip(
+                              value: match.awayScore,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 48,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.92,
+                                color: AppColors.fg,
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 18),
+                        child: Text(
+                          'vs',
+                          style: TextStyle(
+                            fontFamily: 'IowanOldStyle',
+                            fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
+                            fontStyle: FontStyle.italic,
+                            fontSize: 22,
+                            color: AppColors.gold,
+                          ),
+                        ),
+                      ),
+                    Expanded(child: _Side(team: match.awayTeam, alignEnd: true)),
+                  ],
+                ),
+                if (goalscorers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _HeroGoalscorers(
+                    events: goalscorers,
+                    homeTeamId: match.homeTeam.id,
+                  ),
+                ],
+                if (match.venue != null) ...[
+                  const SizedBox(height: 18),
+                  Container(height: 1, color: AppColors.borderSoft),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Eyebrow(match.venue!, size: 10),
+                      if (match.stage != null) Eyebrow(match.stage!, size: 10),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Goal events only — own-goals and penalties count, missed penalties don't.
+bool _isGoalEvent(MatchEventDto e) =>
+    e.kind == EventKind.goal ||
+    e.kind == EventKind.ownGoal ||
+    e.kind == EventKind.penalty;
+
+/// Two-column scorer strip rendered under the score in the hero. Each side
+/// lists the team's scorers with minute marks (`Mbappé 23'`, `Yamal 67'`).
+/// Own-goals are intentionally credited to the *opposite* side so the
+/// scoreboard reads correctly.
+class _HeroGoalscorers extends StatelessWidget {
+  const _HeroGoalscorers({required this.events, required this.homeTeamId});
+  final List<MatchEventDto> events;
+  final String homeTeamId;
+
+  @override
+  Widget build(BuildContext context) {
+    final home = <MatchEventDto>[];
+    final away = <MatchEventDto>[];
+    for (final e in events) {
+      // Own goals score for the opposing side — flip the bucket they land in.
+      final scoresForHome = e.kind == EventKind.ownGoal
+          ? e.teamId != homeTeamId
+          : e.teamId == homeTeamId;
+      (scoresForHome ? home : away).add(e);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _ScorerColumn(events: home, alignEnd: false)),
+        const SizedBox(width: 12),
+        Expanded(child: _ScorerColumn(events: away, alignEnd: true)),
+      ],
+    );
+  }
+}
+
+class _ScorerColumn extends StatelessWidget {
+  const _ScorerColumn({required this.events, required this.alignEnd});
+  final List<MatchEventDto> events;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        for (final e in events)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!alignEnd) ...[_ballIcon(e), const SizedBox(width: 6)],
+                Flexible(
+                  child: Text(
+                    _label(e),
+                    textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fg,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                if (alignEnd) ...[const SizedBox(width: 6), _ballIcon(e)],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _ballIcon(MatchEventDto e) {
+    // Different glyphs so own-goals stand out from regular tallies — the
+    // user can scan the row and immediately see which were unfortunate.
+    final icon = e.kind == EventKind.ownGoal
+        ? Icons.cancel_outlined
+        : e.kind == EventKind.penalty
+            ? Icons.adjust
+            : Icons.sports_soccer;
+    final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
+    return Icon(icon, size: 12, color: color);
+  }
+
+  String _label(MatchEventDto e) {
+    final name = e.playerName ?? 'Unknown';
+    final extra = e.kind == EventKind.ownGoal
+        ? ' (OG)'
+        : e.kind == EventKind.penalty
+            ? ' (P)'
+            : '';
+    return '$name$extra · ${e.displayMinute}';
+  }
+}
+
+class _Side extends StatelessWidget {
+  const _Side({required this.team, required this.alignEnd});
+  final TeamDto team;
+  final bool alignEnd;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 56, height: 56,
+          child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          team.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.24,
+            color: AppColors.fg,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Eyebrow(team.shortName ?? '', size: 9),
+      ],
+    );
+  }
+}
+
+// ─── SECTION HEAD ──────────────────────────────────────────────────────────
+
+class _SectionHead extends StatelessWidget {
+  const _SectionHead({required this.title, required this.icon});
+  final String title;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.gold),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.26,
+              color: AppColors.fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── STATS ─────────────────────────────────────────────────────────────────
+
+class _StatsBlock extends ConsumerWidget {
+  const _StatsBlock({required this.matchId});
+  final String matchId;
+
+  static const _ordered = <_StatRow>[
+    _StatRow('Ball Possession', isPercent: true),
+    _StatRow('Total Shots'),
+    _StatRow('Shots on Goal'),
+    _StatRow('Corner Kicks'),
+    _StatRow('Fouls'),
+    _StatRow('Yellow Cards'),
+    _StatRow('Total passes', display: 'Passes'),
+    _StatRow('Passes %', display: 'Pass accuracy', isPercent: true),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(matchStatsProvider(matchId));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: async.when(
+        loading: () => const Skeleton(height: 200, radius: 16),
+        error: (_, __) => const _SectionEmpty(text: 'Stats temporarily unavailable.'),
+        data: (teams) {
+          if (teams.length != 2) {
+            return const _SectionEmpty(
+              text: 'Stats appear shortly after kickoff.',
+            );
+          }
+          final home = teams[0];
+          final away = teams[1];
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              border: Border.all(color: AppColors.borderSoft),
+              color: AppColors.surface,
+            ),
+            child: Column(
+              children: [
+                for (int i = 0; i < _ordered.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  _StatBar(home: home, away: away, row: _ordered[i]),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StatRow {
+  const _StatRow(this.key, {this.display, this.isPercent = false});
+  final String key;
+  final String? display;
+  final bool isPercent;
+}
+
+class _StatBar extends StatelessWidget {
+  const _StatBar({required this.home, required this.away, required this.row});
+  final TeamMatchStatsDto home;
+  final TeamMatchStatsDto away;
+  final _StatRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final hVal = home[row.key] ?? 0;
+    final aVal = away[row.key] ?? 0;
+    final total = (hVal + aVal).abs();
+    final hRatio = total == 0 ? 0.5 : hVal / total;
+    String fmt(num v) => row.isPercent ? '${v.toStringAsFixed(0)}%' : v.toStringAsFixed(0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Text(
+                fmt(hVal),
+                style: const TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.fg,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                row.display ?? row.key,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(
+                fmt(aVal),
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.fg,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              flex: (hRatio * 100).round().clamp(1, 99),
+              child: Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: ((1 - hRatio) * 100).round().clamp(1, 99),
+              child: Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderSoft,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─── EVENTS ────────────────────────────────────────────────────────────────
+
+class _EventsBlock extends ConsumerWidget {
+  const _EventsBlock({required this.matchId, required this.homeTeamId});
+  final String matchId;
+  final String homeTeamId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(matchEventsProvider(matchId));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: async.when(
+        loading: () => const Skeleton(height: 120, radius: 16),
+        error: (_, __) => const _SectionEmpty(text: 'Events temporarily unavailable.'),
+        data: (events) {
+          if (events.isEmpty) {
+            return const _SectionEmpty(text: 'Goals, cards and subs land here in real time.');
+          }
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              border: Border.all(color: AppColors.borderSoft),
+              color: AppColors.surface,
+            ),
+            child: Column(
+              children: [
+                for (final e in events)
+                  _EventTile(event: e, isHome: e.teamId == homeTeamId),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EventTile extends StatelessWidget {
+  const _EventTile({required this.event, required this.isHome});
+  final MatchEventDto event;
+  final bool isHome;
+
+  IconData get _icon => switch (event.kind) {
+        EventKind.goal || EventKind.penalty => Icons.sports_soccer,
+        EventKind.ownGoal => Icons.swap_calls,
+        EventKind.penaltyMissed => Icons.do_not_disturb_on_outlined,
+        EventKind.yellow => Icons.square,
+        EventKind.red => Icons.square,
+        EventKind.sub => Icons.sync_alt,
+        EventKind.varCheck => Icons.crop_square_outlined,
+        _ => Icons.circle,
+      };
+  Color get _color => switch (event.kind) {
+        EventKind.goal || EventKind.penalty => AppColors.gold,
+        EventKind.ownGoal => AppColors.live,
+        EventKind.yellow => const Color(0xFFFCD34D),
+        EventKind.red => AppColors.live,
+        EventKind.sub => AppColors.pitch,
+        _ => AppColors.muted,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final left = isHome
+        ? _eventSide(event: event, icon: _icon, color: _color, alignEnd: false)
+        : const SizedBox.shrink();
+    final right = isHome
+        ? const SizedBox.shrink()
+        : _eventSide(event: event, icon: _icon, color: _color, alignEnd: true);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: left),
+          SizedBox(
+            width: 44,
+            child: Text(
+              event.displayMinute,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+          Expanded(child: right),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _eventSide({
+    required MatchEventDto event,
+    required IconData icon,
+    required Color color,
+    required bool alignEnd,
+  }) {
+    final col = Column(
+      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          event.playerName ?? '—',
+          textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.fg,
+          ),
+        ),
+        if (event.assistName != null && event.kind == EventKind.goal) ...[
+          const SizedBox(height: 2),
+          Text(
+            'assist · ${event.assistName}',
+            textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              color: AppColors.muted,
+            ),
+          ),
+        ],
+      ],
+    );
+    final pip = Icon(icon, size: 16, color: color);
+    return Row(
+      mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: alignEnd
+          ? [Flexible(child: col), const SizedBox(width: 8), pip]
+          : [pip, const SizedBox(width: 8), Flexible(child: col)],
+    );
+}
+
+// ─── LINEUPS ───────────────────────────────────────────────────────────────
+
+class _LineupsBlock extends ConsumerStatefulWidget {
+  const _LineupsBlock({required this.matchId});
+  final String matchId;
+  @override
+  ConsumerState<_LineupsBlock> createState() => _LineupsBlockState();
+}
+
+/// Tabbed pitch view. One tab per team; selected tab paints the 11-on-a-
+/// pitch view + bench list below.
+class _LineupsBlockState extends ConsumerState<_LineupsBlock> {
+  int _tab = 0;
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(matchLineupsProvider(widget.matchId));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: async.when(
+        loading: () => const Skeleton(height: 320, radius: 16),
+        error: (_, __) => const _SectionEmpty(text: 'Line-ups temporarily unavailable.'),
+        data: (lineups) {
+          if (lineups.isEmpty) {
+            return const _SectionEmpty(
+              text: 'Line-ups confirmed about an hour before kickoff.',
+            );
+          }
+          // api-football returns [home, away]. Clamp the tab in case the
+          // upstream payload is missing one side.
+          final selected = _tab.clamp(0, lineups.length - 1);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _LineupTabs(
+                lineups: lineups,
+                selectedIndex: selected,
+                onSelect: (i) => setState(() => _tab = i),
+              ),
+              const SizedBox(height: 10),
+              _LineupPitchCard(lineup: lineups[selected]),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Pill segmented control — one tab per team. Crest + short name keeps the
+/// affordance scannable without breaking the dark luxe theme.
+class _LineupTabs extends StatelessWidget {
+  const _LineupTabs({
+    required this.lineups,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+  final List<LineupDto> lineups;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < lineups.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onSelect(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex ? AppColors.gold.withValues(alpha: 0.18) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadii.r3),
+                    border: i == selectedIndex
+                        ? Border.all(color: AppColors.goldHairline)
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (lineups[i].teamLogo != null) ...[
+                        SizedBox(width: 18, height: 18, child: PremiumImage(url: lineups[i].teamLogo, fit: BoxFit.contain)),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          lineups[i].teamName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: i == selectedIndex ? AppColors.gold : AppColors.fgSoft,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LineupPitchCard extends StatelessWidget {
+  const _LineupPitchCard({required this.lineup});
+  final LineupDto lineup;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+        color: AppColors.surface,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Eyebrow(
+                lineup.formation.isEmpty ? 'Formation' : 'Formation · ${lineup.formation}',
+                gold: true,
+                size: 10,
+              ),
+              const Spacer(),
+              if (lineup.coachName != null)
+                Text(
+                  lineup.coachName!,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    color: AppColors.muted,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Aspect-ratioed pitch container — keeps positions consistent
+          // across phones. 0.72 ≈ half-pitch portrait, which is what
+          // every football tactic board uses.
+          AspectRatio(
+            aspectRatio: 0.72,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.r3),
+              child: _Pitch(players: lineup.startXI),
+            ),
+          ),
+          if (lineup.substitutes.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Eyebrow('Substitutes', size: 10),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final s in lineup.substitutes)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      border: Border.all(color: AppColors.borderSoft),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (s.number != null) ...[
+                          Text(
+                            '${s.number}',
+                            style: const TextStyle(
+                              fontFamily: 'JetBrainsMono',
+                              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          s.displayName,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.fgSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The painted pitch + positioned player chips.
+///
+/// Positioning: api-football's `grid = "row:col"` puts row 1 at the goal
+/// line. We map row → vertical fraction (GK ~10% from top, last outfield
+/// row ~85%) and col → horizontal fraction within that row. When the grid
+/// is missing for any player, we fall back to grouping by position and
+/// distributing evenly.
+class _Pitch extends StatelessWidget {
+  const _Pitch({required this.players});
+  final List<LineupPlayer> players;
+
+  @override
+  Widget build(BuildContext context) {
+    final positioned = _layout(players);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Pitch surface — green gradient + mowing stripes + lines.
+        const Positioned.fill(child: CustomPaint(painter: _PitchPainter())),
+        for (final p in positioned)
+          Align(
+            alignment: Alignment(p.x * 2 - 1, p.y * 2 - 1),
+            child: FractionallySizedBox(
+              widthFactor: 0.20,
+              child: _PitchChip(player: p.player),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Map every player to a normalized (x, y) in [0,1] within the pitch.
+  /// Prefers the grid attribute when present, falls back to position rows.
+  static List<_Placed> _layout(List<LineupPlayer> players) {
+    final hasGrid = players.any((p) => p.row != null && p.col != null);
+    if (hasGrid) {
+      // Group by row to size columns row-by-row (formations vary the
+      // column count per row — 4-3-3 has 4 then 3 then 3).
+      final byRow = <int, List<LineupPlayer>>{};
+      for (final p in players) {
+        final r = p.row ?? 1;
+        byRow.putIfAbsent(r, () => []).add(p);
+      }
+      final rows = byRow.keys.toList()..sort();
+      final maxRow = rows.last;
+      final placed = <_Placed>[];
+      for (final r in rows) {
+        final rowPlayers = byRow[r]!..sort((a, b) => (a.col ?? 0).compareTo(b.col ?? 0));
+        // y: row 1 → 0.10, maxRow → 0.85, linear interp.
+        final y = maxRow <= 1 ? 0.5 : 0.10 + ((r - 1) / (maxRow - 1)) * 0.75;
+        for (var i = 0; i < rowPlayers.length; i++) {
+          final n = rowPlayers.length;
+          // Evenly distribute across 90% of pitch width.
+          final x = n == 1 ? 0.5 : 0.05 + (i / (n - 1)) * 0.90;
+          placed.add(_Placed(rowPlayers[i], x, y));
+        }
+      }
+      return placed;
+    }
+
+    // No grid → group by position letter (G/D/M/F) and lay out by line.
+    final order = ['G', 'D', 'M', 'F'];
+    final byPos = {for (final p in order) p: <LineupPlayer>[]};
+    for (final p in players) {
+      final k = p.pos.isNotEmpty ? p.pos[0].toUpperCase() : 'M';
+      (byPos[k] ?? byPos['M']!).add(p);
+    }
+    final activeLines = order.where((k) => byPos[k]!.isNotEmpty).toList();
+    final placed = <_Placed>[];
+    for (var i = 0; i < activeLines.length; i++) {
+      final line = byPos[activeLines[i]]!;
+      final y = activeLines.length <= 1
+          ? 0.5
+          : 0.10 + (i / (activeLines.length - 1)) * 0.75;
+      for (var j = 0; j < line.length; j++) {
+        final n = line.length;
+        final x = n == 1 ? 0.5 : 0.05 + (j / (n - 1)) * 0.90;
+        placed.add(_Placed(line[j], x, y));
+      }
+    }
+    return placed;
+  }
+}
+
+class _Placed {
+  const _Placed(this.player, this.x, this.y);
+  final LineupPlayer player;
+  final double x;
+  final double y;
+}
+
+class _PitchChip extends StatelessWidget {
+  const _PitchChip({required this.player});
+  final LineupPlayer player;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEFD8A1), Color(0xFFC99A3D)],
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))],
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            player.number != null ? '${player.number}' : (player.pos.isNotEmpty ? player.pos[0] : '?'),
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E1810),
+              height: 1.0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Text(
+            player.displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Pitch surface — dark green gradient with alternating mowing stripes,
+/// halfway line, centre circle, and 18-yard boxes. Bottom half of the
+/// pitch only is drawn because lineups are portrait. (Full top-to-bottom
+/// pitch read-out — both halves — fits the data better than a half pitch.)
+class _PitchPainter extends CustomPainter {
+  const _PitchPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    // Base gradient.
+    final base = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF1F4F31), Color(0xFF153A24)],
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    // Mowing stripes — 8 alternating bands.
+    final stripe = Paint()..color = Colors.white.withValues(alpha: 0.04);
+    final bandH = size.height / 8;
+    for (int i = 0; i < 8; i += 2) {
+      canvas.drawRect(Rect.fromLTWH(0, i * bandH, size.width, bandH), stripe);
+    }
+
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.32)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    // Outer frame.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(8, 8, size.width - 16, size.height - 16),
+        const Radius.circular(4),
+      ),
+      line,
+    );
+    // Halfway line + centre circle + spot.
+    canvas.drawLine(Offset(8, size.height / 2), Offset(size.width - 8, size.height / 2), line);
+    canvas.drawCircle(size.center(Offset.zero), size.width * 0.13, line);
+    canvas.drawCircle(size.center(Offset.zero), 2, Paint()..color = Colors.white.withValues(alpha: 0.5));
+    // 18-yard boxes (top + bottom).
+    final boxW = size.width * 0.52;
+    final boxH = size.height * 0.12;
+    final boxX = (size.width - boxW) / 2;
+    canvas.drawRect(Rect.fromLTWH(boxX, 8, boxW, boxH), line);
+    canvas.drawRect(Rect.fromLTWH(boxX, size.height - 8 - boxH, boxW, boxH), line);
+    // 6-yard boxes.
+    final smallW = size.width * 0.28;
+    final smallH = size.height * 0.05;
+    final smallX = (size.width - smallW) / 2;
+    canvas.drawRect(Rect.fromLTWH(smallX, 8, smallW, smallH), line);
+    canvas.drawRect(Rect.fromLTWH(smallX, size.height - 8 - smallH, smallW, smallH), line);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// (_LineupCard + _PlayerChip removed — replaced by _LineupPitchCard above.)
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+
+class _SectionEmpty extends StatelessWidget {
+  const _SectionEmpty({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+        color: AppColors.surface,
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 13,
+          color: AppColors.muted,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+}
+
+class _NotFound extends StatelessWidget {
+  const _NotFound({required this.topInset, required this.title, required this.detail});
+  final double topInset;
+  final String title;
+  final String detail;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, topInset + 6, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [CircleIconButton(icon: Icons.chevron_left, onPressed: () => context.pop())]),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.r5),
+              border: Border.all(color: AppColors.borderSoft),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A1714), Color(0xFF0F0D0B)],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Eyebrow('Match', gold: true),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.44,
+                    color: AppColors.fg,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.muted,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

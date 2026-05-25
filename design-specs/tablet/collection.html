@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH Tablet — Collection</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<link rel="stylesheet" href="../css/tablet.css">
+<style>
+  /* Hero */
+  .col-hero { padding: 28px; border-radius: var(--r-5); position: relative; overflow: hidden;
+    background:
+      radial-gradient(80% 80% at 50% 0%, oklch(35% 0.16 200 / 0.4), transparent 60%),
+      radial-gradient(60% 60% at 100% 100%, oklch(35% 0.2 320 / 0.4), transparent 60%),
+      linear-gradient(180deg, oklch(13% 0.02 280), oklch(8% 0.01 290));
+    border: 1px solid oklch(55% 0.18 290 / 0.4);
+    margin-bottom: 24px;
+  }
+  .col-hero__grid { display: grid; grid-template-columns: 180px 1fr auto; gap: 28px; align-items: center; }
+  .col-hero__card { width: 180px; aspect-ratio: 0.66; border-radius: 16px; overflow: hidden; position: relative;
+    box-shadow: 0 28px 70px -16px oklch(50% 0.22 290 / 0.6), 0 0 0 1px oklch(80% 0.1 320);
+    background: linear-gradient(135deg, oklch(50% 0.2 200), oklch(45% 0.22 290), oklch(60% 0.18 85));
+    background-size: 200% 200%; animation: iconicShift 6s linear infinite;
+  }
+  .col-hero__card::after { content: ''; position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.22) 45%, transparent 60%);
+    background-size: 200% 100%; animation: shineFx 4s ease-in-out infinite;
+  }
+  @keyframes shineFx { 0%, 100% { background-position: 200% 50%; } 50% { background-position: -100% 50%; } }
+  .col-hero__card-inner { position: absolute; inset: 0; padding: 16px; display: flex; flex-direction: column; z-index: 5; background: linear-gradient(180deg, transparent 0, transparent 60%, rgba(0,0,0,.45)); }
+  .col-hero__card-r { font-family: var(--font-display); font-size: 48px; font-weight: 800; color: white; letter-spacing: -0.045em; line-height: 0.9; }
+  .col-hero__card-name { margin-top: auto; font-family: var(--font-display); font-weight: 800; font-size: 22px; color: white; letter-spacing: -0.01em; line-height: 1.05; }
+  .col-hero__card-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,.85); margin-top: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  .col-hero__chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    background: oklch(70% 0.18 320 / 0.18); border: 1px solid oklch(70% 0.18 320 / 0.4);
+    font-family: var(--font-mono); font-size: 11px; color: oklch(85% 0.12 320); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .col-hero__chip::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: oklch(70% 0.18 320); }
+  .col-hero__copy h2 { font-family: var(--font-display); font-size: 32px; line-height: 1; font-weight: 800; letter-spacing: -0.035em; margin-top: 10px; }
+  .col-hero__copy h2 em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: oklch(85% 0.12 320); }
+  .col-hero__copy p { font-size: 14px; color: var(--muted); margin-top: 12px; line-height: 1.5; max-width: 420px; }
+  .col-hero__copy .serial { margin-top: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; }
+
+  /* Big stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card { padding: 20px; border-radius: var(--r-3); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); }
+  .stat-card__v { font-family: var(--font-display); font-size: 32px; font-weight: 800; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
+  .stat-card__v--gold { background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat-card__l { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 8px; }
+
+  /* Body grid */
+  .col-body { display: grid; grid-template-columns: 240px 1fr; gap: 28px; }
+  .col-aside { padding: 22px; border-radius: var(--r-4); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); height: fit-content; position: sticky; top: 0; }
+  .col-aside h4 { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 16px; }
+  .tier-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+  .tier-row:last-child { border-bottom: 0; }
+  .tier-row__l { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .tier-row__bar { height: 4px; border-radius: 2px; background: oklch(18% 0.005 70); overflow: hidden; }
+  .tier-row__bar > div { height: 100%; }
+  .tier-row__n { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--fg); min-width: 38px; text-align: right; }
+  .tier--common .tier-row__l { color: oklch(85% 0.005 240); } .tier--common .tier-row__bar > div { background: oklch(55% 0.012 240); }
+  .tier--rare .tier-row__l { color: oklch(85% 0.08 230); } .tier--rare .tier-row__bar > div { background: var(--r-rare); }
+  .tier--epic .tier-row__l { color: oklch(85% 0.12 295); } .tier--epic .tier-row__bar > div { background: var(--r-epic); }
+  .tier--legendary .tier-row__l { color: var(--gold); } .tier--legendary .tier-row__bar > div { background: linear-gradient(90deg, var(--gold-soft), var(--gold-deep)); }
+  .tier--iconic .tier-row__l { background: linear-gradient(90deg, var(--r-iconic-a), var(--r-iconic-b), var(--r-iconic-c)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tier--iconic .tier-row__bar > div { background: linear-gradient(90deg, var(--r-iconic-a), var(--r-iconic-b), var(--r-iconic-c)); }
+
+  .filter-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .filter-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-radius: 10px; background: oklch(11% 0.005 70 / 0.5); border: 1px solid var(--border-soft); font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
+  .filter-row.on { color: var(--gold); background: oklch(15% 0.012 75 / 0.6); border-color: var(--gold-hairline); }
+
+  /* Cards grid */
+  .cards-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .cards-grid .pcard { transition: transform .2s var(--ease); cursor: pointer; }
+  .cards-grid .pcard:hover { transform: translateY(-4px); }
+
+  .filter-chips { display: flex; gap: 8px; padding-bottom: 18px; flex-wrap: wrap; }
+  .filter-chip { padding: 8px 14px; border-radius: 999px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; background: oklch(14% 0.006 70); border: 1px solid var(--border-soft); color: var(--muted); cursor: pointer; }
+  .filter-chip.is-active { background: linear-gradient(180deg, var(--surface-3), var(--surface-2)); color: var(--gold); border-color: var(--gold-hairline); }
+  .filter-chip__n { color: var(--muted-2); margin-left: 6px; }
+  .filter-chip.is-active .filter-chip__n { color: var(--gold); opacity: 0.6; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="tablet"><div class="screen">
+    <div class="tab-shell">
+      <main class="main">
+        <div class="main-hd">
+          <div><h1>Your <em>Collection</em></h1><div class="main-hd__date" style="margin-top:8px">147 of 320 cards · 3 Iconic · 11 Legendary</div></div>
+          <div class="main-hd__right">
+            <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Find player by name, position…</span></div>
+            <button class="tab-iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg></button>
+            <a class="tab-avatar" href="profile.html" title="Jordan · Tier 4 Legend">JS</a>
+          </div>
+        </div>
+
+        <div class="t-section">
+          <!-- Hero -->
+          <section class="col-hero">
+            <div class="col-hero__grid">
+              <div class="col-hero__card">
+                <div class="col-hero__card-inner">
+                  <div class="col-hero__card-r">95</div>
+                  <div class="col-hero__card-name">Lamine<br>Yamal</div>
+                  <div class="col-hero__card-meta"><span>RW</span><span>ESP</span></div>
+                </div>
+              </div>
+              <div class="col-hero__copy">
+                <span class="col-hero__chip">Crown jewel · 1 of 1</span>
+                <h2>The youngest <em>Iconic</em> ever minted.</h2>
+                <p>Earned 4 Apr — Top 1 finish, Euro 1v1 Spring Ladder. Card mints are permanent and tradeable.</p>
+                <div class="serial">Serial #0001 / 0001</div>
+              </div>
+              <div style="text-align: right">
+                <button class="btn btn--ghost-gold btn--sm" style="margin-bottom:8px">Inspect 3D →</button>
+                <div style="font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.12em">Last appraisal — 14.2k pts</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Big stats -->
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-card__v">147</div><div class="stat-card__l">Owned</div></div>
+            <div class="stat-card"><div class="stat-card__v stat-card__v--gold">3</div><div class="stat-card__l">Iconic</div></div>
+            <div class="stat-card"><div class="stat-card__v">89.7</div><div class="stat-card__l">Avg rating</div></div>
+            <div class="stat-card"><div class="stat-card__v" style="color:var(--pitch)">↑12</div><div class="stat-card__l">This week</div></div>
+          </div>
+
+          <!-- Filter chips -->
+          <div class="filter-chips">
+            <button class="filter-chip is-active">All <span class="filter-chip__n">147</span></button>
+            <button class="filter-chip">Iconic <span class="filter-chip__n">3</span></button>
+            <button class="filter-chip">Legendary <span class="filter-chip__n">11</span></button>
+            <button class="filter-chip">Epic <span class="filter-chip__n">28</span></button>
+            <button class="filter-chip">Rare <span class="filter-chip__n">52</span></button>
+            <button class="filter-chip">Common <span class="filter-chip__n">53</span></button>
+            <div style="flex:1"></div>
+            <button class="filter-chip">Sort: rating ↓</button>
+          </div>
+
+          <!-- Body -->
+          <div class="col-body">
+            <aside class="col-aside">
+              <h4>By rarity</h4>
+              <div class="tier-row tier--iconic"><div class="tier-row__l">Iconic</div><div class="tier-row__bar"><div style="width:8%"></div></div><div class="tier-row__n">3/38</div></div>
+              <div class="tier-row tier--legendary"><div class="tier-row__l">Legendary</div><div class="tier-row__bar"><div style="width:32%"></div></div><div class="tier-row__n">11/34</div></div>
+              <div class="tier-row tier--epic"><div class="tier-row__l">Epic</div><div class="tier-row__bar"><div style="width:54%"></div></div><div class="tier-row__n">28/52</div></div>
+              <div class="tier-row tier--rare"><div class="tier-row__l">Rare</div><div class="tier-row__bar"><div style="width:64%"></div></div><div class="tier-row__n">52/81</div></div>
+              <div class="tier-row tier--common"><div class="tier-row__l">Common</div><div class="tier-row__bar"><div style="width:46%"></div></div><div class="tier-row__n">53/115</div></div>
+
+              <h4 style="margin-top:24px">Position</h4>
+              <div class="filter-stack">
+                <div class="filter-row on">All positions <span style="color:var(--gold)">147</span></div>
+                <div class="filter-row">GK <span>9</span></div>
+                <div class="filter-row">DEF <span>34</span></div>
+                <div class="filter-row">MID <span>58</span></div>
+                <div class="filter-row">FWD <span>46</span></div>
+              </div>
+            </aside>
+
+            <div class="cards-grid">
+              <article class="pcard pcard--iconic"><div class="pcard__bg"></div><div class="pcard__glow"></div><div class="pcard__shine"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="pcard__rating">95</div><span class="rarity rarity--iconic">1/1</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Yamal</div><div class="pcard__meta"><span>RW</span><span>ESP</span></div></div></div></article>
+
+              <article class="pcard pcard--legendary"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">93</div><span class="rarity rarity--legendary">L</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Mbappé</div><div class="pcard__meta"><span>ST</span><span>FRA</span></div></div></div></article>
+
+              <article class="pcard pcard--legendary"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">91</div><span class="rarity rarity--legendary">L</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Vinicius Jr</div><div class="pcard__meta"><span>LW</span><span>BRA</span></div></div></div></article>
+
+              <article class="pcard pcard--legendary"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">90</div><span class="rarity rarity--legendary">L</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Haaland</div><div class="pcard__meta"><span>ST</span><span>NOR</span></div></div></div></article>
+
+              <article class="pcard pcard--legendary"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">90</div><span class="rarity rarity--legendary">L</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Rodri</div><div class="pcard__meta"><span>CDM</span><span>ESP</span></div></div></div></article>
+
+              <article class="pcard pcard--epic"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">89</div><span class="rarity rarity--epic">E</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Bellingham</div><div class="pcard__meta"><span>AM</span><span>ENG</span></div></div></div></article>
+
+              <article class="pcard pcard--epic"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">89</div><span class="rarity rarity--epic">E</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Pedri</div><div class="pcard__meta"><span>CM</span><span>ESP</span></div></div></div></article>
+
+              <article class="pcard pcard--epic"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">88</div><span class="rarity rarity--epic">E</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Saliba</div><div class="pcard__meta"><span>CB</span><span>FRA</span></div></div></div></article>
+
+              <article class="pcard pcard--rare"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">86</div><span class="rarity rarity--rare">R</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Musiala</div><div class="pcard__meta"><span>AM</span><span>GER</span></div></div></div></article>
+
+              <article class="pcard pcard--rare"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">84</div><span class="rarity rarity--rare">R</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Saka</div><div class="pcard__meta"><span>RW</span><span>ENG</span></div></div></div></article>
+
+              <article class="pcard pcard--rare"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">83</div><span class="rarity rarity--rare">R</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Foden</div><div class="pcard__meta"><span>AM</span><span>ENG</span></div></div></div></article>
+
+              <article class="pcard pcard--rare"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">82</div><span class="rarity rarity--rare">R</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Wirtz</div><div class="pcard__meta"><span>AM</span><span>GER</span></div></div></div></article>
+
+              <article class="pcard pcard--common"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">79</div><span class="rarity rarity--common">C</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Olmo</div><div class="pcard__meta"><span>AM</span><span>ESP</span></div></div></div></article>
+
+              <article class="pcard pcard--common"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">77</div><span class="rarity rarity--common">C</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Olise</div><div class="pcard__meta"><span>RW</span><span>FRA</span></div></div></div></article>
+
+              <article class="pcard pcard--common"><div class="pcard__bg"></div><div class="pcard__glow"></div>
+                <div class="pcard__chrome"><div style="display:flex;justify-content:space-between"><div class="pcard__rating">76</div><span class="rarity rarity--common">C</span></div>
+                  <div style="margin-top:auto"><div class="pcard__name">Camavinga</div><div class="pcard__meta"><span>CM</span><span>FRA</span></div></div></div></article>
+            </div>
+          </div>
+
+          <div style="text-align:center; padding: 24px 0"><button class="btn btn--ghost-gold">Load 132 more →</button></div>
+        </div>
+      </main>
+      <nav class="tab-tabbar">
+        <a class="tab-tabbar__item" href="home.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+          Home
+        </a>
+        <a class="tab-tabbar__item" href="world-cup.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>
+          World Cup
+        </a>
+        <a class="tab-tabbar__item" href="fantasy.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>
+          Fantasy
+        </a>
+        <a class="tab-tabbar__item" href="match.html">
+          <span class="badge badge--live">3</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="m12 7 1 6h-2zM8 17l4-3 4 3"/></svg>
+          Live
+        </a>
+        <a class="tab-tabbar__item" href="news.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+          News
+        </a>
+        <a class="tab-tabbar__item is-active" href="collection.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+          Cards
+        </a>
+        <a class="tab-tabbar__item" href="trade.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg>
+          Trade
+        </a>
+      </nav>
+    </div>
+  </div></div>
+</div>
+</body>
+</html>

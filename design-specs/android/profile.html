@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — Profile</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<style>
+  .scroll { height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 100px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 4px; }
+  .topbar__title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--gold); text-transform: uppercase; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: oklch(18% 0.005 70 / 0.6); border: 1px solid var(--border-soft); color: var(--fg); }
+
+  /* Profile hero */
+  .pro-hero {
+    margin: 0 16px 14px; padding: 24px 20px 22px; border-radius: var(--r-5); position: relative; overflow: hidden;
+    background:
+      radial-gradient(80% 80% at 100% 0%, oklch(45% 0.16 80 / 0.3), transparent 60%),
+      radial-gradient(60% 60% at 0% 100%, oklch(30% 0.1 60 / 0.3), transparent 70%),
+      linear-gradient(160deg, oklch(15% 0.012 75), oklch(8% 0.006 70));
+    border: 1px solid var(--gold-hairline);
+  }
+  .pro-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, transparent 60%, oklch(8% 0.005 60 / 0.4));
+  }
+  .pro-hero__inner { position: relative; z-index: 1; display: flex; align-items: center; gap: 18px; }
+  .pro-hero__avatar {
+    width: 76px; height: 76px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, oklch(55% 0.16 75), oklch(35% 0.12 60));
+    display: grid; place-items: center;
+    font-family: var(--font-display); font-weight: 800; font-size: 24px; color: oklch(15% 0.02 70);
+    box-shadow: 0 0 0 2px var(--gold), 0 0 0 5px oklch(15% 0.02 75), 0 12px 32px oklch(50% 0.16 80 / 0.3);
+  }
+  .pro-hero__info { flex: 1; min-width: 0; }
+  .pro-hero__name { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
+  .pro-hero__handle { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.06em; }
+  .pro-hero__chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+    padding: 4px 10px; border-radius: 999px; background: oklch(82% 0.135 88 / 0.18); border: 1px solid var(--gold-hairline);
+    font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .pro-hero__chip::before { content: '★'; }
+
+  /* Quick stats */
+  .pro-stats { margin: 16px 16px 14px; padding: 14px 18px; border-radius: var(--r-4); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); display: grid; grid-template-columns: repeat(4, 1fr); }
+  .pro-stat { text-align: center; position: relative; }
+  .pro-stat:not(:last-child)::after { content: ''; position: absolute; right: 0; top: 18%; bottom: 18%; width: 1px; background: var(--border-soft); }
+  .pro-stat__v { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+  .pro-stat__l { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 4px; }
+
+  /* Section */
+  .sect-head { padding: 18px 20px 12px; display: flex; align-items: baseline; justify-content: space-between; }
+  .sect-head h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.015em; }
+  .sect-head__action { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* Followed teams */
+  .followed { padding: 0 16px; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+  .followed::-webkit-scrollbar { display: none; }
+  .followed__t {
+    min-width: 96px; padding: 14px 10px; border-radius: var(--r-3);
+    background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    text-align: center;
+  }
+  .followed__crest { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 12px; color: white; }
+  .followed__crest--ars { background: linear-gradient(135deg, oklch(45% 0.18 25), oklch(25% 0.12 25)); }
+  .followed__crest--fra { background: linear-gradient(180deg, #002654, #ed2939); }
+  .followed__crest--rm { background: linear-gradient(135deg, oklch(45% 0.05 80), oklch(25% 0.02 70)); color: var(--gold); }
+  .followed__crest--add { background: oklch(18% 0.005 70); border: 1px dashed var(--border); color: var(--muted); }
+  .followed__name { font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: -0.005em; }
+  .followed__sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.06em; }
+
+  /* Settings groups */
+  .group { margin: 0 16px 14px; border-radius: var(--r-4); overflow: hidden; background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); }
+  .row {
+    display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center;
+    padding: 14px 16px; border-bottom: 1px solid var(--border-soft);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row__ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: oklch(18% 0.008 70); border: 1px solid var(--border-soft); color: var(--gold); }
+  .row__ic svg { width: 14px; height: 14px; }
+  .row__name { font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .row__sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; margin-top: 2px; }
+  .row__val { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.04em; }
+  .row__arrow { color: var(--muted-2); }
+
+  /* Toggle */
+  .toggle { width: 36px; height: 20px; border-radius: 10px; position: relative; background: oklch(22% 0.008 70); border: 1px solid var(--border-soft); }
+  .toggle.on { background: linear-gradient(90deg, var(--gold-soft), var(--gold-deep)); border-color: var(--gold-deep); }
+  .toggle::after { content: ''; position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform .2s var(--ease); box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+  .toggle.on::after { transform: translateX(16px); }
+
+  /* Manager achievement strip */
+  .achv {
+    margin: 0 16px 14px; padding: 18px; border-radius: var(--r-4); position: relative; overflow: hidden;
+    background:
+      radial-gradient(50% 80% at 100% 0%, oklch(40% 0.18 290 / 0.3), transparent 60%),
+      linear-gradient(180deg, oklch(13% 0.02 290), oklch(9% 0.012 70));
+    border: 1px solid oklch(45% 0.18 295 / 0.35);
+  }
+  .achv__title { font-family: var(--font-mono); font-size: 10px; color: oklch(85% 0.12 295); letter-spacing: 0.16em; text-transform: uppercase; }
+  .achv__stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+  .achv__b {
+    aspect-ratio: 1; border-radius: 50%; position: relative;
+    display: grid; place-items: center;
+    background: oklch(18% 0.008 75 / 0.6); border: 1px solid var(--border-soft);
+    color: var(--muted);
+  }
+  .achv__b--earned {
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+    color: oklch(15% 0.02 70); border-color: var(--gold-deep);
+    box-shadow: 0 0 16px oklch(60% 0.16 80 / 0.35);
+  }
+  .achv__b svg { width: 16px; height: 16px; }
+  .achv__b-label { position: absolute; top: 110%; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 8px; color: var(--muted); letter-spacing: 0.1em; white-space: nowrap; text-transform: uppercase; }
+
+  .signout {
+    margin: 20px 16px 0; padding: 14px; text-align: center; border-radius: var(--r-4);
+    background: oklch(20% 0.008 30 / 0.4); border: 1px solid oklch(40% 0.12 30 / 0.4);
+    color: oklch(75% 0.14 30); font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen"><div class="punch"></div>
+
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="sig">
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M2 4a7 7 0 0 1 14 0v1H2V4zm0 3h14v1H2V7zm2 3h10v1H4v-1z"/></svg>
+        <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"><rect x="1" y="2" width="20" height="8" rx="2"/><rect x="3" y="4" width="16" height="4" rx="0.5" fill="currentColor"/><rect x="22" y="4.5" width="1.5" height="3" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="scroll">
+
+      <div class="topbar">
+        <a class="icon-btn" href="home.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>
+        <div class="topbar__title">Account</div>
+        <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-9-9 9 9 0 0 1 9-9 9 9 0 0 1 9 9z"/></svg></button>
+      </div>
+
+      <!-- Profile hero -->
+      <section class="pro-hero">
+        <div class="pro-hero__inner">
+          <div class="pro-hero__avatar">JS</div>
+          <div class="pro-hero__info">
+            <div class="pro-hero__name">Jordan<br>Saunders</div>
+            <div class="pro-hero__handle">@jordans · joined Aug 2024</div>
+            <span class="pro-hero__chip">Legendary Manager · Tier 4</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick stats -->
+      <div class="pro-stats">
+        <div class="pro-stat"><div class="pro-stat__v" data-num>147</div><div class="pro-stat__l">Cards</div></div>
+        <div class="pro-stat"><div class="pro-stat__v" data-num>2,148</div><div class="pro-stat__l">Total pts</div></div>
+        <div class="pro-stat"><div class="pro-stat__v" data-num>11W</div><div class="pro-stat__l">1v1</div></div>
+        <div class="pro-stat"><div class="pro-stat__v">★4.9</div><div class="pro-stat__l">Trades</div></div>
+      </div>
+
+      <!-- Achievements -->
+      <section class="achv">
+        <div class="achv__title">Manager achievements · 8 of 24 earned</div>
+        <div class="achv__stack">
+          <div class="achv__b achv__b--earned"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 6v6c0 5 4 9 8 10 4-1 8-5 8-10V6z"/></svg></div>
+          <div class="achv__b achv__b--earned"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg></div>
+          <div class="achv__b achv__b--earned"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 4 6 14h6l-2 6 8-10h-6z"/></svg></div>
+          <div class="achv__b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></div>
+        </div>
+      </section>
+
+      <!-- Followed teams -->
+      <div class="sect-head"><h3>Following</h3><span class="sect-head__action">Edit →</span></div>
+      <div class="followed">
+        <div class="followed__t">
+          <div class="followed__crest followed__crest--ars">ARS</div>
+          <div class="followed__name">Arsenal</div>
+          <div class="followed__sub">EPL</div>
+        </div>
+        <div class="followed__t">
+          <div class="followed__crest followed__crest--fra">FR</div>
+          <div class="followed__name">France</div>
+          <div class="followed__sub">National</div>
+        </div>
+        <div class="followed__t">
+          <div class="followed__crest followed__crest--rm">RM</div>
+          <div class="followed__name">Real Madrid</div>
+          <div class="followed__sub">La Liga</div>
+        </div>
+        <div class="followed__t">
+          <div class="followed__crest followed__crest--add">+</div>
+          <div class="followed__name" style="color:var(--muted)">Add team</div>
+          <div class="followed__sub">&nbsp;</div>
+        </div>
+      </div>
+
+      <!-- Account preferences -->
+      <div class="sect-head"><h3>Account</h3></div>
+      <section class="group">
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div>
+          <div><div class="row__name">Region & language</div><div class="row__sub">United Kingdom · English</div></div>
+          <div class="row__arrow">›</div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></div>
+          <div><div class="row__name">Payment method</div><div class="row__sub">Apple Pay · 1 method</div></div>
+          <div class="row__arrow">›</div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M12 8v4l3 2"/></svg></div>
+          <div><div class="row__name">Subscription</div><div class="row__sub">PITCH Pro · Annual</div></div>
+          <div class="row__val">Pro</div>
+        </div>
+      </section>
+
+      <!-- Notifications -->
+      <div class="sect-head"><h3>Notifications</h3></div>
+      <section class="group">
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div>
+          <div><div class="row__name">Live match alerts</div><div class="row__sub">Goals, kick-offs, fulltime</div></div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg></div>
+          <div><div class="row__name">Fantasy updates</div><div class="row__sub">Score changes, rank moves</div></div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg></div>
+          <div><div class="row__name">Trade offers</div><div class="row__sub">From friends only</div></div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="m3 8 9 6 9-6"/></svg></div>
+          <div><div class="row__name">Weekly news digest</div><div class="row__sub">Saturdays at 9am</div></div>
+          <div class="toggle"></div>
+        </div>
+      </section>
+
+      <!-- Privacy & support -->
+      <div class="sect-head"><h3>Privacy & support</h3></div>
+      <section class="group">
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+          <div><div class="row__name">PIN & biometrics</div><div class="row__sub">Face ID required for trades</div></div>
+          <div class="row__arrow">›</div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg></div>
+          <div><div class="row__name">Help & support</div><div class="row__sub">FAQ · Contact us</div></div>
+          <div class="row__arrow">›</div>
+        </div>
+        <div class="row">
+          <div class="row__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/></svg></div>
+          <div><div class="row__name">Card wallet</div><div class="row__sub">Connected · 0x4a3...e9c</div></div>
+          <div class="row__val">Linked</div>
+        </div>
+      </section>
+
+      <button class="signout">Sign out</button>
+
+      <div style="text-align:center; padding: 16px 0 8px; font-family: var(--font-mono); font-size: 10px; color: var(--muted-2); letter-spacing: 0.12em;">
+        PITCH · v3.2.1 (build 416)
+      </div>
+
+      <div style="height: 20px"></div>
+    </div>
+
+    <nav class="tabbar">
+      <a class="tabbar__item" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+      <a class="tabbar__item" href="world-cup.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>World Cup</a>
+      <a class="tabbar__item" href="fantasy.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>Fantasy</a>
+      <a class="tabbar__item" href="collection.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Cards</a>
+      <a class="tabbar__item is-active" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M3 21c0-4 4-7 9-7s9 3 9 7"/></svg>You</a>
+    </nav>
+
+    <div class="navbar"></div>
+  </div></div>
+</div>
+</body>
+</html>

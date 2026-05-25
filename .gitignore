@@ -47,3 +47,5 @@ android/app/google-services.json
 android/local.properties
 android/key.properties
 
+# FVM Version Cache
+.fvm/

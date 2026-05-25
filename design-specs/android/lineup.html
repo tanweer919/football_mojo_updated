@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — Build XI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<style>
+  .scroll { height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 196px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* Top bar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 4px; }
+  .topbar__title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--gold); text-transform: uppercase; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: oklch(18% 0.005 70 / 0.6); border: 1px solid var(--border-soft); color: var(--fg); }
+
+  .deadline {
+    margin: 4px 16px 14px; padding: 10px 14px; border-radius: var(--r-3);
+    background: linear-gradient(90deg, oklch(40% 0.16 25 / 0.18), oklch(15% 0.005 70 / 0.4));
+    border: 1px solid oklch(60% 0.16 25 / 0.3);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .deadline__l { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10px; color: oklch(78% 0.14 25); letter-spacing: 0.14em; text-transform: uppercase; }
+  .deadline__l::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: oklch(70% 0.18 25); box-shadow: 0 0 0 4px oklch(70% 0.18 25 / 0.18); animation: pulse 1.6s infinite; }
+  .deadline__time { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--fg); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+
+  /* Budget meter — premium, clear */
+  .budget {
+    margin: 0 16px 18px; padding: 16px 18px;
+    border-radius: var(--r-4);
+    background:
+      radial-gradient(80% 60% at 100% 0%, oklch(50% 0.18 80 / 0.18), transparent 60%),
+      linear-gradient(180deg, oklch(15% 0.012 75), oklch(10% 0.006 70));
+    border: 1px solid var(--gold-hairline);
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,.4);
+  }
+  .budget__hd { display: flex; justify-content: space-between; align-items: baseline; }
+  .budget__l { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+  .budget__main { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .budget__spent {
+    font-family: var(--font-display); font-size: 36px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .budget__cap { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--muted-2); letter-spacing: -0.02em; }
+  .budget__bar { height: 6px; border-radius: 3px; background: oklch(20% 0.005 70); margin-top: 12px; overflow: hidden; position: relative; }
+  .budget__fill { height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--gold-deep), var(--gold), var(--gold-soft));
+    box-shadow: 0 0 12px var(--gold-glow);
+    transition: width .35s var(--ease);
+  }
+  .budget__bar.is-over .budget__fill { background: linear-gradient(90deg, oklch(60% 0.2 25), oklch(70% 0.22 27)); box-shadow: 0 0 12px oklch(70% 0.22 27 / 0.4); }
+  .budget__sub { display: flex; justify-content: space-between; margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .budget__sub b { font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: -0.01em; color: var(--pitch); text-transform: none; font-variant-numeric: tabular-nums; }
+  .budget__sub.is-over b { color: oklch(72% 0.2 25); }
+
+  /* Pitch container */
+  .pitch-wrap { padding: 0 16px; }
+  .lp-pitch {
+    position: relative;
+    width: 100%; aspect-ratio: 0.66;
+    border-radius: 14px;
+    background:
+      radial-gradient(80% 60% at 50% 50%, oklch(34% 0.12 145 / 0.5), transparent 65%),
+      repeating-linear-gradient(180deg, oklch(28% 0.1 142) 0 12.5%, oklch(24% 0.09 145) 12.5% 25%);
+    border: 1px solid oklch(48% 0.16 145 / 0.4);
+    overflow: hidden;
+    box-shadow:
+      0 24px 48px -16px rgba(0,0,0,.55),
+      inset 0 1px 0 oklch(100% 0 0 / 0.06),
+      inset 0 0 60px oklch(8% 0.02 145 / 0.5);
+  }
+  /* Pitch markings */
+  .lp-pitch__lines { position: absolute; inset: 0; pointer-events: none; }
+  .lp-pitch__lines::before { content: ''; position: absolute; inset: 8px; border: 1.5px solid oklch(85% 0.06 145 / 0.42); border-radius: 4px; }
+  .lp-pitch__lines::after { content: ''; position: absolute; top: 50%; left: 8px; right: 8px; height: 1px; background: oklch(85% 0.06 145 / 0.4); }
+  .lp-pitch__circle { position: absolute; top: 50%; left: 50%; width: 78px; height: 78px; border-radius: 50%; border: 1.5px solid oklch(85% 0.06 145 / 0.4); transform: translate(-50%, -50%); }
+  .lp-pitch__spot { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; border-radius: 50%; background: oklch(85% 0.06 145 / 0.5); transform: translate(-50%, -50%); }
+  .lp-pitch__pen-top, .lp-pitch__pen-bot { position: absolute; left: 24%; right: 24%; height: 12%; border: 1.5px solid oklch(85% 0.06 145 / 0.4); }
+  .lp-pitch__pen-top { top: 8px; border-top: 0; }
+  .lp-pitch__pen-bot { bottom: 8px; border-bottom: 0; }
+  .lp-pitch__six-top, .lp-pitch__six-bot { position: absolute; left: 36%; right: 36%; height: 5%; border: 1.5px solid oklch(85% 0.06 145 / 0.4); }
+  .lp-pitch__six-top { top: 8px; border-top: 0; }
+  .lp-pitch__six-bot { bottom: 8px; border-bottom: 0; }
+
+  /* Slot positioning — 5 starters
+     Top→bottom: FWD (top), MID + UTIL (mid row), DEF, GK (bottom) */
+  .lp-slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 5;
+  }
+  .lp-slot.is-fwd { top: 18%; left: 50%; }
+  .lp-slot.is-mid { top: 41%; left: 32%; }
+  .lp-slot.is-utl { top: 41%; left: 68%; }
+  .lp-slot.is-def { top: 65%; left: 50%; }
+  .lp-slot.is-gk  { top: 87%; left: 50%; }
+
+  /* Filled mini-card chip */
+  .lp-chip {
+    width: 64px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, oklch(22% 0.025 80) 0%, oklch(13% 0.012 70) 100%);
+    border: 1.5px solid oklch(35% 0.04 75);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 8px 20px -6px rgba(0,0,0,.55), inset 0 1px 0 oklch(100% 0 0 / 0.08);
+  }
+  .lp-chip__top {
+    padding: 6px 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: linear-gradient(180deg, oklch(28% 0.06 80 / 0.6), transparent);
+  }
+  .lp-chip__rating {
+    font-family: var(--font-display); font-size: 18px; font-weight: 800;
+    color: var(--gold); letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .lp-chip__pos {
+    font-family: var(--font-mono); font-size: 7px; font-weight: 700; color: oklch(70% 0.05 75);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .lp-chip__flag { width: 14px; height: 10px; border-radius: 2px; box-shadow: 0 0 0 1px oklch(100% 0 0 / 0.15) inset; }
+  .lp-chip__name {
+    padding: 3px 4px;
+    font-family: var(--font-display); font-size: 9px; font-weight: 700;
+    color: var(--fg); text-align: center; letter-spacing: -0.01em; line-height: 1.1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border-top: 1px solid oklch(35% 0.04 75 / 0.5);
+  }
+  .lp-chip__cost {
+    padding: 2px 4px;
+    background: oklch(82% 0.135 88 / 0.15);
+    border-top: 1px solid var(--gold-hairline);
+    font-family: var(--font-mono); font-size: 8px; font-weight: 700; color: var(--gold);
+    text-align: center; letter-spacing: 0.06em; font-variant-numeric: tabular-nums;
+  }
+
+  /* Position label below chip */
+  .lp-slot__label {
+    margin-top: 6px;
+    font-family: var(--font-mono); font-size: 8px; font-weight: 700; color: var(--gold);
+    letter-spacing: 0.18em; text-transform: uppercase; text-align: center;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+
+  /* Empty slot */
+  .lp-slot.is-empty .lp-chip {
+    background: oklch(15% 0.005 70 / 0.55);
+    border: 1.5px dashed var(--gold-hairline);
+    backdrop-filter: blur(8px);
+    height: 84px;
+    display: grid; place-items: center;
+    box-shadow: none;
+  }
+  .lp-slot.is-empty .lp-chip__plus {
+    font-family: var(--font-display); font-size: 28px; font-weight: 300; color: var(--gold);
+    line-height: 1;
+  }
+
+  /* Captain ribbon */
+  .lp-slot__captain {
+    position: absolute; top: -8px; right: -8px; z-index: 6;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+    color: oklch(15% 0.02 70); font-family: var(--font-display);
+    font-size: 12px; font-weight: 800;
+    display: grid; place-items: center;
+    box-shadow: 0 0 0 2px oklch(8% 0.005 70), 0 0 14px var(--gold-glow);
+  }
+  .lp-slot[data-captain="true"] .lp-chip { box-shadow: 0 8px 20px -6px rgba(0,0,0,.55), 0 0 0 2px var(--gold), 0 0 24px var(--gold-glow); }
+
+  /* Bench / sub */
+  .bench {
+    margin: 16px 16px 0; padding: 14px 16px;
+    border-radius: var(--r-4);
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--border-soft);
+    display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: center;
+  }
+  .bench__chip-wrap { width: 64px; }
+  .bench__l { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; }
+  .bench__t { font-family: var(--font-display); font-size: 13px; font-weight: 700; margin-top: 4px; letter-spacing: -0.015em; }
+  .bench__d { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.06em; }
+  .bench__swap { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--gold-hairline); border-radius: var(--r-2); background: transparent; }
+
+  /* Action bar (sticky above tabbar) */
+  .action-bar {
+    position: absolute; left: 12px; right: 12px; bottom: 96px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: stretch;
+    background: oklch(11% 0.005 70 / 0.92); backdrop-filter: blur(20px);
+    border: 1px solid var(--border-soft); border-radius: 14px;
+    padding: 10px;
+    z-index: 40;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.4);
+  }
+  .action-bar__ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 0 12px; height: 44px; border-radius: 10px;
+    background: oklch(18% 0.006 70); border: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 10px; color: var(--fg-soft);
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .action-bar__ghost svg { width: 14px; height: 14px; color: var(--gold); }
+  .action-bar__primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 44px; border-radius: 10px;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold), var(--gold-deep));
+    color: oklch(15% 0.02 75);
+    font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: -0.005em;
+    box-shadow: inset 0 1px 0 oklch(100% 0 0 / .35), 0 6px 18px oklch(60% 0.16 80 / 0.3);
+  }
+  .action-bar__primary[disabled] { background: oklch(25% 0.01 70); color: var(--muted-2); box-shadow: none; cursor: not-allowed; }
+
+  /* Player picker drawer (bottom sheet) */
+  .picker-back {
+    position: absolute; inset: 0; background: oklch(0% 0 0 / 0.55);
+    backdrop-filter: blur(6px); z-index: 80; opacity: 0; pointer-events: none;
+    transition: opacity .22s var(--ease);
+  }
+  .picker-back.is-open { opacity: 1; pointer-events: auto; }
+  .picker {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 81;
+    background: linear-gradient(180deg, oklch(13% 0.008 75), oklch(8% 0.005 70));
+    border-top: 1px solid var(--gold-hairline);
+    border-radius: 22px 22px 0 0;
+    padding: 8px 14px 22px;
+    transform: translateY(110%); transition: transform .32s var(--ease);
+    max-height: 80%;
+    display: flex; flex-direction: column;
+    box-shadow: 0 -24px 60px rgba(0,0,0,0.5);
+  }
+  .picker.is-open { transform: translateY(0); }
+  .picker__handle { width: 38px; height: 4px; border-radius: 2px; background: var(--border-hi); margin: 4px auto 12px; }
+  .picker__hd { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 12px; }
+  .picker__hd-l { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.18em; text-transform: uppercase; }
+  .picker__hd-t { font-family: var(--font-display); font-size: 18px; font-weight: 800; letter-spacing: -0.025em; margin-top: 2px; }
+  .picker__hd-c { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; margin-top: 4px; }
+  .picker__close { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: oklch(20% 0.01 75); border: 1px solid var(--border); color: var(--fg); }
+  .picker__chips { display: flex; gap: 6px; padding: 4px 0 12px; overflow-x: auto; scrollbar-width: none; }
+  .picker__chips::-webkit-scrollbar { display: none; }
+  .pchip { padding: 6px 12px; border-radius: 999px; background: oklch(18% 0.006 70); border: 1px solid var(--border-soft); font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; flex-shrink: 0; }
+  .pchip.is-active { background: linear-gradient(180deg, oklch(25% 0.06 80 / 0.6), oklch(15% 0.03 75 / 0.5)); border-color: var(--gold-hairline); color: var(--gold); }
+  .picker__sort { display: flex; gap: 12px; padding: 0 4px 12px; border-bottom: 1px solid var(--border-soft); margin-bottom: 6px; }
+  .picker__sort span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; padding-bottom: 6px; }
+  .picker__sort span.is-active { color: var(--gold); border-bottom: 1.5px solid var(--gold); }
+  .picker__list { overflow-y: auto; flex: 1; scrollbar-width: none; padding-bottom: 8px; }
+  .picker__list::-webkit-scrollbar { display: none; }
+  .prow { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--border-soft); }
+  .prow:last-child { border-bottom: 0; }
+  .prow:hover { background: oklch(15% 0.008 75 / 0.5); }
+  .prow.is-disabled { opacity: 0.45; pointer-events: none; }
+  .prow__avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, oklch(35% 0.05 75), oklch(20% 0.02 70)); border: 1px solid oklch(40% 0.04 75); position: relative; overflow: hidden; display: grid; place-items: center; }
+  .prow__avatar .flag { position: absolute; bottom: -1px; right: -1px; width: 14px; height: 10px; border-radius: 0 0 4px 0; box-shadow: 0 0 0 1.5px oklch(13% 0.008 75); }
+  .prow__avatar span { font-family: var(--font-display); font-size: 12px; font-weight: 800; color: var(--gold); letter-spacing: -0.02em; }
+  .prow__name { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+  .prow__meta { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-top: 2px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .prow__form { display: inline-flex; gap: 2px; align-items: center; }
+  .prow__form i { width: 4px; height: 8px; border-radius: 1px; background: oklch(30% 0.01 70); }
+  .prow__form i.is-on { background: var(--pitch); box-shadow: 0 0 4px var(--pitch-glow); }
+  .prow__cost { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .prow__pts { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; margin-top: 2px; text-transform: uppercase; }
+  .prow__add { padding: 6px 10px; border-radius: 6px; background: oklch(82% 0.135 88 / 0.15); border: 1px solid var(--gold-hairline); color: var(--gold); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* Toast */
+  .toast {
+    position: absolute; top: 60px; left: 50%; transform: translate(-50%, -20px);
+    background: linear-gradient(180deg, oklch(20% 0.012 80), oklch(12% 0.008 75));
+    border: 1px solid var(--gold-hairline); border-radius: 12px;
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--gold);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none; transition: all .25s var(--ease);
+    z-index: 90;
+  }
+  .toast::before { content: '✓'; font-size: 14px; }
+  .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen"><div class="punch"></div>
+
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="sig">
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M2 4a7 7 0 0 1 14 0v1H2V4zm0 3h14v1H2V7zm2 3h10v1H4v-1z"/></svg>
+        <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"><rect x="1" y="2" width="20" height="8" rx="2"/><rect x="3" y="4" width="16" height="4" rx="0.5" fill="currentColor"/><rect x="22" y="4.5" width="1.5" height="3" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="scroll">
+
+      <div class="topbar">
+        <a class="icon-btn" href="fantasy.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>
+        <div class="topbar__title">Build XI · GW 36</div>
+        <button class="icon-btn" id="resetBtn" title="Reset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg></button>
+      </div>
+
+      <!-- Deadline -->
+      <div class="deadline">
+        <span class="deadline__l">Locks in</span>
+        <span class="deadline__time" id="countdown">2d 14h 32m 06s</span>
+      </div>
+
+      <!-- Budget meter -->
+      <div class="budget">
+        <div class="budget__hd">
+          <span class="budget__l">Budget · 5-a-side</span>
+          <span class="budget__l">Cap 100</span>
+        </div>
+        <div class="budget__main">
+          <span class="budget__spent num"><span id="spentTxt">82</span></span>
+          <span class="budget__cap">/ 100</span>
+        </div>
+        <div class="budget__bar" id="bar"><div class="budget__fill" id="fill" style="width: 82%"></div></div>
+        <div class="budget__sub" id="subTxt"><span>Remaining</span><b><span id="leftTxt">18</span> pts</b></div>
+      </div>
+
+      <!-- Pitch with 5 slots -->
+      <div class="pitch-wrap">
+        <div class="lp-pitch">
+          <div class="lp-pitch__lines"></div>
+          <div class="lp-pitch__pen-top"></div>
+          <div class="lp-pitch__pen-bot"></div>
+          <div class="lp-pitch__six-top"></div>
+          <div class="lp-pitch__six-bot"></div>
+          <div class="lp-pitch__circle"></div>
+          <div class="lp-pitch__spot"></div>
+
+          <!-- FWD slot -->
+          <div class="lp-slot is-fwd" data-slot="fwd"></div>
+          <!-- MID slot -->
+          <div class="lp-slot is-mid" data-slot="mid"></div>
+          <!-- UTIL slot -->
+          <div class="lp-slot is-utl" data-slot="utl"></div>
+          <!-- DEF slot -->
+          <div class="lp-slot is-def" data-slot="def"></div>
+          <!-- GK slot -->
+          <div class="lp-slot is-gk" data-slot="gk"></div>
+        </div>
+      </div>
+
+      <!-- Bench / sub -->
+      <div class="bench">
+        <div class="bench__chip-wrap" id="benchChipWrap"></div>
+        <div>
+          <div class="bench__l">Bench · Sub</div>
+          <div class="bench__t" id="benchName">Bukayo Saka</div>
+          <div class="bench__d" id="benchMeta">FWD · ENG · 20 pts · Form ●●●●○</div>
+        </div>
+        <button class="bench__swap" data-slot="sub">Swap</button>
+      </div>
+
+      <div style="height: 8px"></div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="action-bar__ghost" id="autoBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 17 4-4-4-4M14 17l4-4-4-4M2 12h20"/></svg>
+        Auto
+      </button>
+      <button class="action-bar__primary" id="saveBtn">Save lineup · 82 pts spent</button>
+      <button class="action-bar__ghost" id="capBtn" title="Cycle captain">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><text x="12" y="16" text-anchor="middle" font-family="Inter Display, sans-serif" font-size="11" font-weight="800" fill="currentColor">C</text></svg>
+        2×
+      </button>
+    </div>
+
+    <nav class="tabbar">
+      <a class="tabbar__item" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+      <a class="tabbar__item" href="world-cup.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>World Cup</a>
+      <a class="tabbar__item is-active" href="fantasy.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>Fantasy</a>
+      <a class="tabbar__item" href="collection.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Cards</a>
+      <a class="tabbar__item" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M3 21c0-4 4-7 9-7s9 3 9 7"/></svg>You</a>
+    </nav>
+
+    <div class="navbar"></div>
+
+    <!-- Player picker -->
+    <div class="picker-back" id="pickerBack"></div>
+    <div class="picker" id="picker">
+      <div class="picker__handle"></div>
+      <div class="picker__hd">
+        <div>
+          <div class="picker__hd-l" id="pickerEyebrow">Pick a striker</div>
+          <div class="picker__hd-t" id="pickerTitle">Forwards</div>
+          <div class="picker__hd-c" id="pickerCap">Remaining budget · 18 pts</div>
+        </div>
+        <button class="picker__close" id="pickerClose"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="picker__chips" id="pickerChips"></div>
+      <div class="picker__sort">
+        <span class="is-active" data-sort="form">Form</span>
+        <span data-sort="cost">Cost</span>
+        <span data-sort="rating">Rating</span>
+        <span data-sort="exp">Exp pts</span>
+      </div>
+      <div class="picker__list" id="pickerList"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Lineup saved · GW36 ready</div>
+
+  </div></div>
+</div>
+
+<script>
+/* ─── Player pool ─── */
+const POOL = [
+  // GK
+  { id:'donn',  name:'G. Donnarumma', short:'Donnarumma', pos:'gk',  flag:'it', team:'PSG',  rating:88, cost:12, form:4, exp:18 },
+  { id:'cour',  name:'T. Courtois',   short:'Courtois',   pos:'gk',  flag:'be', team:'RM',   rating:90, cost:14, form:5, exp:21 },
+  { id:'maig',  name:'M. Maignan',    short:'Maignan',    pos:'gk',  flag:'fr', team:'MIL',  rating:87, cost:11, form:3, exp:16 },
+  { id:'onan',  name:'A. Onana',      short:'Onana',      pos:'gk',  flag:'br', team:'MUN',  rating:84, cost:10, form:3, exp:14 },
+  // DEF
+  { id:'hak',   name:'A. Hakimi',     short:'Hakimi',     pos:'def', flag:'ma', team:'PSG',  rating:88, cost:18, form:4, exp:22 },
+  { id:'vd',    name:'V. van Dijk',   short:'Van Dijk',   pos:'def', flag:'nl', team:'LIV',  rating:90, cost:22, form:5, exp:25 },
+  { id:'rud',   name:'A. Rüdiger',    short:'Rüdiger',    pos:'def', flag:'de', team:'RM',   rating:87, cost:16, form:4, exp:19 },
+  { id:'bast',  name:'A. Bastoni',    short:'Bastoni',    pos:'def', flag:'it', team:'INT',  rating:85, cost:15, form:4, exp:18 },
+  { id:'carv',  name:'D. Carvajal',   short:'Carvajal',   pos:'def', flag:'es', team:'RM',   rating:84, cost:14, form:3, exp:16 },
+  // MID
+  { id:'bell',  name:'J. Bellingham', short:'Bellingham', pos:'mid', flag:'en', team:'RM',   rating:91, cost:24, form:5, exp:28 },
+  { id:'pedri', name:'Pedri',         short:'Pedri',      pos:'mid', flag:'es', team:'BAR',  rating:87, cost:20, form:4, exp:23 },
+  { id:'kdb',   name:'K. de Bruyne',  short:'De Bruyne',  pos:'mid', flag:'be', team:'NAP',  rating:89, cost:22, form:4, exp:26 },
+  { id:'val',   name:'F. Valverde',   short:'Valverde',   pos:'mid', flag:'ur', team:'RM',   rating:87, cost:18, form:4, exp:22 },
+  { id:'wirtz', name:'F. Wirtz',      short:'Wirtz',      pos:'mid', flag:'de', team:'LIV',  rating:86, cost:19, form:5, exp:24 },
+  { id:'tch',   name:'A. Tchouameni', short:'Tchouameni', pos:'mid', flag:'fr', team:'RM',   rating:84, cost:16, form:3, exp:18 },
+  // FWD
+  { id:'mbap',  name:'K. Mbappé',     short:'Mbappé',     pos:'fwd', flag:'fr', team:'RM',   rating:93, cost:28, form:5, exp:32 },
+  { id:'haa',   name:'E. Haaland',    short:'Haaland',    pos:'fwd', flag:'no', team:'MCI',  rating:92, cost:30, form:5, exp:34 },
+  { id:'yam',   name:'L. Yamal',      short:'Yamal',      pos:'fwd', flag:'es', team:'BAR',  rating:88, cost:24, form:5, exp:27 },
+  { id:'vini',  name:'Vinicius Jr',   short:'Vini Jr',    pos:'fwd', flag:'br', team:'RM',   rating:90, cost:26, form:4, exp:29 },
+  { id:'sal',   name:'M. Salah',      short:'Salah',      pos:'fwd', flag:'eg', team:'LIV',  rating:88, cost:22, form:4, exp:24 },
+  { id:'saka',  name:'B. Saka',       short:'Saka',       pos:'fwd', flag:'en', team:'ARS',  rating:86, cost:20, form:4, exp:22 },
+  { id:'kane',  name:'H. Kane',       short:'Kane',       pos:'fwd', flag:'en', team:'BAY',  rating:89, cost:24, form:4, exp:26 },
+  { id:'fod',   name:'P. Foden',      short:'Foden',      pos:'fwd', flag:'en', team:'MCI',  rating:86, cost:21, form:3, exp:22 },
+];
+
+const POS_LABEL = { gk:'Goalkeeper', def:'Defender', mid:'Midfielder', fwd:'Forward', utl:'Utility (DEF/MID/FWD)', sub:'Substitute' };
+const POS_SHORT = { gk:'GK', def:'DEF', mid:'MID', fwd:'FWD', utl:'UTL', sub:'SUB' };
+
+const STARTING = ['gk','def','mid','utl','fwd'];
+
+/* ─── State ─── */
+const state = {
+  lineup: { gk: 'donn', def: 'hak', mid: 'bell', utl: null, fwd: 'mbap' },
+  sub: 'saka',
+  captain: 'fwd',  // slot id
+  cap: 100,
+  pickerSlot: null,
+  pickerSort: 'form',
+};
+
+/* ─── Helpers ─── */
+const byId = id => POOL.find(p => p.id === id);
+const allowedFor = slot => slot === 'utl' ? ['def','mid','fwd'] : slot === 'sub' ? ['gk','def','mid','fwd'] : [slot];
+const isAllowed = (slot, p) => allowedFor(slot).includes(p.pos);
+
+function spent() {
+  let s = 0;
+  STARTING.forEach(slot => { const p = byId(state.lineup[slot]); if (p) s += p.cost; });
+  return s;
+}
+function remaining() { return state.cap - spent(); }
+
+/* ─── Rendering ─── */
+function chipHTML(p, slot, isCaptain) {
+  return `
+    ${isCaptain ? '<div class="lp-slot__captain">C</div>' : ''}
+    <div class="lp-chip">
+      <div class="lp-chip__top">
+        <div class="lp-chip__rating">${p.rating}</div>
+        <div class="lp-chip__pos">${POS_SHORT[p.pos]}</div>
+        <div class="lp-chip__flag flag flag--${p.flag}"></div>
+      </div>
+      <div class="lp-chip__name">${p.short}</div>
+      <div class="lp-chip__cost">${p.cost} pts</div>
+    </div>
+    <div class="lp-slot__label">${POS_SHORT[slot]}</div>
+  `;
+}
+function emptyChipHTML(slot) {
+  return `
+    <div class="lp-chip"><div class="lp-chip__plus">+</div></div>
+    <div class="lp-slot__label">+ ${POS_SHORT[slot]}</div>
+  `;
+}
+
+function renderPitch() {
+  STARTING.forEach(slot => {
+    const el = document.querySelector(`.lp-slot[data-slot="${slot}"]`);
+    const playerId = state.lineup[slot];
+    const p = playerId ? byId(playerId) : null;
+    el.dataset.captain = (state.captain === slot && p) ? 'true' : 'false';
+    el.classList.toggle('is-empty', !p);
+    el.innerHTML = p ? chipHTML(p, slot, state.captain === slot) : emptyChipHTML(slot);
+  });
+  // bench
+  const sub = state.sub ? byId(state.sub) : null;
+  const wrap = document.getElementById('benchChipWrap');
+  if (sub) {
+    wrap.innerHTML = `<div class="lp-chip">
+      <div class="lp-chip__top">
+        <div class="lp-chip__rating">${sub.rating}</div>
+        <div class="lp-chip__pos">${POS_SHORT[sub.pos]}</div>
+        <div class="lp-chip__flag flag flag--${sub.flag}"></div>
+      </div>
+      <div class="lp-chip__name">${sub.short}</div>
+      <div class="lp-chip__cost">free</div>
+    </div>`;
+    document.getElementById('benchName').textContent = sub.name;
+    document.getElementById('benchMeta').textContent = `${POS_SHORT[sub.pos]} · ${sub.flag.toUpperCase()} · ${sub.exp} exp pts · ${sub.team}`;
+  } else {
+    wrap.innerHTML = `<div class="lp-chip" style="background: oklch(15% 0.005 70 / 0.5); border: 1.5px dashed var(--gold-hairline); height:84px; display:grid; place-items:center"><div class="lp-chip__plus">+</div></div>`;
+    document.getElementById('benchName').textContent = '— Choose a sub —';
+    document.getElementById('benchMeta').textContent = 'Free pick from your collection (not budgeted)';
+  }
+}
+
+function renderBudget() {
+  const s = spent();
+  const r = remaining();
+  document.getElementById('spentTxt').textContent = s;
+  document.getElementById('leftTxt').textContent = r >= 0 ? r : `-${Math.abs(r)}`;
+  const pct = Math.min(100, (s / state.cap) * 100);
+  document.getElementById('fill').style.width = pct + '%';
+  const bar = document.getElementById('bar');
+  const sub = document.getElementById('subTxt');
+  bar.classList.toggle('is-over', s > state.cap);
+  sub.classList.toggle('is-over', s > state.cap);
+  sub.firstElementChild.textContent = s > state.cap ? 'Over budget' : (r === 0 ? 'Spent in full' : 'Remaining');
+  // save button state
+  const filled = STARTING.every(slot => state.lineup[slot]);
+  const save = document.getElementById('saveBtn');
+  if (s > state.cap) { save.disabled = true; save.textContent = `Over budget · −${s - state.cap} pts`; }
+  else if (!filled) { save.disabled = true; save.textContent = `Pick all 5 starters · ${5 - STARTING.filter(x => state.lineup[x]).length} left`; }
+  else { save.disabled = false; save.textContent = `Save lineup · ${s} pts spent`; }
+  document.getElementById('pickerCap').textContent = `Remaining budget · ${r >= 0 ? r : `-${Math.abs(r)}`} pts`;
+}
+
+/* ─── Picker ─── */
+const picker = document.getElementById('picker');
+const pickerBack = document.getElementById('pickerBack');
+
+function openPicker(slot) {
+  state.pickerSlot = slot;
+  document.getElementById('pickerEyebrow').textContent = slot === 'sub' ? 'Pick from your collection' : `Pick a ${POS_LABEL[slot].toLowerCase()}`;
+  document.getElementById('pickerTitle').textContent = slot === 'utl' ? 'Utility — DEF / MID / FWD' : (slot === 'sub' ? 'Substitute' : POS_LABEL[slot] + 's');
+  renderChips(slot);
+  renderList(slot, allowedFor(slot)[0]);
+  picker.classList.add('is-open');
+  pickerBack.classList.add('is-open');
+}
+function closePicker() { picker.classList.remove('is-open'); pickerBack.classList.remove('is-open'); state.pickerSlot = null; }
+
+function renderChips(slot) {
+  const allow = allowedFor(slot);
+  const chips = document.getElementById('pickerChips');
+  if (slot === 'sub' || slot === 'utl') {
+    chips.innerHTML = allow.map((a,i)=>`<button class="pchip ${i===0?'is-active':''}" data-pos="${a}">${POS_SHORT[a]}</button>`).join('');
+    chips.querySelectorAll('.pchip').forEach(c => c.onclick = () => {
+      chips.querySelectorAll('.pchip').forEach(x => x.classList.remove('is-active'));
+      c.classList.add('is-active');
+      renderList(slot, c.dataset.pos);
+    });
+  } else {
+    chips.innerHTML = `<button class="pchip is-active">${POS_SHORT[slot]} only</button><button class="pchip">All teams</button><button class="pchip">My favourites</button><button class="pchip">In form</button>`;
+  }
+}
+
+function renderList(slot, posFilter) {
+  const allow = (slot === 'utl' || slot === 'sub') ? [posFilter] : [slot];
+  const sortFn = {
+    form: (a,b) => b.form - a.form || a.cost - b.cost,
+    cost: (a,b) => b.cost - a.cost,
+    rating: (a,b) => b.rating - a.rating,
+    exp: (a,b) => b.exp - a.exp,
+  }[state.pickerSort];
+  const inUse = new Set(Object.values(state.lineup).filter(Boolean));
+  if (state.sub) inUse.add(state.sub);
+  // Allow re-picking the player currently in this exact slot
+  const currentInSlot = state.lineup[slot] || (slot === 'sub' ? state.sub : null);
+  const list = POOL.filter(p => allow.includes(p.pos)).sort(sortFn);
+  const r = remaining() + (currentInSlot ? byId(currentInSlot).cost : 0);
+  document.getElementById('pickerList').innerHTML = list.map(p => {
+    const used = inUse.has(p.id) && p.id !== currentInSlot;
+    const tooExpensive = slot !== 'sub' && p.cost > r;
+    const disabled = used || tooExpensive;
+    const formHTML = '<i class="' + (p.form>=1?'is-on':'') + '"></i>' + '<i class="' + (p.form>=2?'is-on':'') + '"></i>' + '<i class="' + (p.form>=3?'is-on':'') + '"></i>' + '<i class="' + (p.form>=4?'is-on':'') + '"></i>' + '<i class="' + (p.form>=5?'is-on':'') + '"></i>';
+    return `<div class="prow ${disabled?'is-disabled':''}" data-id="${p.id}">
+      <div class="prow__avatar"><span>${p.rating}</span><div class="flag flag--${p.flag}"></div></div>
+      <div>
+        <div class="prow__name">${p.name}</div>
+        <div class="prow__meta">
+          <span>${POS_SHORT[p.pos]}</span>
+          <span>·</span>
+          <span>${p.team}</span>
+          <span>·</span>
+          <span class="prow__form">${formHTML}</span>
+          <span>·</span>
+          <span>${p.exp} exp</span>
+          ${used ? '<span style="color:var(--muted-2)">· in lineup</span>' : ''}
+          ${tooExpensive ? '<span style="color:oklch(72% 0.2 25)">· over budget</span>' : ''}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="prow__cost">${slot === 'sub' ? 'free' : p.cost+' pts'}</div>
+        <div class="prow__pts">${p.exp} exp</div>
+      </div>
+      <button class="prow__add">Pick</button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('#pickerList .prow').forEach(row => {
+    row.onclick = () => {
+      if (row.classList.contains('is-disabled')) return;
+      const id = row.dataset.id;
+      if (state.pickerSlot === 'sub') state.sub = id;
+      else state.lineup[state.pickerSlot] = id;
+      renderPitch(); renderBudget(); closePicker();
+    };
+  });
+}
+
+/* ─── Wire up ─── */
+document.querySelectorAll('.lp-slot').forEach(s => s.addEventListener('click', () => openPicker(s.dataset.slot)));
+document.querySelector('.bench__swap').addEventListener('click', () => openPicker('sub'));
+document.getElementById('pickerClose').addEventListener('click', closePicker);
+pickerBack.addEventListener('click', closePicker);
+document.querySelectorAll('.picker__sort span').forEach(s => s.addEventListener('click', () => {
+  document.querySelectorAll('.picker__sort span').forEach(x => x.classList.remove('is-active'));
+  s.classList.add('is-active'); state.pickerSort = s.dataset.sort;
+  if (state.pickerSlot) {
+    const active = document.querySelector('#pickerChips .pchip.is-active');
+    const pos = active && active.dataset.pos ? active.dataset.pos : allowedFor(state.pickerSlot)[0];
+    renderList(state.pickerSlot, pos);
+  }
+}));
+
+document.getElementById('capBtn').addEventListener('click', () => {
+  const filled = STARTING.filter(s => state.lineup[s]);
+  if (!filled.length) return;
+  const idx = filled.indexOf(state.captain);
+  state.captain = filled[(idx + 1) % filled.length];
+  renderPitch();
+  flashToast(`Captain · ${byId(state.lineup[state.captain]).short} (2× points)`);
+});
+
+document.getElementById('autoBtn').addEventListener('click', () => {
+  // Cheapest valid filling for unfilled slots, respecting budget
+  STARTING.forEach(slot => {
+    if (state.lineup[slot]) return;
+    const used = new Set(Object.values(state.lineup).filter(Boolean));
+    if (state.sub) used.add(state.sub);
+    const candidates = POOL
+      .filter(p => isAllowed(slot, p) && !used.has(p.id))
+      .filter(p => p.cost <= remaining())
+      .sort((a,b) => b.exp - a.exp);
+    if (candidates.length) state.lineup[slot] = candidates[0].id;
+  });
+  renderPitch(); renderBudget();
+  flashToast('Auto-filled within budget');
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  state.lineup = { gk: null, def: null, mid: null, utl: null, fwd: null };
+  state.sub = null;
+  state.captain = 'fwd';
+  renderPitch(); renderBudget();
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  if (document.getElementById('saveBtn').disabled) return;
+  flashToast('Lineup saved · GW36 ready');
+});
+
+function flashToast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.classList.add('is-on');
+  clearTimeout(window.__tT); window.__tT = setTimeout(() => t.classList.remove('is-on'), 2200);
+}
+
+/* Live countdown */
+let secs = 2*86400 + 14*3600 + 32*60 + 6;
+function tick() {
+  secs--;
+  const d = Math.floor(secs/86400), h = Math.floor((secs%86400)/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+  document.getElementById('countdown').textContent = `${d}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+}
+setInterval(tick, 1000);
+
+renderPitch();
+renderBudget();
+</script>
+</body>
+</html>

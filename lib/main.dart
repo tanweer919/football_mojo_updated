@@ -1,68 +1,57 @@
-import 'package:firebase_analytics/observer.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'start.dart';
-import 'package:provider/provider.dart';
-import 'screens/NoInternetScreen.dart';
-import 'services/NetworkStatusService.dart';
-import 'Provider/ThemeProvider.dart';
-import 'App.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-void main() async {
+import 'app.dart';
 
-  //Setting up theme
-  final ThemeData lightTheme = ThemeData(
-      primaryColor: Color(0xFF50C878),
-      primaryColorDark: Color(0X8A000000),
-      brightness: Brightness.light);
-  final ThemeData darkTheme = ThemeData(
-      primaryColor: Color(0xFF54B2FB),
-      primaryColorDark: Color(0XFFD1D1D1),
-      brightness: Brightness.dark);
+/// Hard rule: anything `await`-ed here delays the first frame. Only put work
+/// here that's required to render the splash-replacement frame correctly.
+///
+/// Deferred to first frame (via [runDeferredBootstrap] in HomeShell):
+///   AdMob init, FCM bootstrap + permission ask, Clarity, in-app update,
+///   Shorebird patch check, Remote Config gate.
+///
+/// Splash budget:
+///   - The native (Android 12+ / iOS) launch screen renders BEFORE Flutter
+///     starts. We retain it via flutter_native_splash so the user never sees
+///     a white flash between OS splash and Flutter splash.
+///   - First frame fires at runApp(). FlutterNativeSplash.remove() is called
+///     from FootballMojoApp.initState after that.
+Future<void> main() async {
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
 
-  WidgetsFlutterBinding.ensureInitialized();
+  // Fire-and-forget — orientation lock doesn't gate the first frame.
+  SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-  //Initialising all the required services before attaching the app to the screen
-  await App.initialiseApp();
-  Crashlytics.instance.enableInDevMode = true;
-  
-  //Setting up Crashlytics to report errors.
-  FlutterError.onError = Crashlytics.instance.recordFlutterError;
-  runApp(MultiProvider(          
-    providers: [
-      ChangeNotifierProvider( //Provider to provide app global state
-        create: (context) => App.appProvider,
-      ),
-      StreamProvider<NetworkStatus>( //Provider to listen for network connectvity change
-        create: (context) =>
-            App.networkStatusService.networkStatusController.stream,
-      ),
-      ChangeNotifierProvider( //Provider for handling theme of the app
-        create: (context) => App.themeProvider,
-      )
-    ],
-    child: FlutterEasyLoading(
-      child: Consumer<ThemeProvider>(
-        builder: (context, model, child) => MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: lightTheme,
-          darkTheme: darkTheme,
-          themeMode: model.appTheme == AppTheme.Light
-              ? ThemeMode.light
-              : ThemeMode.dark,
-          navigatorKey: App.routerService.navigationKey, //Navigator key for routing from outside widget tree
-          home: WillPopScope(
-              onWillPop: () => Future.value(false),
-              //Shows either the starting page or no connection page depending on the network connectivity
-              child: App.result ? Start() : NoInternetScreen()), 
-          onGenerateRoute: App.routerService.generateRoutes, //Setting up router
-          navigatorObservers: [
-            HeroController(), //Controller for Hero animation
-            FirebaseAnalyticsObserver(analytics: App.analytics) //Firebase analytics
-          ],
-        ),
-      ),
-    ),
-  ));
+  // Edge-to-edge so the system nav bar doesn't paint a black band over the
+  // gradient backgrounds in our Pitch screens. Combined with `Scaffold`'s
+  // background colour painting under the system bars, the gesture pill /
+  // 3-button bar now floats on top of our content seamlessly.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // Parallelise: Hive (local cache) and Firebase init are independent.
+  // Cutting from serial ~250ms to ~max(50, 200) ≈ 200ms.
+  await Future.wait([
+    Hive.initFlutter(),
+    _initFirebase(),
+  ]);
+
+  runApp(const ProviderScope(child: FootballMojoApp()));
+}
+
+Future<void> _initFirebase() async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e, st) {
+    // Tolerate missing Firebase config in dev — the rest of the app still boots.
+    if (kDebugMode) debugPrint('Firebase init skipped: $e\n$st');
+  }
 }

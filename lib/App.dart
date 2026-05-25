@@ -1,88 +1,76 @@
-import 'package:sportsmojo/models/User.dart';
-import 'Provider/AppProvider.dart';
-import 'services/CustomRouter.dart';
-import 'services/GetItLocator.dart';
-import 'services/LocalStorage.dart';
-import 'services/FirebaseService.dart';
-import 'services/RemoteConfigService.dart';
-import 'package:data_connection_checker/data_connection_checker.dart';
-import 'services/NetworkStatusService.dart';
-import 'services/FirebaseMessagingService.dart';
-import 'Provider/ThemeProvider.dart';
-import 'services/AnalyticsService.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-///Class containing all the services that needs to be initialised before running the app
-class App {
-  static ThemeProvider themeProvider;
-  static AppProvider appProvider;
-  static RouterService routerService;
-  static NetworkStatusService networkStatusService;
-  static FirebaseAnalytics analytics;
-  static bool result;
+import 'core/bootstrap/deferred_bootstrap.dart';
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
+import 'core/updates/app_updates_service.dart';
+import 'core/updates/update_banner.dart';
 
-  static Future initialiseApp() async {
-    //Setup GetIt Locator
-    await setupLocator();
+class FootballMojoApp extends ConsumerStatefulWidget {
+  const FootballMojoApp({super.key});
+  @override
+  ConsumerState<FootballMojoApp> createState() => _FootballMojoAppState();
+}
 
-    //Get league name 
-    final leagueName = await LocalStorage.getString('leagueName');
-    //Get notification Preference
-    final notificationEnabledPreference =
-        await LocalStorage.getString('notificationEnabled');
-    final bool notificationEnabled = notificationEnabledPreference == null ||
-            notificationEnabledPreference == "yes"
-        ? true
-        : false;
+class _FootballMojoAppState extends ConsumerState<FootballMojoApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Release the native launch splash now that Flutter has mounted its widget
+    // tree — the first frame will paint immediately after. Eliminates the
+    // OS-splash → white-flash → Flutter-splash sequence.
+    WidgetsBinding.instance.addPostFrameCallback((_) => FlutterNativeSplash.remove());
+  }
 
-    //Initial 
-    User currentUser = null;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-    //Analytics Service
-    final AnalyticsService analyticsService = locator<AnalyticsService>();
-    analytics = analyticsService.analytics;
-
-    //Firebase Service
-    FirebaseService firebaseService = locator<FirebaseService>();
-
-    //Firebase remote config service
-    final RemoteConfigService _remoteConfigService =
-        locator<RemoteConfigService>();
-
-    //Network connectivity service
-    networkStatusService = locator<NetworkStatusService>();
-
-    //Firebase cloud messaging service
-    final FirebaseMessagingService _fcmService =
-        locator<FirebaseMessagingService>();
-
-    //Router service
-    routerService = locator<RouterService>();
-
-    //Check current connection status
-    result = await DataConnectionChecker().hasConnection;
-
-    //If network coonectivity is present
-    if (result) {
-      //Initialise Firebase cloud messaging
-      await _fcmService.initialise();
-      //Initialise Firebase remote config
-      await _remoteConfigService.initialise();
-      //Get current user from firebase
-      currentUser = await firebaseService.getCurrentUser();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check on resume — long-backgrounded apps may have a patch waiting,
+    // a newer version published, or a min-version bump pushed via Remote Config.
+    if (state == AppLifecycleState.resumed) {
+      AppUpdatesService.checkAll();
+      inAppUpdateService.check();
     }
+  }
 
-    //Get theme preference
-    final _theme = await LocalStorage.getString('appTheme');
+  @override
+  Widget build(BuildContext context) {
+    final router = ref.watch(appRouterProvider);
+    final mode = ref.watch(themeModeProvider);
 
-    //Setup app global state provider
-    appProvider = locator<AppProvider>(param1: {
-      'leagueName': leagueName,
-      'notificationEnabled': notificationEnabled
-    }, param2: currentUser);
-
-    //Setup theme provider
-    themeProvider = locator<ThemeProvider>(
-        param1: _theme == "dark" ? AppTheme.Dark : AppTheme.Light);
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        return MaterialApp.router(
+          title: 'FootballMojo',
+          debugShowCheckedModeBanner: false,
+          routerConfig: router,
+          theme: AppTheme.light(lightDynamic),
+          darkTheme: AppTheme.dark(darkDynamic),
+          themeMode: mode,
+          // Forced updates take over the screen completely; recommended/patch
+          // updates show as a slim banner above the routed body.
+          builder: (context, child) {
+            return ForceUpdateGate(
+              child: Column(
+                children: [
+                  const UpdateBanner(),
+                  Expanded(child: child ?? const SizedBox.shrink()),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
