@@ -103,6 +103,7 @@ export class UsersService {
       userTag: user.userTag,
       photoUrl: user.photoUrl,
       countryCode: user.countryCode,
+      supportedCountryCode: user.supportedCountryCode,
       coins: user.coins,
       gems: user.gems,
       proExpiresAt: user.proExpiresAt,
@@ -226,6 +227,147 @@ export class UsersService {
       where: { id: uid },
       data: { favouriteTeams: { set: next } },
     });
+  }
+
+  /// Idempotently add an FCM token to a user. Tokens rotate periodically
+  /// (every ~30 days or after app re-install) so the client posts the
+  /// current token on each cold start; this method de-dupes silently.
+  async addFcmToken(uid: string, token: string) {
+    const t = token.trim();
+    if (!t) throw new BadRequestException('token_required');
+    const u = await this.prisma.user.findUnique({
+      where: { id: uid },
+      select: { fcmTokens: true },
+    });
+    if (!u) throw new NotFoundException('user_not_found');
+    if (u.fcmTokens.includes(t)) return;
+    await this.prisma.user.update({
+      where: { id: uid },
+      data: { fcmTokens: { set: [...u.fcmTokens, t] } },
+    });
+  }
+
+  /// Remove an FCM token (sign-out, or token refresh from the client).
+  async removeFcmToken(uid: string, token: string) {
+    const t = token.trim();
+    if (!t) return;
+    const u = await this.prisma.user.findUnique({
+      where: { id: uid },
+      select: { fcmTokens: true },
+    });
+    if (!u) return;
+    const next = u.fcmTokens.filter((x) => x !== t);
+    if (next.length === u.fcmTokens.length) return;
+    await this.prisma.user.update({
+      where: { id: uid },
+      data: { fcmTokens: { set: next } },
+    });
+  }
+
+  /// Pick a country to support during the World Cup. Pass null to clear.
+  /// Stored separately from `countryCode` (nationality) so a user can be
+  /// from one place and root for another.
+  async setSupportedCountry(uid: string, code: string | null) {
+    const normalized = code?.toUpperCase().trim() || null;
+    if (normalized != null && !/^[A-Z]{2,4}$/.test(normalized)) {
+      throw new BadRequestException('invalid_country_code');
+    }
+    await this.prisma.user.update({
+      where: { id: uid },
+      data: { supportedCountryCode: normalized },
+    });
+    return { supportedCountryCode: normalized };
+  }
+
+  /// Read the user's notification preferences. Returns defaults (everything
+  /// enabled) when no row exists — absence means "no opt-out yet".
+  async getNotificationPreferences(uid: string) {
+    const pref = await this.prisma.notificationPreference.findUnique({
+      where: { userId: uid },
+    });
+    if (pref) return pref;
+    return {
+      userId: uid,
+      matchGoals: true,
+      matchKickoff: true,
+      matchFulltime: true,
+      matchLineup: true,
+      breakingNews: true,
+      wcDailyRecap: true,
+      fantasyResults: true,
+      h2hInvites: true,
+      h2hResults: true,
+      cardDrops: true,
+      updatedAt: new Date(),
+    };
+  }
+
+  /// Upsert preferences. Only the fields the client sends are updated; the
+  /// rest keep their last value (or default to true if no row yet).
+  async setNotificationPreferences(
+    uid: string,
+    patch: Partial<Omit<Prisma.NotificationPreferenceUncheckedCreateInput, 'userId' | 'updatedAt'>>,
+  ) {
+    return this.prisma.notificationPreference.upsert({
+      where: { userId: uid },
+      create: { userId: uid, ...patch },
+      update: patch,
+    });
+  }
+
+  /// Paginated notification history. `cursor` is the last id from the
+  /// previous page (sentAt-desc ordering). Returns null `nextCursor` when
+  /// there are no more pages.
+  async notificationHistory(uid: string, limit = 30, cursor?: string) {
+    const rows = await this.prisma.notificationLog.findMany({
+      where: { userId: uid },
+      orderBy: { sentAt: 'desc' },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    const hasMore = rows.length > limit;
+    const slice = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items: slice.map((n) => ({
+        id: n.id,
+        type: n.type,
+        category: n.category,
+        title: n.title,
+        body: n.body,
+        deepLink: n.deepLink,
+        payload: n.payload,
+        sentAt: n.sentAt,
+        readAt: n.readAt,
+      })),
+      nextCursor: hasMore ? slice[slice.length - 1]!.id : null,
+    };
+  }
+
+  /// Count of unread (readAt == null) notifications for the user. Drives
+  /// the home appbar bell badge. Cap at 99 client-side for display.
+  async unreadNotificationCount(uid: string) {
+    const count = await this.prisma.notificationLog.count({
+      where: { userId: uid, readAt: null },
+    });
+    return { unread: count };
+  }
+
+  /// Mark notifications read. Pass `null` for `ids` to mark *all* as read
+  /// (the "open the notification center" implicit-read pattern).
+  async markNotificationsRead(uid: string, ids: string[] | null) {
+    const now = new Date();
+    if (ids === null) {
+      await this.prisma.notificationLog.updateMany({
+        where: { userId: uid, readAt: null },
+        data: { readAt: now },
+      });
+    } else if (ids.length) {
+      await this.prisma.notificationLog.updateMany({
+        where: { userId: uid, id: { in: ids }, readAt: null },
+        data: { readAt: now },
+      });
+    }
+    return { readAt: now };
   }
 
   /// Public team-search for the favourites picker. Filters by name prefix

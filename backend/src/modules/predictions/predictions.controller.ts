@@ -34,4 +34,17 @@ export class PredictionsController {
   ) {
     return this.predictions.submitBracket(uid, body.competitionId, body.picks);
   }
+
+  @Get('bracket/me')
+  async myBracket(
+    @CurrentUser('uid') uid: string,
+    @Query('competitionId') competitionId: string,
+  ) {
+    return (await this.predictions.getMyBracket(uid, competitionId)) ?? null;
+  }
+
+  @Get('bracket/leaderboard')
+  bracketLeaderboard(@Query('competitionId') competitionId: string) {
+    return this.predictions.bracketLeaderboard(competitionId);
+  }
 }

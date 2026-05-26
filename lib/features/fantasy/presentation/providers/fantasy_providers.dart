@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/fantasy_models.dart';
+import '../../data/models/league_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
 
 /// Default Global Cup slug — wired to the WC 2026 tournament seed.
@@ -83,3 +84,17 @@ class DraftLineupNotifier extends Notifier<DraftLineupState> {
 }
 
 final draftLineupProvider = NotifierProvider<DraftLineupNotifier, DraftLineupState>(DraftLineupNotifier.new);
+
+// Private leagues
+final myLeaguesProvider =
+    FutureProvider.family<List<FantasyLeagueSummary>, String?>((ref, tournamentId) {
+  return ref.read(fantasyRepositoryProvider).myLeagues(tournamentId: tournamentId);
+});
+
+final leagueLeaderboardProvider = FutureProvider.family<List<LeaderboardEntry>,
+    ({String leagueId, String gameweekId})>((ref, args) {
+  return ref.read(fantasyRepositoryProvider).leagueLeaderboard(
+        leagueId: args.leagueId,
+        gameweekId: args.gameweekId,
+      );
+});

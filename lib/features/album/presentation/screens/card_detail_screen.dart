@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/design/motion.dart';
 import '../../../../core/design/rarity_theme.dart';
+import '../../../../core/share/share_service.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/foil_overlay.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../data/models/card_models.dart';
 import '../../data/repositories/album_repository.dart';
+import '../widgets/card_pull_share_card.dart';
 
 /// Premium card detail. Top half is a 3D-tilted player card with foil/holo
 /// overlay, drag the card to tilt, tap to flip, with rarity-driven background
@@ -68,6 +70,26 @@ class _CardDetailScreenState extends ConsumerState<CardDetailScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          FutureBuilder<OwnedCardDto>(
+            future: _future,
+            builder: (_, snap) {
+              final card = snap.data;
+              if (card == null) return const SizedBox.shrink();
+              return IconButton(
+                tooltip: 'Share',
+                icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+                onPressed: () => ShareService.instance.shareArtifact(
+                  context: context,
+                  logicalSize: const Size(1080, 1350),
+                  text: 'Pulled ${card.template.playerName ?? card.template.edition} on PITCH',
+                  filename: 'pitch_card.png',
+                  builder: (_) => CardPullShareCard(card: card),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<OwnedCardDto>(
         future: _future,

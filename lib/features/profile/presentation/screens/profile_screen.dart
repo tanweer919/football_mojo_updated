@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../core/router/route_paths.dart';
 
 import '../../../../core/auth/auth_repository.dart';
 import '../../../../core/auth/sign_in_sheet.dart';
@@ -134,6 +137,19 @@ class _SignedOutAccount extends ConsumerWidget {
   }
 }
 
+/// Open an external URL via the system browser. Falls back to a snackbar
+/// when the URL can't be launched (no installed browser, malformed, etc).
+Future<void> _open(String url, BuildContext context) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return;
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Couldn't open $url")),
+    );
+  }
+}
+
 class _ProfileBody extends ConsumerWidget {
   const _ProfileBody({required this.profile});
   final Profile profile;
@@ -150,7 +166,7 @@ class _ProfileBody extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _StatsRow(stats: p.stats),
               ),
-              const SectionHead(title: 'Achievements', action: 'All →'),
+              const SectionHead(title: 'Achievements'),
               if (p.achievements.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
@@ -195,6 +211,7 @@ class _ProfileBody extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SettingsGroup(rows: [
+                  // Account-info rows are read-only — no chevron, no tap.
                   _SettingRow(icon: Icons.email_outlined, label: 'Email', value: p.email ?? '—'),
                   _SettingRow(
                     icon: Icons.diamond_outlined,
@@ -207,6 +224,9 @@ class _ProfileBody extends ConsumerWidget {
                     value: p.proExpiresAt == null
                         ? 'Free tier'
                         : 'Until ${DateFormat.yMMMd().format(p.proExpiresAt!.toLocal())}',
+                    // Always tappable — Pro paywall is the upgrade surface
+                    // when free, and the manage-subscription view when paid.
+                    onTap: () => context.push(RoutePaths.proPaywall),
                   ),
                 ]),
               ),
@@ -214,17 +234,70 @@ class _ProfileBody extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SettingsGroup(rows: [
-                  _SettingRow(icon: Icons.toll, label: 'Coins', value: '${p.coins}', gold: true),
-                  _SettingRow(icon: Icons.diamond, label: 'Gems', value: '${p.gems}', gold: true),
+                  _SettingRow(
+                    icon: Icons.toll,
+                    label: 'Coins',
+                    value: '${p.coins}',
+                    gold: true,
+                    onTap: () => context.push(RoutePaths.wallet),
+                  ),
+                  _SettingRow(
+                    icon: Icons.diamond,
+                    label: 'Gems',
+                    value: '${p.gems}',
+                    gold: true,
+                    onTap: () => context.push(RoutePaths.wallet),
+                  ),
+                ]),
+              ),
+              const SectionHead(title: 'World Cup'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _SettingsGroup(rows: [
+                  _SettingRow(
+                    icon: Icons.flag_rounded,
+                    label: 'Country I support',
+                    value: p.supportedCountryCode ?? 'Pick one',
+                    gold: p.supportedCountryCode != null,
+                    onTap: () => context.push(RoutePaths.supportedCountry),
+                  ),
+                  _SettingRow(
+                    icon: Icons.emoji_events_outlined,
+                    label: 'Tournament awards',
+                    onTap: () => context.push(RoutePaths.awardPicks),
+                  ),
+                ]),
+              ),
+              const SectionHead(title: 'Notifications'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _SettingsGroup(rows: [
+                  _SettingRow(
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Manage alerts',
+                    onTap: () => context.push(RoutePaths.notificationPrefs),
+                  ),
                 ]),
               ),
               const SectionHead(title: 'Privacy & support'),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SettingsGroup(rows: [
-                  _SettingRow(icon: Icons.help_outline, label: 'Help centre'),
-                  _SettingRow(icon: Icons.privacy_tip_outlined, label: 'Privacy'),
-                  _SettingRow(icon: Icons.gavel_outlined, label: 'Terms'),
+                  _SettingRow(
+                    icon: Icons.help_outline,
+                    label: 'Help centre',
+                    onTap: () => _open('https://pitch.app/help', context),
+                  ),
+                  _SettingRow(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Privacy',
+                    onTap: () => _open('https://pitch.app/privacy', context),
+                  ),
+                  _SettingRow(
+                    icon: Icons.gavel_outlined,
+                    label: 'Terms',
+                    onTap: () => _open('https://pitch.app/terms', context),
+                  ),
                 ]),
               ),
               const SizedBox(height: 24),
@@ -511,14 +584,22 @@ class _SettingsGroup extends StatelessWidget {
 }
 
 class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.icon, required this.label, this.value, this.gold = false});
+  const _SettingRow({
+    required this.icon,
+    required this.label,
+    this.value,
+    this.gold = false,
+    this.onTap,
+  });
   final IconData icon;
   final String label;
   final String? value;
   final bool gold;
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
@@ -547,9 +628,16 @@ class _SettingRow extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 6),
-          const Icon(Icons.chevron_right, size: 18, color: AppColors.muted2),
+          // Chevron only when there's a tap target — otherwise it lies
+          // about being tappable.
+          if (onTap != null)
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.muted2)
+          else
+            const SizedBox(width: 18),
         ],
       ),
     );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }

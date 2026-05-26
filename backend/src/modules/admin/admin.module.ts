@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { AwardsModule } from '../awards/awards.module';
+import { AdminAwardsController } from './awards.controller';
 import { AdminRoleGuard } from './admin-role.guard';
 import { AdminDashboardController } from './dashboard.controller';
 import { AdminPlayersController } from './players.controller';
@@ -19,7 +21,7 @@ import { AdminTeamsService } from './teams.service';
  * Mounted at `/v1/admin/*`. Consumed by the Next.js admin panel.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, AwardsModule],
   providers: [
     AdminRoleGuard,
     AdminPlayersService,
@@ -33,6 +35,7 @@ import { AdminTeamsService } from './teams.service';
     AdminCardsController,
     AdminUsersController,
     AdminTeamsController,
+    AdminAwardsController,
   ],
 })
 export class AdminModule {}

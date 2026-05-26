@@ -154,7 +154,150 @@ class _OwnedTile extends StatelessWidget {
                   ),
                 ),
               ),
+            // Mint scarcity badge — "247 / 500" along the bottom-right.
+            // Only shown when a real cap exists.
+            if (entry.template.hasMintCap)
+              Positioned(
+                right: 6, bottom: 26,
+                child: _MintBadge(
+                  minted: entry.template.mintedCount,
+                  total: entry.template.totalSupply,
+                  accent: theme.accent,
+                ),
+              ),
+            // Drop window countdown chip — only when the window matters.
+            if (entry.template.hasDropWindow)
+              Positioned(
+                left: 6, bottom: 26,
+                child: _DropChip(template: entry.template, accent: theme.accent),
+              ),
+            // Iconic shimmer sweep — single subtle pass every few seconds.
+            // The rarity theme exposes a holographic flag we previously didn't honour.
+            if (theme.label.toUpperCase() == 'ICONIC')
+              const Positioned.fill(child: _IconicShimmer()),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MintBadge extends StatelessWidget {
+  const _MintBadge({required this.minted, required this.total, required this.accent});
+  final int minted;
+  final int total;
+  final Color accent;
+  @override
+  Widget build(BuildContext context) {
+    final remaining = (total - minted).clamp(0, 1 << 30);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: accent.withValues(alpha: 0.55), width: 0.5),
+      ),
+      child: Text(
+        remaining == 0 ? 'SOLD OUT' : '$minted / $total',
+        style: TextStyle(
+          color: remaining == 0 ? Colors.redAccent.shade100 : accent,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropChip extends StatelessWidget {
+  const _DropChip({required this.template, required this.accent});
+  final CardTemplateDto template;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final untilOpen = template.untilOpen;
+    final untilClose = template.untilClose;
+    final label = untilOpen != null
+        ? 'OPENS ${_short(untilOpen)}'
+        : untilClose != null
+            ? 'CLOSES ${_short(untilClose)}'
+            : 'CLOSED';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: accent.withValues(alpha: 0.55), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: accent,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  static String _short(Duration d) {
+    if (d.inDays >= 1) return '${d.inDays}d';
+    if (d.inHours >= 1) return '${d.inHours}h';
+    return '${d.inMinutes}m';
+  }
+}
+
+class _IconicShimmer extends StatefulWidget {
+  const _IconicShimmer();
+  @override
+  State<_IconicShimmer> createState() => _IconicShimmerState();
+}
+
+class _IconicShimmerState extends State<_IconicShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => ShaderMask(
+          blendMode: BlendMode.plus,
+          shaderCallback: (rect) {
+            final t = _c.value;
+            return LinearGradient(
+              begin: Alignment(-1 + 2 * t, -1),
+              end: Alignment(1 + 2 * t, 1),
+              colors: const [
+                Color(0x00FFFFFF),
+                Color(0x33FFEED4),
+                Color(0x88FFE6A2),
+                Color(0x33FFEED4),
+                Color(0x00FFFFFF),
+              ],
+              stops: const [0.30, 0.45, 0.50, 0.55, 0.70],
+            ).createShader(rect);
+          },
+          child: Container(color: Colors.white.withValues(alpha: 0.05)),
         ),
       ),
     );

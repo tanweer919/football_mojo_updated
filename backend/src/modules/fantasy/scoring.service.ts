@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PlayerPosition, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { ApiFootballCacheService } from '../api-football/api-football-cache.service';
+import { GemsService } from '../gems/gems.service';
+import { PushService } from '../notifications/push.service';
 import { ApiFixturePlayerStat } from '../api-football/api-football.client';
 import {
   ALL_AROUND_CAP,
@@ -32,6 +34,8 @@ export class FantasyScoringService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly apiFootball: ApiFootballCacheService,
+    private readonly gems: GemsService,
+    private readonly push: PushService,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -420,6 +424,46 @@ export class FantasyScoringService {
         where: { id: t.id }, data: { rank: i + 1 },
       })),
     );
+
+    // Award gems by rank tier. Dedupe key (user, FANTASY_RANK, "lineup", id)
+    // means a re-score that doesn't change the ranking won't double-credit.
+    const rankedLineups = await this.prisma.fantasyLineup.findMany({
+      where: { gameweekId },
+      select: { id: true, userId: true, rank: true, totalPoints: true },
+    });
+    for (const l of rankedLineups) {
+      if (l.rank == null) continue;
+      try {
+        await this.gems.creditFantasyRank(l.userId, l.id, l.rank);
+      } catch (err) {
+        this.log.warn(`Gem credit failed for lineup ${l.id}: ${(err as Error).message}`);
+      }
+    }
+
+    // Push fantasy results — but only on the FINAL pass when the gameweek
+    // gets marked scored=true. Live ticks call rollupLineups every minute;
+    // we don't want a "GW1 results — #234, 67 pts" push fired 90 times.
+    const gw = await this.prisma.fantasyGameweek.findUnique({
+      where: { id: gameweekId },
+      select: { number: true, scored: true },
+    });
+    if (gw?.scored) {
+      for (const l of rankedLineups) {
+        if (l.rank == null) continue;
+        void this.push.pushToUser({
+          userId: l.userId,
+          category: 'fantasyResults',
+          title: `GW${gw.number} results in`,
+          body: `You finished #${l.rank} with ${l.totalPoints.toFixed(1)} pts.`,
+          data: {
+            type: 'fantasy_result',
+            gameweekId,
+            rank: String(l.rank),
+            deepLink: 'footballmojo://fantasy',
+          },
+        });
+      }
+    }
   }
 
   private inferPosition(raw: string | null | undefined): PlayerPosition {

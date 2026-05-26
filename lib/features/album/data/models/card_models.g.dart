@@ -18,6 +18,16 @@ _CardTemplateDto _$CardTemplateDtoFromJson(Map<String, dynamic> json) =>
       playerName: json['playerName'] as String?,
       teamName: json['teamName'] as String?,
       teamCrestUrl: json['teamCrestUrl'] as String?,
+      dropOpensAt:
+          json['dropOpensAt'] == null
+              ? null
+              : DateTime.parse(json['dropOpensAt'] as String),
+      dropClosesAt:
+          json['dropClosesAt'] == null
+              ? null
+              : DateTime.parse(json['dropClosesAt'] as String),
+      maxPerUser: (json['maxPerUser'] as num?)?.toInt(),
+      uniqueOwners: (json['uniqueOwners'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$CardTemplateDtoToJson(_CardTemplateDto instance) =>
@@ -32,6 +42,10 @@ Map<String, dynamic> _$CardTemplateDtoToJson(_CardTemplateDto instance) =>
       'playerName': instance.playerName,
       'teamName': instance.teamName,
       'teamCrestUrl': instance.teamCrestUrl,
+      'dropOpensAt': instance.dropOpensAt?.toIso8601String(),
+      'dropClosesAt': instance.dropClosesAt?.toIso8601String(),
+      'maxPerUser': instance.maxPerUser,
+      'uniqueOwners': instance.uniqueOwners,
     };
 
 const _$CardRarityEnumMap = {

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AcquisitionSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { GemsService } from '../gems/gems.service';
 import { MintingService } from './minting.service';
 
 /// XP→level table. Doubling cadence keeps the curve interesting all the
@@ -22,6 +23,7 @@ export class CardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly minting: MintingService,
+    private readonly gems: GemsService,
   ) {}
 
   // ─── Album view ────────────────────────────────────────────────────────────
@@ -66,6 +68,11 @@ export class CardsService {
       playerName: t.player?.name ?? null,
       teamName: t.player?.team?.name ?? null,
       teamCrestUrl: t.player?.team?.crestUrl ?? null,
+      // Scarcity surface — exposed so the client can render mint caps,
+      // drop windows, and per-user caps in the album / market tiles.
+      dropOpensAt:  t.dropOpensAt ?? null,
+      dropClosesAt: t.dropClosesAt ?? null,
+      maxPerUser:   t.maxPerUser ?? null,
     });
 
     const result = sets.map((s) => ({
@@ -281,38 +288,109 @@ export class CardsService {
 
   // ─── Direct purchase (halal IAP) ──────────────────────────────────────────
   // User explicitly buys a NAMED card for a KNOWN gem price. No uncertainty.
+  // Gem deduction goes through the GemsService ledger so every spend is
+  // auditable and dedupe-protected.
   async purchaseCard(userId: string, templateId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const tpl = await tx.cardTemplate.findUnique({ where: { id: templateId } });
-      if (!tpl) throw new NotFoundException('template_not_found');
-      if (!tpl.purchasable || !tpl.gemPrice)
-        throw new BadRequestException('not_purchasable');
-      if (tpl.mintedCount >= tpl.totalSupply)
-        throw new BadRequestException('sold_out');
+    const tpl = await this.prisma.cardTemplate.findUnique({ where: { id: templateId } });
+    if (!tpl) throw new NotFoundException('template_not_found');
+    if (!tpl.purchasable || !tpl.gemPrice)
+      throw new BadRequestException('not_purchasable');
+    if (tpl.mintedCount >= tpl.totalSupply)
+      throw new BadRequestException('sold_out');
+    // Drop-window enforcement here mirrors MintingService.mint so the user
+    // can't buy a template whose window hasn't opened yet.
+    const now = new Date();
+    if (tpl.dropOpensAt && tpl.dropOpensAt.getTime() > now.getTime())
+      throw new BadRequestException('drop_not_open_yet');
+    if (tpl.dropClosesAt && tpl.dropClosesAt.getTime() <= now.getTime())
+      throw new BadRequestException('drop_closed');
+    if (tpl.maxPerUser != null) {
+      const owned = await this.prisma.ownedCard.count({
+        where: { templateId, ownerId: userId },
+      });
+      if (owned >= tpl.maxPerUser)
+        throw new BadRequestException('per_user_cap_reached');
+    }
 
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new NotFoundException('user_not_found');
-      if (user.gems < tpl.gemPrice) throw new BadRequestException('insufficient_gems');
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { gems: { decrement: tpl.gemPrice } },
-      });
-      // Mint using the same SERIALIZABLE path.
-      const updated = await tx.cardTemplate.update({
-        where: { id: templateId },
-        data: { mintedCount: { increment: 1 } },
-      });
-      return tx.ownedCard.create({
-        data: {
-          templateId,
-          serialNumber: updated.mintedCount,
-          ownerId: userId,
-          firstOwnerId: userId,
-          acquiredVia: 'DIRECT_PURCHASE',
-        },
-      });
+    // Debit through the ledger. Idempotent dedupe on (user, source, ref).
+    // We use a per-purchase ref by combining templateId + the next serial
+    // number — recorded inside the mint transaction below to keep them
+    // both consistent. Since the serial isn't known yet, we use a unique
+    // request-id-style ref (timestamp + templateId) so a flaky retry doesn't
+    // re-debit on a second attempt: callers should treat this as "fire once".
+    const debitRef = `${templateId}:${Date.now()}`;
+    await this.gems.debit({
+      userId,
+      amount: tpl.gemPrice,
+      source: 'CARD_PACK_PURCHASE',
+      description: `Bought ${tpl.edition} (${tpl.rarity})`,
+      refType: 'pack',
+      refId: debitRef,
     });
+
+    // Now mint. If this throws after the debit, the user is owed gems —
+    // refund through the ledger so the audit trail stays balanced.
+    try {
+      return await this.minting.award({
+        userId,
+        templateId,
+        source: 'DIRECT_PURCHASE',
+      });
+    } catch (err) {
+      await this.gems.credit({
+        userId,
+        amount: tpl.gemPrice,
+        source: 'ADJUSTMENT',
+        description: `Refund — mint failed for ${tpl.edition}`,
+        refType: 'pack-refund',
+        refId: debitRef,
+      });
+      throw err;
+    }
+  }
+
+  /** Featured templates the user can spend gems on right now. Drives the
+   *  wallet store list. Returns only `purchasable && gemPrice` templates
+   *  that are inside their drop window. */
+  async featuredForSale() {
+    const now = new Date();
+    const rows = await this.prisma.cardTemplate.findMany({
+      where: {
+        purchasable: true,
+        gemPrice: { not: null },
+        OR: [
+          { dropOpensAt: null },
+          { dropOpensAt: { lte: now } },
+        ],
+        AND: [
+          {
+            OR: [
+              { dropClosesAt: null },
+              { dropClosesAt: { gt: now } },
+            ],
+          },
+        ],
+      },
+      include: { player: { include: { team: true } } },
+      orderBy: [{ rarity: 'desc' }, { gemPrice: 'asc' }],
+      take: 24,
+    });
+    return rows.map((t) => ({
+      id: t.id,
+      edition: t.edition,
+      rarity: t.rarity,
+      totalSupply: t.totalSupply,
+      mintedCount: t.mintedCount,
+      artUrl: t.artUrl,
+      frameStyle: t.frameStyle,
+      gemPrice: t.gemPrice,
+      maxPerUser: t.maxPerUser ?? null,
+      dropOpensAt: t.dropOpensAt ?? null,
+      dropClosesAt: t.dropClosesAt ?? null,
+      playerName: t.player?.name ?? null,
+      teamName: t.player?.team?.name ?? null,
+      teamCrestUrl: t.player?.team?.crestUrl ?? null,
+    }));
   }
 
   // ─── Set completion ────────────────────────────────────────────────────────

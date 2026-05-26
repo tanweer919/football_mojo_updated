@@ -24,9 +24,13 @@ import '../../../insights/data/standings_repository.dart';
 import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
+import '../../../news/presentation/providers/home_news_provider.dart';
 import '../../../news/presentation/providers/news_feed_provider.dart';
+import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
 import '../../../profile/data/profile_repository.dart' show myProfileProvider;
+import '../../../iap/presentation/widgets/gem_chip.dart';
+import '../../../profile/presentation/widgets/notification_bell.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
 import '../providers/home_dashboard_providers.dart';
@@ -76,10 +80,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ref.invalidate(liveMatchesProvider);
         ref.invalidate(homeFixturesProvider);
         ref.invalidate(newsFeedProvider);
+        ref.invalidate(homeNewsProvider);
         await Future.wait<dynamic>([
           ref.read(liveMatchesProvider.future),
           ref.read(homeFixturesProvider.future),
-          ref.read(newsFeedProvider.future),
+          ref.read(homeNewsProvider.future),
         ]);
       },
       child: SingleChildScrollView(
@@ -219,8 +224,10 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          CircleIconButton(icon: Icons.notifications_outlined, onPressed: () {}),
-          const SizedBox(width: 12),
+          const GemChip(),
+          const SizedBox(width: 6),
+          const NotificationBell(),
+          const SizedBox(width: 4),
           GestureDetector(
             onTap: () => context.push(RoutePaths.profile),
             child: const _AppbarAvatar(),
@@ -391,15 +398,15 @@ class _WcHero extends StatelessWidget {
               children: [
                 Expanded(
                   child: GoldButton(
-                    label: 'Enter Global Cup',
-                    onPressed: () => context.push(RoutePaths.fantasyHome),
+                    label: 'Make your bracket',
+                    onPressed: () => context.push(RoutePaths.bracket),
                     expand: true,
                   ),
                 ),
                 const SizedBox(width: 8),
                 GhostButton(
-                  label: 'View bracket',
-                  onPressed: () => context.push(RoutePaths.tournament),
+                  label: 'Global Cup',
+                  onPressed: () => context.push(RoutePaths.fantasyHome),
                   small: true,
                 ),
               ],
@@ -1083,13 +1090,16 @@ class _NewsList extends ConsumerWidget {
   const _NewsList();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final feed = ref.watch(newsFeedProvider);
+    final feed = ref.watch(homeNewsProvider);
     return feed.when(
-      loading: () => Column(
-        children: List.generate(3, (_) => const Padding(
-          padding: EdgeInsets.only(bottom: 10),
-          child: NewsTileSkeleton(),
-        )),
+      loading: () => const Column(
+        children: [
+          _NewsHeroSkeleton(),
+          SizedBox(height: 10),
+          NewsTileSkeleton(),
+          SizedBox(height: 10),
+          NewsTileSkeleton(),
+        ],
       ),
       error: (_, __) => const _ListEmpty(
         title: 'News on a tea break',
@@ -1104,13 +1114,16 @@ class _NewsList extends ConsumerWidget {
             glyph: EmptyGlyph.paper,
           );
         }
-        final items = page.items.take(3).toList();
+        // Hero takes the lead story (already image-prioritised by the
+        // provider); the next two render as compact rows under it.
+        final hero = page.items.first;
+        final rest = page.items.skip(1).take(2).toList();
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (int i = 0; i < items.length; i++) ...[
-              if (i > 0) Container(height: 1, color: AppColors.borderSoft),
-              _NewsItem(article: items[i]),
-            ],
+            _NewsHero(article: hero),
+            if (rest.isNotEmpty) const SizedBox(height: 10),
+            for (final article in rest) _NewsRow(article: article),
           ],
         );
       },
@@ -1118,58 +1131,258 @@ class _NewsList extends ConsumerWidget {
   }
 }
 
-class _NewsItem extends StatelessWidget {
-  const _NewsItem({required this.article});
+/// Big magazine-style hero card. 16:9 image with a bottom scrim, source
+/// pill + breaking/new badge on the image, headline + summary beneath.
+class _NewsHero extends StatelessWidget {
+  const _NewsHero({required this.article});
   final NewsArticleDto article;
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/news/${article.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
+    final age = DateTime.now().difference(article.publishedAt.toLocal());
+    final isBreaking = age.inHours < 1;
+    return Material(
+      color: AppColors.surface2,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/news/${article.id}'),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 88, height: 88,
-                child: PremiumImage(url: article.imageUrl, fit: BoxFit.cover),
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  NewsThumb(
+                    imageUrl: article.imageUrl,
+                    source: article.source,
+                  ),
+                  // Bottom scrim so the source pill stays legible over
+                  // both photo + branded-fallback backgrounds.
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0x00000000), Color(0xAA000000)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0.55, 1.0],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12, bottom: 12,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            article.source.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                        if (isBreaking) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.live,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: const Text(
+                              'BREAKING',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Eyebrow(article.source, gold: true, size: 9),
-                  const SizedBox(height: 4),
                   Text(
                     article.title,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.21,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
                       color: AppColors.fg,
-                      height: 1.3,
+                      height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Eyebrow(
-                    DateFormat('d MMM').format(article.publishedAt.toLocal()),
-                    size: 10,
-                    color: AppColors.muted2,
+                  if (article.summary != null && article.summary!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      article.summary!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: AppColors.muted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule, size: 12, color: AppColors.muted2),
+                      const SizedBox(width: 4),
+                      Text(
+                        relativeTime(article.publishedAt),
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted2,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Compact row for stories #2 / #3 — bigger image than the old 88x88,
+/// branded fallback when the image is missing, relative-time stamp.
+class _NewsRow extends StatelessWidget {
+  const _NewsRow({required this.article});
+  final NewsArticleDto article;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push('/news/${article.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 104, height: 78,
+                    child: NewsThumb(
+                      imageUrl: article.imageUrl,
+                      source: article.source,
+                      dense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Eyebrow(article.source, gold: true, size: 9),
+                      const SizedBox(height: 4),
+                      Text(
+                        article.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                          color: AppColors.fg,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule, size: 11, color: AppColors.muted2),
+                          const SizedBox(width: 4),
+                          Text(
+                            relativeTime(article.publishedAt),
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.muted2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Skeleton placeholder matching the hero's footprint while the home news
+/// query is in-flight. Keeps layout stable on load (no jump).
+class _NewsHeroSkeleton extends StatelessWidget {
+  const _NewsHeroSkeleton();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Container(color: AppColors.surface3),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBlock(height: 16, radius: 4),
+                SizedBox(height: 8),
+                SkeletonBlock(height: 12, radius: 4),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

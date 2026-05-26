@@ -18,9 +18,41 @@ abstract class CardTemplateDto with _$CardTemplateDto {
     String? playerName,
     String? teamName,
     String? teamCrestUrl,
+    // Scarcity primitives. All optional + defaulted so older payloads parse.
+    DateTime? dropOpensAt,
+    DateTime? dropClosesAt,
+    int? maxPerUser,
+    @Default(0) int uniqueOwners,
   }) = _CardTemplateDto;
 
   factory CardTemplateDto.fromJson(Map<String, dynamic> json) => _$CardTemplateDtoFromJson(json);
+}
+
+/// Helpers that don't require regenerated freezed plumbing.
+extension CardTemplateScarcity on CardTemplateDto {
+  bool get hasMintCap => totalSupply > 0;
+  double get mintFraction =>
+      totalSupply <= 0 ? 0 : (mintedCount / totalSupply).clamp(0, 1).toDouble();
+  int get remaining => (totalSupply - mintedCount).clamp(0, 1 << 30).toInt();
+  bool get isSoldOut => totalSupply > 0 && mintedCount >= totalSupply;
+
+  bool get hasDropWindow => dropOpensAt != null || dropClosesAt != null;
+  bool get dropOpen {
+    final now = DateTime.now();
+    if (dropOpensAt != null && now.isBefore(dropOpensAt!)) return false;
+    if (dropClosesAt != null && !now.isBefore(dropClosesAt!)) return false;
+    return true;
+  }
+  Duration? get untilOpen {
+    if (dropOpensAt == null) return null;
+    final d = dropOpensAt!.difference(DateTime.now());
+    return d.isNegative ? null : d;
+  }
+  Duration? get untilClose {
+    if (dropClosesAt == null) return null;
+    final d = dropClosesAt!.difference(DateTime.now());
+    return d.isNegative ? null : d;
+  }
 }
 
 @freezed

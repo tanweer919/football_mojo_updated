@@ -23,6 +23,11 @@ _FantasyTournamentDto _$FantasyTournamentDtoFromJson(
           ?.map((e) => FantasyGameweekDto.fromJson(e as Map<String, dynamic>))
           .toList() ??
       const <FantasyGameweekDto>[],
+  prizes:
+      (json['prizes'] as List<dynamic>?)
+          ?.map((e) => GlobalCupPrizeDto.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <GlobalCupPrizeDto>[],
 );
 
 Map<String, dynamic> _$FantasyTournamentDtoToJson(
@@ -38,6 +43,7 @@ Map<String, dynamic> _$FantasyTournamentDtoToJson(
   'startsAt': instance.startsAt.toIso8601String(),
   'endsAt': instance.endsAt.toIso8601String(),
   'gameweeks': instance.gameweeks,
+  'prizes': instance.prizes,
 };
 
 const _$FantasyFormatEnumMap = {
@@ -45,6 +51,28 @@ const _$FantasyFormatEnumMap = {
   FantasyFormat.FRIENDLY: 'FRIENDLY',
   FantasyFormat.H2H: 'H2H',
 };
+
+_GlobalCupPrizeDto _$GlobalCupPrizeDtoFromJson(Map<String, dynamic> json) =>
+    _GlobalCupPrizeDto(
+      id: json['id'] as String,
+      rankFrom: (json['rankFrom'] as num).toInt(),
+      rankTo: (json['rankTo'] as num).toInt(),
+      description: json['description'] as String,
+      cardTemplateId: json['cardTemplateId'] as String,
+      cardArtUrl: json['cardArtUrl'] as String?,
+      cardRarity: json['cardRarity'] as String?,
+    );
+
+Map<String, dynamic> _$GlobalCupPrizeDtoToJson(_GlobalCupPrizeDto instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'rankFrom': instance.rankFrom,
+      'rankTo': instance.rankTo,
+      'description': instance.description,
+      'cardTemplateId': instance.cardTemplateId,
+      'cardArtUrl': instance.cardArtUrl,
+      'cardRarity': instance.cardRarity,
+    };
 
 _FantasyGameweekDto _$FantasyGameweekDtoFromJson(Map<String, dynamic> json) =>
     _FantasyGameweekDto(
@@ -54,6 +82,7 @@ _FantasyGameweekDto _$FantasyGameweekDtoFromJson(Map<String, dynamic> json) =>
       lockAt: DateTime.parse(json['lockAt'] as String),
       endsAt: DateTime.parse(json['endsAt'] as String),
       scored: json['scored'] as bool? ?? false,
+      liveMatchCount: (json['liveMatchCount'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$FantasyGameweekDtoToJson(_FantasyGameweekDto instance) =>
@@ -64,6 +93,7 @@ Map<String, dynamic> _$FantasyGameweekDtoToJson(_FantasyGameweekDto instance) =>
       'lockAt': instance.lockAt.toIso8601String(),
       'endsAt': instance.endsAt.toIso8601String(),
       'scored': instance.scored,
+      'liveMatchCount': instance.liveMatchCount,
     };
 
 _PlayerValuationDto _$PlayerValuationDtoFromJson(Map<String, dynamic> json) =>

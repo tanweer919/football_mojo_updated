@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$FantasyTournamentDto {
 
- String get id; String get slug; String get name; FantasyFormat get format; double get budget; String? get description; String? get emblemUrl; DateTime get startsAt; DateTime get endsAt; List<FantasyGameweekDto> get gameweeks;
+ String get id; String get slug; String get name; FantasyFormat get format; double get budget; String? get description; String? get emblemUrl; DateTime get startsAt; DateTime get endsAt; List<FantasyGameweekDto> get gameweeks; List<GlobalCupPrizeDto> get prizes;
 /// Create a copy of FantasyTournamentDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $FantasyTournamentDtoCopyWith<FantasyTournamentDto> get copyWith => _$FantasyTou
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FantasyTournamentDto&&(identical(other.id, id) || other.id == id)&&(identical(other.slug, slug) || other.slug == slug)&&(identical(other.name, name) || other.name == name)&&(identical(other.format, format) || other.format == format)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.description, description) || other.description == description)&&(identical(other.emblemUrl, emblemUrl) || other.emblemUrl == emblemUrl)&&(identical(other.startsAt, startsAt) || other.startsAt == startsAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&const DeepCollectionEquality().equals(other.gameweeks, gameweeks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FantasyTournamentDto&&(identical(other.id, id) || other.id == id)&&(identical(other.slug, slug) || other.slug == slug)&&(identical(other.name, name) || other.name == name)&&(identical(other.format, format) || other.format == format)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.description, description) || other.description == description)&&(identical(other.emblemUrl, emblemUrl) || other.emblemUrl == emblemUrl)&&(identical(other.startsAt, startsAt) || other.startsAt == startsAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&const DeepCollectionEquality().equals(other.gameweeks, gameweeks)&&const DeepCollectionEquality().equals(other.prizes, prizes));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,slug,name,format,budget,description,emblemUrl,startsAt,endsAt,const DeepCollectionEquality().hash(gameweeks));
+int get hashCode => Object.hash(runtimeType,id,slug,name,format,budget,description,emblemUrl,startsAt,endsAt,const DeepCollectionEquality().hash(gameweeks),const DeepCollectionEquality().hash(prizes));
 
 @override
 String toString() {
-  return 'FantasyTournamentDto(id: $id, slug: $slug, name: $name, format: $format, budget: $budget, description: $description, emblemUrl: $emblemUrl, startsAt: $startsAt, endsAt: $endsAt, gameweeks: $gameweeks)';
+  return 'FantasyTournamentDto(id: $id, slug: $slug, name: $name, format: $format, budget: $budget, description: $description, emblemUrl: $emblemUrl, startsAt: $startsAt, endsAt: $endsAt, gameweeks: $gameweeks, prizes: $prizes)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $FantasyTournamentDtoCopyWith<$Res>  {
   factory $FantasyTournamentDtoCopyWith(FantasyTournamentDto value, $Res Function(FantasyTournamentDto) _then) = _$FantasyTournamentDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String slug, String name, FantasyFormat format, double budget, String? description, String? emblemUrl, DateTime startsAt, DateTime endsAt, List<FantasyGameweekDto> gameweeks
+ String id, String slug, String name, FantasyFormat format, double budget, String? description, String? emblemUrl, DateTime startsAt, DateTime endsAt, List<FantasyGameweekDto> gameweeks, List<GlobalCupPrizeDto> prizes
 });
 
 
@@ -65,7 +65,7 @@ class _$FantasyTournamentDtoCopyWithImpl<$Res>
 
 /// Create a copy of FantasyTournamentDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? slug = null,Object? name = null,Object? format = null,Object? budget = null,Object? description = freezed,Object? emblemUrl = freezed,Object? startsAt = null,Object? endsAt = null,Object? gameweeks = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? slug = null,Object? name = null,Object? format = null,Object? budget = null,Object? description = freezed,Object? emblemUrl = freezed,Object? startsAt = null,Object? endsAt = null,Object? gameweeks = null,Object? prizes = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,slug: null == slug ? _self.slug : slug // ignore: cast_nullable_to_non_nullable
@@ -77,7 +77,8 @@ as String?,emblemUrl: freezed == emblemUrl ? _self.emblemUrl : emblemUrl // igno
 as String?,startsAt: null == startsAt ? _self.startsAt : startsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,endsAt: null == endsAt ? _self.endsAt : endsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,gameweeks: null == gameweeks ? _self.gameweeks : gameweeks // ignore: cast_nullable_to_non_nullable
-as List<FantasyGameweekDto>,
+as List<FantasyGameweekDto>,prizes: null == prizes ? _self.prizes : prizes // ignore: cast_nullable_to_non_nullable
+as List<GlobalCupPrizeDto>,
   ));
 }
 
@@ -162,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks,  List<GlobalCupPrizeDto> prizes)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FantasyTournamentDto() when $default != null:
-return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks);case _:
+return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks,_that.prizes);case _:
   return orElse();
 
 }
@@ -183,10 +184,10 @@ return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.d
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks,  List<GlobalCupPrizeDto> prizes)  $default,) {final _that = this;
 switch (_that) {
 case _FantasyTournamentDto():
-return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks);case _:
+return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks,_that.prizes);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +204,10 @@ return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.d
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String slug,  String name,  FantasyFormat format,  double budget,  String? description,  String? emblemUrl,  DateTime startsAt,  DateTime endsAt,  List<FantasyGameweekDto> gameweeks,  List<GlobalCupPrizeDto> prizes)?  $default,) {final _that = this;
 switch (_that) {
 case _FantasyTournamentDto() when $default != null:
-return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks);case _:
+return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.description,_that.emblemUrl,_that.startsAt,_that.endsAt,_that.gameweeks,_that.prizes);case _:
   return null;
 
 }
@@ -218,7 +219,7 @@ return $default(_that.id,_that.slug,_that.name,_that.format,_that.budget,_that.d
 @JsonSerializable()
 
 class _FantasyTournamentDto implements FantasyTournamentDto {
-  const _FantasyTournamentDto({required this.id, required this.slug, required this.name, required this.format, required this.budget, this.description, this.emblemUrl, required this.startsAt, required this.endsAt, final  List<FantasyGameweekDto> gameweeks = const <FantasyGameweekDto>[]}): _gameweeks = gameweeks;
+  const _FantasyTournamentDto({required this.id, required this.slug, required this.name, required this.format, required this.budget, this.description, this.emblemUrl, required this.startsAt, required this.endsAt, final  List<FantasyGameweekDto> gameweeks = const <FantasyGameweekDto>[], final  List<GlobalCupPrizeDto> prizes = const <GlobalCupPrizeDto>[]}): _gameweeks = gameweeks,_prizes = prizes;
   factory _FantasyTournamentDto.fromJson(Map<String, dynamic> json) => _$FantasyTournamentDtoFromJson(json);
 
 @override final  String id;
@@ -237,6 +238,13 @@ class _FantasyTournamentDto implements FantasyTournamentDto {
   return EqualUnmodifiableListView(_gameweeks);
 }
 
+ final  List<GlobalCupPrizeDto> _prizes;
+@override@JsonKey() List<GlobalCupPrizeDto> get prizes {
+  if (_prizes is EqualUnmodifiableListView) return _prizes;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_prizes);
+}
+
 
 /// Create a copy of FantasyTournamentDto
 /// with the given fields replaced by the non-null parameter values.
@@ -251,16 +259,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FantasyTournamentDto&&(identical(other.id, id) || other.id == id)&&(identical(other.slug, slug) || other.slug == slug)&&(identical(other.name, name) || other.name == name)&&(identical(other.format, format) || other.format == format)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.description, description) || other.description == description)&&(identical(other.emblemUrl, emblemUrl) || other.emblemUrl == emblemUrl)&&(identical(other.startsAt, startsAt) || other.startsAt == startsAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&const DeepCollectionEquality().equals(other._gameweeks, _gameweeks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FantasyTournamentDto&&(identical(other.id, id) || other.id == id)&&(identical(other.slug, slug) || other.slug == slug)&&(identical(other.name, name) || other.name == name)&&(identical(other.format, format) || other.format == format)&&(identical(other.budget, budget) || other.budget == budget)&&(identical(other.description, description) || other.description == description)&&(identical(other.emblemUrl, emblemUrl) || other.emblemUrl == emblemUrl)&&(identical(other.startsAt, startsAt) || other.startsAt == startsAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&const DeepCollectionEquality().equals(other._gameweeks, _gameweeks)&&const DeepCollectionEquality().equals(other._prizes, _prizes));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,slug,name,format,budget,description,emblemUrl,startsAt,endsAt,const DeepCollectionEquality().hash(_gameweeks));
+int get hashCode => Object.hash(runtimeType,id,slug,name,format,budget,description,emblemUrl,startsAt,endsAt,const DeepCollectionEquality().hash(_gameweeks),const DeepCollectionEquality().hash(_prizes));
 
 @override
 String toString() {
-  return 'FantasyTournamentDto(id: $id, slug: $slug, name: $name, format: $format, budget: $budget, description: $description, emblemUrl: $emblemUrl, startsAt: $startsAt, endsAt: $endsAt, gameweeks: $gameweeks)';
+  return 'FantasyTournamentDto(id: $id, slug: $slug, name: $name, format: $format, budget: $budget, description: $description, emblemUrl: $emblemUrl, startsAt: $startsAt, endsAt: $endsAt, gameweeks: $gameweeks, prizes: $prizes)';
 }
 
 
@@ -271,7 +279,7 @@ abstract mixin class _$FantasyTournamentDtoCopyWith<$Res> implements $FantasyTou
   factory _$FantasyTournamentDtoCopyWith(_FantasyTournamentDto value, $Res Function(_FantasyTournamentDto) _then) = __$FantasyTournamentDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String slug, String name, FantasyFormat format, double budget, String? description, String? emblemUrl, DateTime startsAt, DateTime endsAt, List<FantasyGameweekDto> gameweeks
+ String id, String slug, String name, FantasyFormat format, double budget, String? description, String? emblemUrl, DateTime startsAt, DateTime endsAt, List<FantasyGameweekDto> gameweeks, List<GlobalCupPrizeDto> prizes
 });
 
 
@@ -288,7 +296,7 @@ class __$FantasyTournamentDtoCopyWithImpl<$Res>
 
 /// Create a copy of FantasyTournamentDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? slug = null,Object? name = null,Object? format = null,Object? budget = null,Object? description = freezed,Object? emblemUrl = freezed,Object? startsAt = null,Object? endsAt = null,Object? gameweeks = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? slug = null,Object? name = null,Object? format = null,Object? budget = null,Object? description = freezed,Object? emblemUrl = freezed,Object? startsAt = null,Object? endsAt = null,Object? gameweeks = null,Object? prizes = null,}) {
   return _then(_FantasyTournamentDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,slug: null == slug ? _self.slug : slug // ignore: cast_nullable_to_non_nullable
@@ -300,7 +308,289 @@ as String?,emblemUrl: freezed == emblemUrl ? _self.emblemUrl : emblemUrl // igno
 as String?,startsAt: null == startsAt ? _self.startsAt : startsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,endsAt: null == endsAt ? _self.endsAt : endsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,gameweeks: null == gameweeks ? _self._gameweeks : gameweeks // ignore: cast_nullable_to_non_nullable
-as List<FantasyGameweekDto>,
+as List<FantasyGameweekDto>,prizes: null == prizes ? _self._prizes : prizes // ignore: cast_nullable_to_non_nullable
+as List<GlobalCupPrizeDto>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$GlobalCupPrizeDto {
+
+ String get id; int get rankFrom; int get rankTo; String get description; String get cardTemplateId; String? get cardArtUrl; String? get cardRarity;
+/// Create a copy of GlobalCupPrizeDto
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$GlobalCupPrizeDtoCopyWith<GlobalCupPrizeDto> get copyWith => _$GlobalCupPrizeDtoCopyWithImpl<GlobalCupPrizeDto>(this as GlobalCupPrizeDto, _$identity);
+
+  /// Serializes this GlobalCupPrizeDto to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is GlobalCupPrizeDto&&(identical(other.id, id) || other.id == id)&&(identical(other.rankFrom, rankFrom) || other.rankFrom == rankFrom)&&(identical(other.rankTo, rankTo) || other.rankTo == rankTo)&&(identical(other.description, description) || other.description == description)&&(identical(other.cardTemplateId, cardTemplateId) || other.cardTemplateId == cardTemplateId)&&(identical(other.cardArtUrl, cardArtUrl) || other.cardArtUrl == cardArtUrl)&&(identical(other.cardRarity, cardRarity) || other.cardRarity == cardRarity));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,rankFrom,rankTo,description,cardTemplateId,cardArtUrl,cardRarity);
+
+@override
+String toString() {
+  return 'GlobalCupPrizeDto(id: $id, rankFrom: $rankFrom, rankTo: $rankTo, description: $description, cardTemplateId: $cardTemplateId, cardArtUrl: $cardArtUrl, cardRarity: $cardRarity)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $GlobalCupPrizeDtoCopyWith<$Res>  {
+  factory $GlobalCupPrizeDtoCopyWith(GlobalCupPrizeDto value, $Res Function(GlobalCupPrizeDto) _then) = _$GlobalCupPrizeDtoCopyWithImpl;
+@useResult
+$Res call({
+ String id, int rankFrom, int rankTo, String description, String cardTemplateId, String? cardArtUrl, String? cardRarity
+});
+
+
+
+
+}
+/// @nodoc
+class _$GlobalCupPrizeDtoCopyWithImpl<$Res>
+    implements $GlobalCupPrizeDtoCopyWith<$Res> {
+  _$GlobalCupPrizeDtoCopyWithImpl(this._self, this._then);
+
+  final GlobalCupPrizeDto _self;
+  final $Res Function(GlobalCupPrizeDto) _then;
+
+/// Create a copy of GlobalCupPrizeDto
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? rankFrom = null,Object? rankTo = null,Object? description = null,Object? cardTemplateId = null,Object? cardArtUrl = freezed,Object? cardRarity = freezed,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,rankFrom: null == rankFrom ? _self.rankFrom : rankFrom // ignore: cast_nullable_to_non_nullable
+as int,rankTo: null == rankTo ? _self.rankTo : rankTo // ignore: cast_nullable_to_non_nullable
+as int,description: null == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String,cardTemplateId: null == cardTemplateId ? _self.cardTemplateId : cardTemplateId // ignore: cast_nullable_to_non_nullable
+as String,cardArtUrl: freezed == cardArtUrl ? _self.cardArtUrl : cardArtUrl // ignore: cast_nullable_to_non_nullable
+as String?,cardRarity: freezed == cardRarity ? _self.cardRarity : cardRarity // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [GlobalCupPrizeDto].
+extension GlobalCupPrizeDtoPatterns on GlobalCupPrizeDto {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _GlobalCupPrizeDto value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _GlobalCupPrizeDto value)  $default,){
+final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _GlobalCupPrizeDto value)?  $default,){
+final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  int rankFrom,  int rankTo,  String description,  String cardTemplateId,  String? cardArtUrl,  String? cardRarity)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto() when $default != null:
+return $default(_that.id,_that.rankFrom,_that.rankTo,_that.description,_that.cardTemplateId,_that.cardArtUrl,_that.cardRarity);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  int rankFrom,  int rankTo,  String description,  String cardTemplateId,  String? cardArtUrl,  String? cardRarity)  $default,) {final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto():
+return $default(_that.id,_that.rankFrom,_that.rankTo,_that.description,_that.cardTemplateId,_that.cardArtUrl,_that.cardRarity);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  int rankFrom,  int rankTo,  String description,  String cardTemplateId,  String? cardArtUrl,  String? cardRarity)?  $default,) {final _that = this;
+switch (_that) {
+case _GlobalCupPrizeDto() when $default != null:
+return $default(_that.id,_that.rankFrom,_that.rankTo,_that.description,_that.cardTemplateId,_that.cardArtUrl,_that.cardRarity);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _GlobalCupPrizeDto implements GlobalCupPrizeDto {
+  const _GlobalCupPrizeDto({required this.id, required this.rankFrom, required this.rankTo, required this.description, required this.cardTemplateId, this.cardArtUrl, this.cardRarity});
+  factory _GlobalCupPrizeDto.fromJson(Map<String, dynamic> json) => _$GlobalCupPrizeDtoFromJson(json);
+
+@override final  String id;
+@override final  int rankFrom;
+@override final  int rankTo;
+@override final  String description;
+@override final  String cardTemplateId;
+@override final  String? cardArtUrl;
+@override final  String? cardRarity;
+
+/// Create a copy of GlobalCupPrizeDto
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$GlobalCupPrizeDtoCopyWith<_GlobalCupPrizeDto> get copyWith => __$GlobalCupPrizeDtoCopyWithImpl<_GlobalCupPrizeDto>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$GlobalCupPrizeDtoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GlobalCupPrizeDto&&(identical(other.id, id) || other.id == id)&&(identical(other.rankFrom, rankFrom) || other.rankFrom == rankFrom)&&(identical(other.rankTo, rankTo) || other.rankTo == rankTo)&&(identical(other.description, description) || other.description == description)&&(identical(other.cardTemplateId, cardTemplateId) || other.cardTemplateId == cardTemplateId)&&(identical(other.cardArtUrl, cardArtUrl) || other.cardArtUrl == cardArtUrl)&&(identical(other.cardRarity, cardRarity) || other.cardRarity == cardRarity));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,rankFrom,rankTo,description,cardTemplateId,cardArtUrl,cardRarity);
+
+@override
+String toString() {
+  return 'GlobalCupPrizeDto(id: $id, rankFrom: $rankFrom, rankTo: $rankTo, description: $description, cardTemplateId: $cardTemplateId, cardArtUrl: $cardArtUrl, cardRarity: $cardRarity)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$GlobalCupPrizeDtoCopyWith<$Res> implements $GlobalCupPrizeDtoCopyWith<$Res> {
+  factory _$GlobalCupPrizeDtoCopyWith(_GlobalCupPrizeDto value, $Res Function(_GlobalCupPrizeDto) _then) = __$GlobalCupPrizeDtoCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, int rankFrom, int rankTo, String description, String cardTemplateId, String? cardArtUrl, String? cardRarity
+});
+
+
+
+
+}
+/// @nodoc
+class __$GlobalCupPrizeDtoCopyWithImpl<$Res>
+    implements _$GlobalCupPrizeDtoCopyWith<$Res> {
+  __$GlobalCupPrizeDtoCopyWithImpl(this._self, this._then);
+
+  final _GlobalCupPrizeDto _self;
+  final $Res Function(_GlobalCupPrizeDto) _then;
+
+/// Create a copy of GlobalCupPrizeDto
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? rankFrom = null,Object? rankTo = null,Object? description = null,Object? cardTemplateId = null,Object? cardArtUrl = freezed,Object? cardRarity = freezed,}) {
+  return _then(_GlobalCupPrizeDto(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,rankFrom: null == rankFrom ? _self.rankFrom : rankFrom // ignore: cast_nullable_to_non_nullable
+as int,rankTo: null == rankTo ? _self.rankTo : rankTo // ignore: cast_nullable_to_non_nullable
+as int,description: null == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
+as String,cardTemplateId: null == cardTemplateId ? _self.cardTemplateId : cardTemplateId // ignore: cast_nullable_to_non_nullable
+as String,cardArtUrl: freezed == cardArtUrl ? _self.cardArtUrl : cardArtUrl // ignore: cast_nullable_to_non_nullable
+as String?,cardRarity: freezed == cardRarity ? _self.cardRarity : cardRarity // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -311,7 +601,9 @@ as List<FantasyGameweekDto>,
 /// @nodoc
 mixin _$FantasyGameweekDto {
 
- String get id; int get number; String get name; DateTime get lockAt; DateTime get endsAt; bool get scored;
+ String get id; int get number; String get name; DateTime get lockAt; DateTime get endsAt; bool get scored;/// Number of matches in this gameweek that are currently LIVE.
+/// Drives client-side live polling. 0 = no need to poll.
+ int get liveMatchCount;
 /// Create a copy of FantasyGameweekDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -324,16 +616,16 @@ $FantasyGameweekDtoCopyWith<FantasyGameweekDto> get copyWith => _$FantasyGamewee
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FantasyGameweekDto&&(identical(other.id, id) || other.id == id)&&(identical(other.number, number) || other.number == number)&&(identical(other.name, name) || other.name == name)&&(identical(other.lockAt, lockAt) || other.lockAt == lockAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&(identical(other.scored, scored) || other.scored == scored));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FantasyGameweekDto&&(identical(other.id, id) || other.id == id)&&(identical(other.number, number) || other.number == number)&&(identical(other.name, name) || other.name == name)&&(identical(other.lockAt, lockAt) || other.lockAt == lockAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&(identical(other.scored, scored) || other.scored == scored)&&(identical(other.liveMatchCount, liveMatchCount) || other.liveMatchCount == liveMatchCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,number,name,lockAt,endsAt,scored);
+int get hashCode => Object.hash(runtimeType,id,number,name,lockAt,endsAt,scored,liveMatchCount);
 
 @override
 String toString() {
-  return 'FantasyGameweekDto(id: $id, number: $number, name: $name, lockAt: $lockAt, endsAt: $endsAt, scored: $scored)';
+  return 'FantasyGameweekDto(id: $id, number: $number, name: $name, lockAt: $lockAt, endsAt: $endsAt, scored: $scored, liveMatchCount: $liveMatchCount)';
 }
 
 
@@ -344,7 +636,7 @@ abstract mixin class $FantasyGameweekDtoCopyWith<$Res>  {
   factory $FantasyGameweekDtoCopyWith(FantasyGameweekDto value, $Res Function(FantasyGameweekDto) _then) = _$FantasyGameweekDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, int number, String name, DateTime lockAt, DateTime endsAt, bool scored
+ String id, int number, String name, DateTime lockAt, DateTime endsAt, bool scored, int liveMatchCount
 });
 
 
@@ -361,7 +653,7 @@ class _$FantasyGameweekDtoCopyWithImpl<$Res>
 
 /// Create a copy of FantasyGameweekDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? number = null,Object? name = null,Object? lockAt = null,Object? endsAt = null,Object? scored = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? number = null,Object? name = null,Object? lockAt = null,Object? endsAt = null,Object? scored = null,Object? liveMatchCount = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,number: null == number ? _self.number : number // ignore: cast_nullable_to_non_nullable
@@ -369,7 +661,8 @@ as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nu
 as String,lockAt: null == lockAt ? _self.lockAt : lockAt // ignore: cast_nullable_to_non_nullable
 as DateTime,endsAt: null == endsAt ? _self.endsAt : endsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,scored: null == scored ? _self.scored : scored // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,liveMatchCount: null == liveMatchCount ? _self.liveMatchCount : liveMatchCount // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -454,10 +747,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored,  int liveMatchCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FantasyGameweekDto() when $default != null:
-return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored);case _:
+return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored,_that.liveMatchCount);case _:
   return orElse();
 
 }
@@ -475,10 +768,10 @@ return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored,  int liveMatchCount)  $default,) {final _that = this;
 switch (_that) {
 case _FantasyGameweekDto():
-return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored);case _:
+return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored,_that.liveMatchCount);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -495,10 +788,10 @@ return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  int number,  String name,  DateTime lockAt,  DateTime endsAt,  bool scored,  int liveMatchCount)?  $default,) {final _that = this;
 switch (_that) {
 case _FantasyGameweekDto() when $default != null:
-return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored);case _:
+return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that.scored,_that.liveMatchCount);case _:
   return null;
 
 }
@@ -510,7 +803,7 @@ return $default(_that.id,_that.number,_that.name,_that.lockAt,_that.endsAt,_that
 @JsonSerializable()
 
 class _FantasyGameweekDto extends FantasyGameweekDto {
-  const _FantasyGameweekDto({required this.id, required this.number, required this.name, required this.lockAt, required this.endsAt, this.scored = false}): super._();
+  const _FantasyGameweekDto({required this.id, required this.number, required this.name, required this.lockAt, required this.endsAt, this.scored = false, this.liveMatchCount = 0}): super._();
   factory _FantasyGameweekDto.fromJson(Map<String, dynamic> json) => _$FantasyGameweekDtoFromJson(json);
 
 @override final  String id;
@@ -519,6 +812,9 @@ class _FantasyGameweekDto extends FantasyGameweekDto {
 @override final  DateTime lockAt;
 @override final  DateTime endsAt;
 @override@JsonKey() final  bool scored;
+/// Number of matches in this gameweek that are currently LIVE.
+/// Drives client-side live polling. 0 = no need to poll.
+@override@JsonKey() final  int liveMatchCount;
 
 /// Create a copy of FantasyGameweekDto
 /// with the given fields replaced by the non-null parameter values.
@@ -533,16 +829,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FantasyGameweekDto&&(identical(other.id, id) || other.id == id)&&(identical(other.number, number) || other.number == number)&&(identical(other.name, name) || other.name == name)&&(identical(other.lockAt, lockAt) || other.lockAt == lockAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&(identical(other.scored, scored) || other.scored == scored));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FantasyGameweekDto&&(identical(other.id, id) || other.id == id)&&(identical(other.number, number) || other.number == number)&&(identical(other.name, name) || other.name == name)&&(identical(other.lockAt, lockAt) || other.lockAt == lockAt)&&(identical(other.endsAt, endsAt) || other.endsAt == endsAt)&&(identical(other.scored, scored) || other.scored == scored)&&(identical(other.liveMatchCount, liveMatchCount) || other.liveMatchCount == liveMatchCount));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,number,name,lockAt,endsAt,scored);
+int get hashCode => Object.hash(runtimeType,id,number,name,lockAt,endsAt,scored,liveMatchCount);
 
 @override
 String toString() {
-  return 'FantasyGameweekDto(id: $id, number: $number, name: $name, lockAt: $lockAt, endsAt: $endsAt, scored: $scored)';
+  return 'FantasyGameweekDto(id: $id, number: $number, name: $name, lockAt: $lockAt, endsAt: $endsAt, scored: $scored, liveMatchCount: $liveMatchCount)';
 }
 
 
@@ -553,7 +849,7 @@ abstract mixin class _$FantasyGameweekDtoCopyWith<$Res> implements $FantasyGamew
   factory _$FantasyGameweekDtoCopyWith(_FantasyGameweekDto value, $Res Function(_FantasyGameweekDto) _then) = __$FantasyGameweekDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, int number, String name, DateTime lockAt, DateTime endsAt, bool scored
+ String id, int number, String name, DateTime lockAt, DateTime endsAt, bool scored, int liveMatchCount
 });
 
 
@@ -570,7 +866,7 @@ class __$FantasyGameweekDtoCopyWithImpl<$Res>
 
 /// Create a copy of FantasyGameweekDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? number = null,Object? name = null,Object? lockAt = null,Object? endsAt = null,Object? scored = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? number = null,Object? name = null,Object? lockAt = null,Object? endsAt = null,Object? scored = null,Object? liveMatchCount = null,}) {
   return _then(_FantasyGameweekDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,number: null == number ? _self.number : number // ignore: cast_nullable_to_non_nullable
@@ -578,7 +874,8 @@ as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nu
 as String,lockAt: null == lockAt ? _self.lockAt : lockAt // ignore: cast_nullable_to_non_nullable
 as DateTime,endsAt: null == endsAt ? _self.endsAt : endsAt // ignore: cast_nullable_to_non_nullable
 as DateTime,scored: null == scored ? _self.scored : scored // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,liveMatchCount: null == liveMatchCount ? _self.liveMatchCount : liveMatchCount // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

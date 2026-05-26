@@ -21,15 +21,19 @@ class RoutePaths {
   static const cardStats   = '/album/:id/stats';
   static const marketCard  = '/market/:templateId';
   static const settings    = '/settings';
-  static const bracket     = '/tournament/bracket';
+  static const bracket            = '/tournament/bracket';
+  static const bracketLeaderboard = '/tournament/bracket/leaderboard';
 
   // Fantasy / Global Cup / H2H
   static const fantasyHome        = '/fantasy';
   static const fantasyTournament  = '/fantasy/:slug';
   static const lineupBuilder      = '/fantasy/:slug/gameweek/:gwId/builder';
   static const fantasyLeaderboard = '/fantasy/:slug/gameweek/:gwId/leaderboard';
+  static const fantasyLeagues     = '/fantasy/:slug/leagues';
   static const globalCup          = '/global-cup/:tournamentId';
   static const h2h                = '/h2h';
+  static const h2hLadder          = '/h2h/ladder';
+  static const h2hInvite          = '/h2h/i/:token';
   static const predictionsBoard   = '/predictions/leaderboard';
   static const scoringRules       = '/scoring/rules';
   static const playerBreakdown    = '/scoring/breakdown/:gwId/:playerId';
@@ -45,4 +49,13 @@ class RoutePaths {
 
   // IAP
   static const proPaywall         = '/pro';
+  static const wallet             = '/wallet';
+
+  // Profile sub-screens
+  static const notificationPrefs   = '/profile/notifications';
+  static const notificationCenter  = '/profile/inbox';
+  static const supportedCountry    = '/profile/country';
+
+  // Award pick'em
+  static const awardPicks         = '/tournament/awards';
 }

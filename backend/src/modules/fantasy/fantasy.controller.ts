@@ -101,4 +101,49 @@ export class FantasyController {
   rules() {
     return { squad: SQUAD };
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // PRIVATE LEAGUES
+  // ───────────────────────────────────────────────────────────────────────────
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('leagues')
+  createLeague(
+    @CurrentUser('uid') uid: string,
+    @Body() body: { tournamentId: string; name: string },
+  ) {
+    return this.fantasy.createLeague(uid, body.tournamentId, body.name);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('leagues/join')
+  joinLeague(@CurrentUser('uid') uid: string, @Body() body: { joinCode: string }) {
+    return this.fantasy.joinLeague(uid, body.joinCode);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('leagues/:leagueId/leave')
+  leaveLeague(@CurrentUser('uid') uid: string, @Param('leagueId') leagueId: string) {
+    return this.fantasy.leaveLeague(uid, leagueId);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('leagues/mine')
+  myLeagues(
+    @CurrentUser('uid') uid: string,
+    @Query('tournamentId') tournamentId?: string,
+  ) {
+    return this.fantasy.listMyLeagues(uid, tournamentId);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('leagues/:leagueId/gameweeks/:gwId/leaderboard')
+  leagueLeaderboard(
+    @CurrentUser('uid') uid: string,
+    @Param('leagueId') leagueId: string,
+    @Param('gwId') gwId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.fantasy.leagueLeaderboard(uid, leagueId, gwId, limit ? +limit : 100);
+  }
 }

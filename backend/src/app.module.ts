@@ -12,9 +12,11 @@ import { RedisModule } from './common/redis.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ApiFootballModule } from './modules/api-football/api-football.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AwardsModule } from './modules/awards/awards.module';
 import { CardsModule } from './modules/cards/cards.module';
 import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { FantasyModule } from './modules/fantasy/fantasy.module';
+import { GemsModule } from './modules/gems/gems.module';
 import { GlobalCupModule } from './modules/global-cup/global-cup.module';
 import { H2HModule } from './modules/h2h/h2h.module';
 import { InsightsModule } from './modules/insights/insights.module';
@@ -61,6 +63,8 @@ import { UsersModule } from './modules/users/users.module';
     CardsModule,
     CompetitionsModule,
     FantasyModule,
+    GemsModule,
+    AwardsModule,
     H2HModule,
     GlobalCupModule,
     InsightsModule,

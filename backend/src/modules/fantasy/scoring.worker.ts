@@ -75,9 +75,11 @@ export class FantasyScoringWorker implements OnModuleInit {
     switch (job.kind) {
       case 'score-fixture':
         await this.scoring.scoreFixture(job.matchId, job.gameweekId);
-        if (job.reason === 'final') {
-          await this.scoring.rollupLineups(job.gameweekId);
-        }
+        // Roll up *every* live tick so FantasyLineup.totalPoints tracks
+        // the live PlayerGameweekScore values. Without this, live updates
+        // would stop at the per-player layer and lineups wouldn't move
+        // until the gameweek's final pass. Idempotent + cheap.
+        await this.scoring.rollupLineups(job.gameweekId);
         return;
       case 'score-gameweek':
         await this.scoring.scoreGameweek(job.gameweekId);

@@ -4,6 +4,7 @@ import { Interval } from '@nestjs/schedule';
 import { createHash } from 'crypto';
 import Parser from 'rss-parser';
 import { PrismaService } from '../../common/prisma.service';
+import { PushService } from '../notifications/push.service';
 
 type Item = Parser.Item & { 'media:content'?: { $: { url: string } }; enclosure?: { url?: string } };
 
@@ -20,7 +21,11 @@ export class RssAggregatorService implements OnModuleInit {
   private readonly intervalMs: number;
   private running = false;
 
-  constructor(cfg: ConfigService, private readonly prisma: PrismaService) {
+  constructor(
+    cfg: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {
     this.feeds = cfg.getOrThrow<string>('NEWS_RSS_FEEDS').split(',').map((s) => s.trim()).filter(Boolean);
     this.intervalMs = +(cfg.get('NEWS_REFRESH_INTERVAL_MS') ?? 600_000);
   }
@@ -72,7 +77,37 @@ export class RssAggregatorService implements OnModuleInit {
         },
         update: {},
       });
-      if (created.fetchedAt.getTime() > Date.now() - 60_000) added++;
+      const isNew = created.fetchedAt.getTime() > Date.now() - 60_000;
+      if (isNew) {
+        added++;
+        // Push as breaking when the article qualifies. Two signals:
+        //   1. Tagged "breaking" or "live" upstream.
+        //   2. Published in the last 30 minutes (genuinely fresh — not a
+        //      backfill from an old feed).
+        // Both keep notification volume sane while still catching the
+        // moments that matter (transfers, injury news, match incidents).
+        const tagsLower = tags.map((t) => t.toLowerCase());
+        const looksBreaking = tagsLower.includes('breaking') || tagsLower.includes('live');
+        const publishedRecently =
+          created.publishedAt.getTime() > Date.now() - 30 * 60_000;
+        if (looksBreaking && publishedRecently) {
+          // Topic broadcast — opt-in via subscription, so this fires to
+          // every device that subscribed to `news_breaking` (Flutter side
+          // gates the subscription on the breakingNews preference).
+          void this.push.pushToTopic(
+            'news_breaking',
+            {
+              title: `⚡ ${source}`,
+              body: item.title.trim().slice(0, 140),
+            },
+            {
+              type: 'news_breaking',
+              articleId: id,
+              deepLink: `footballmojo://news/${id}`,
+            },
+          );
+        }
+      }
     }
     return added;
   }

@@ -28,8 +28,29 @@ export class FirebaseAdminService implements OnModuleInit {
   }
 
   async sendToTokens(tokens: string[], notification: { title: string; body: string }, data?: Record<string, string>) {
-    if (!tokens.length) return { successCount: 0, failureCount: 0 };
-    return admin.messaging().sendEachForMulticast({ tokens, notification, data });
+    if (!tokens.length) return { successCount: 0, failureCount: 0, invalidTokens: [] as string[] };
+    const res = await admin.messaging().sendEachForMulticast({ tokens, notification, data });
+    // Collect tokens FCM tells us are dead so callers can scrub them.
+    // The two codes that mean "permanently invalid" are:
+    //   - messaging/invalid-registration-token  (malformed or wrong app)
+    //   - messaging/registration-token-not-registered  (user uninstalled / re-installed)
+    // Transient errors (rate limit, unavailable) stay in the array.
+    const invalidTokens: string[] = [];
+    res.responses.forEach((r, i) => {
+      if (r.success || !r.error) return;
+      const code = r.error.code;
+      if (
+        code === 'messaging/invalid-registration-token' ||
+        code === 'messaging/registration-token-not-registered'
+      ) {
+        invalidTokens.push(tokens[i]!);
+      }
+    });
+    return {
+      successCount: res.successCount,
+      failureCount: res.failureCount,
+      invalidTokens,
+    };
   }
 
   async sendToTopic(topic: string, notification: { title: string; body: string }, data?: Record<string, string>) {

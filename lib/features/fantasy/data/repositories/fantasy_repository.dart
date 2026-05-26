@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_provider.dart';
 import '../models/fantasy_models.dart';
+import '../models/league_models.dart';
 
 class FantasyRepository {
   FantasyRepository(this._dio);
@@ -67,6 +68,79 @@ class FantasyRepository {
   Future<List<LeaderboardEntry>> leaderboard(String slug, String gameweekId, {int limit = 100}) async {
     final res = await _dio.get<List<dynamic>>(
       '/v1/fantasy/tournaments/$slug/gameweeks/$gameweekId/leaderboard',
+      queryParameters: {'limit': limit},
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(LeaderboardEntry.fromJson)
+        .toList(growable: false);
+  }
+
+  // ─── Private leagues ────────────────────────────────────────────────────
+  Future<List<FantasyLeagueSummary>> myLeagues({String? tournamentId}) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/v1/fantasy/leagues/mine',
+      queryParameters: {if (tournamentId != null) 'tournamentId': tournamentId},
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(FantasyLeagueSummary.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<FantasyLeagueSummary> createLeague({
+    required String tournamentId,
+    required String name,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/v1/fantasy/leagues',
+      data: {'tournamentId': tournamentId, 'name': name},
+    );
+    final j = res.data!;
+    // Server returns the league row; coerce into our flat summary shape.
+    return FantasyLeagueSummary(
+      id: j['id'] as String,
+      tournamentId: j['tournamentId'] as String,
+      tournamentSlug: '',
+      tournamentName: '',
+      name: j['name'] as String,
+      joinCode: j['joinCode'] as String,
+      memberCount: ((j['_count'] as Map?)?['members'] as num?)?.toInt() ?? 1,
+      memberLimit: (j['memberLimit'] as num?)?.toInt() ?? 100,
+      isOwner: true,
+    );
+  }
+
+  Future<FantasyLeagueSummary> joinLeague(String joinCode) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/v1/fantasy/leagues/join',
+      data: {'joinCode': joinCode},
+    );
+    final j = res.data!;
+    return FantasyLeagueSummary(
+      id: j['id'] as String,
+      tournamentId: j['tournamentId'] as String,
+      tournamentSlug: '',
+      tournamentName: '',
+      name: j['name'] as String,
+      joinCode: j['joinCode'] as String,
+      memberCount: ((j['_count'] as Map?)?['members'] as num?)?.toInt() ?? 1,
+      memberLimit: (j['memberLimit'] as num?)?.toInt() ?? 100,
+      isOwner: false,
+    );
+  }
+
+  Future<void> leaveLeague(String leagueId) async {
+    await _dio.post('/v1/fantasy/leagues/$leagueId/leave');
+  }
+
+  Future<List<LeaderboardEntry>> leagueLeaderboard({
+    required String leagueId,
+    required String gameweekId,
+    int limit = 100,
+  }) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/v1/fantasy/leagues/$leagueId/gameweeks/$gameweekId/leaderboard',
       queryParameters: {'limit': limit},
     );
     return (res.data ?? const [])

@@ -86,6 +86,7 @@ model Player {
   events      MatchEvent[]
   valuation   PlayerValuation?
   gameweekScores PlayerGameweekScore[]
+  awardPicks  AwardPick[]
   @@index([teamId])
 }
 
@@ -195,6 +196,11 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  /// "Who I support at the World Cup" — distinct from `countryCode` which
+  /// is the user's nationality. Drives country-themed accents on home,
+  /// country-fans leaderboard, and country_<code> push topic membership.
+  supportedCountryCode String?
+
   predictions     Prediction[]
   bracket         Bracket?
   ownedCards      OwnedCard[]
@@ -206,6 +212,60 @@ model User {
   fantasyLineups  FantasyLineup[]
   challengesSent     H2HChallenge[] @relation("Challenger")
   challengesReceived H2HChallenge[] @relation("Opponent")
+  ownedLeagues       FantasyLeague[] @relation("LeagueOwner")
+  leagueMemberships  FantasyLeagueMember[]
+  gemTransactions    GemTransaction[]
+  lastDailyClaimAt   DateTime?
+  notificationPreferences NotificationPreference?
+  awardPicks         AwardPick[]
+}
+
+/// Per-user notification opt-ins. Created lazily on first write so the
+/// absence of a row means "all defaults on" — new categories don't need
+/// a backfill, they just default to enabled until the user opts out.
+model NotificationPreference {
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Match alerts
+  matchGoals         Boolean  @default(true)
+  matchKickoff       Boolean  @default(true)
+  matchFulltime      Boolean  @default(true)
+  matchLineup        Boolean  @default(true)
+  // Content
+  breakingNews       Boolean  @default(true)
+  wcDailyRecap       Boolean  @default(true)
+  // Fantasy / cards
+  fantasyResults     Boolean  @default(true)
+  h2hInvites         Boolean  @default(true)
+  h2hResults         Boolean  @default(true)
+  cardDrops          Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+}
+
+/// Tournament-end awards the user picks before kickoff. Resolved once when
+/// the AwardWinner table is populated post-tournament. Three picks max per
+/// user per competition (one per AwardType).
+enum AwardType {
+  GOLDEN_BOOT
+  GOLDEN_BALL
+  BEST_YOUNG_PLAYER
+}
+
+model AwardPick {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitionId  String
+  awardType      AwardType
+  playerId       String
+  player         Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  pointsAwarded  Int        @default(0)
+  scoredAt       DateTime?
+  lockedAt       DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  @@unique([userId, competitionId, awardType])
+  @@index([competitionId, awardType])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,6 +322,15 @@ model CardTemplate {
   giftableOnly  Boolean     @default(false)  // never purchasable, only earned/airdropped
   purchasable   Boolean     @default(false)  // direct gem purchase allowed?
   gemPrice      Int?                         // if purchasable
+  /// Time-locked drop windows. NULL on both sides = legacy "always open"
+  /// behaviour. When set, MintingService refuses mints outside the window.
+  /// Stage-locked WC editions use this — open during the relevant stage,
+  /// closed forever after.
+  dropOpensAt   DateTime?
+  dropClosesAt  DateTime?
+  /// Optional per-user mint cap (e.g. "max 1 Iconic Mbappé per account").
+  /// Counted at mint time by `count(OwnedCard.templateId, ownerId)`.
+  maxPerUser    Int?
   setMemberships CardSetEntry[]
   ownedCards    OwnedCard[]
   globalCupPrizes GlobalCupPrize[]
@@ -452,13 +521,23 @@ model IapReceipt {
 }
 
 model NotificationLog {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        String                           // "goal" | "kickoff" | "trade_offered" | ...
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String                                // legacy: "goal" | "kickoff" | …
+  /// Maps to NotificationPreference column names; drives in-app filter
+  /// chips + which mojo.* Android channel rendered the push.
+  category    String?
+  title       String?
+  body        String?
+  /// Tap-deeplink target — `footballmojo://<path>` set by the backend.
+  deepLink    String?
   payload     Json
-  sentAt      DateTime @default(now())
+  sentAt      DateTime  @default(now())
+  /// Set when the user opens the row in-app. Drives the unread badge.
+  readAt      DateTime?
   @@index([userId, sentAt])
+  @@index([userId, readAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -498,8 +577,72 @@ model FantasyTournament {
   gameweeks      FantasyGameweek[]
   prizes         GlobalCupPrize[]
   challenges     H2HChallenge[]
+  leagues        FantasyLeague[]
   createdAt      DateTime      @default(now())
   @@index([competitionId])
+}
+
+// Private friend league inside a Fantasy tournament. Owner controls the
+// member list via a shareable 6-character join code. Membership only —
+// scoring still uses each user's existing `FantasyLineup` rows; the league
+// just filters which subset of users to rank.
+model FantasyLeague {
+  id            String   @id @default(cuid())
+  tournamentId  String
+  tournament    FantasyTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  ownerId       String
+  owner         User     @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  joinCode      String   @unique                  // upper-case, 6 chars
+  memberLimit   Int      @default(100)
+  createdAt     DateTime @default(now())
+  members       FantasyLeagueMember[]
+  @@index([tournamentId])
+}
+
+// Gem economy ledger. Every credit and debit lands here so the in-memory
+// `User.gems` counter is always a derivable cache of `SUM(amount)` for that
+// user. Source records WHY the change happened — predictions, fantasy rank,
+// bracket scoring, daily login, card pack purchase. refType/refId let us
+// link a row back to the originating entity (e.g. `prediction:<id>`).
+enum GemSource {
+  PREDICTION_CORRECT
+  PREDICTION_EXACT
+  FANTASY_RANK
+  BRACKET_GROUP_WINNER
+  BRACKET_RUNNER_UP
+  BRACKET_CHAMPION
+  DAILY_LOGIN
+  IAP_PURCHASE
+  CARD_PACK_PURCHASE
+  PROFILE_FLAIR
+  ADJUSTMENT
+}
+
+model GemTransaction {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Int                                // positive = credit, negative = debit
+  source        GemSource
+  description   String?
+  refType       String?                            // "prediction" | "lineup" | "bracket" | "pack" | …
+  refId         String?
+  balanceAfter  Int
+  createdAt     DateTime  @default(now())
+  @@index([userId, createdAt])
+  @@unique([userId, source, refType, refId], name: "gem_dedupe")
+}
+
+model FantasyLeagueMember {
+  id          String   @id @default(cuid())
+  leagueId    String
+  league      FantasyLeague @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime @default(now())
+  @@unique([leagueId, userId])
+  @@index([userId])
 }
 
 model FantasyGameweek {
@@ -610,8 +753,15 @@ model H2HChallenge {
   gameweek              FantasyGameweek @relation(fields: [gameweekId], references: [id], onDelete: Cascade)
   challengerId          String
   challenger            User     @relation("Challenger", fields: [challengerId], references: [id], onDelete: Cascade)
-  opponentId            String
-  opponent              User     @relation("Opponent",   fields: [opponentId],   references: [id], onDelete: Cascade)
+  /// Null when the challenge is an OPEN INVITE (anyone with the link can
+  /// accept). Filled in when accepted via direct propose-to-user or when
+  /// someone redeems an invite token.
+  opponentId            String?
+  opponent              User?    @relation("Opponent",   fields: [opponentId],   references: [id], onDelete: Cascade)
+  /// Shareable invite token — present when the challenge was created as an
+  /// open link instead of being addressed to a specific opponent. URL-safe
+  /// 16-char string. Stays present even after redemption (auditable).
+  inviteToken           String?  @unique
   challengerLineupId    String?
   opponentLineupId      String?
   challengerScore       Float    @default(0)

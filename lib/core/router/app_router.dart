@@ -6,15 +6,19 @@ import '../../features/album/presentation/screens/album_screen.dart';
 import '../../features/album/presentation/screens/card_detail_screen.dart';
 import '../../features/album/presentation/screens/owned_card_stats_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_home_screen.dart';
+import '../../features/fantasy/presentation/screens/leagues_screen.dart';
 import '../../features/following/presentation/screens/team_picker_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
 import '../../features/fantasy/presentation/screens/lineup_builder_screen.dart';
 import '../../features/fantasy/presentation/screens/player_breakdown_screen.dart';
 import '../../features/fantasy/presentation/screens/scoring_rules_screen.dart';
 import '../../features/iap/presentation/screens/pro_paywall_screen.dart';
+import '../../features/iap/presentation/screens/wallet_screen.dart';
 import '../../features/insights/presentation/screens/injuries_screen.dart';
 import '../../features/global_cup/presentation/screens/global_cup_screen.dart';
 import '../../features/player/presentation/screens/player_profile_screen.dart';
+import '../../features/h2h/presentation/screens/h2h_invite_screen.dart';
+import '../../features/h2h/presentation/screens/h2h_ladder_screen.dart';
 import '../../features/h2h/presentation/screens/h2h_screen.dart';
 import '../../features/home/presentation/screens/home_dashboard_screen.dart';
 import '../../features/home/presentation/screens/home_shell.dart';
@@ -26,9 +30,14 @@ import '../../features/news/presentation/screens/news_reader_screen.dart';
 import '../../features/news/presentation/screens/news_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/predictions/presentation/screens/predictions_leaderboard_screen.dart';
+import '../../features/profile/presentation/screens/notification_center_screen.dart';
+import '../../features/profile/presentation/screens/notification_preferences_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/settings_screen.dart';
+import '../../features/profile/presentation/screens/supported_country_screen.dart';
 import '../../features/today/presentation/screens/today_screen.dart';
+import '../../features/tournament/presentation/screens/award_picks_screen.dart';
+import '../../features/tournament/presentation/screens/bracket_leaderboard_screen.dart';
 import '../../features/tournament/presentation/screens/bracket_screen.dart';
 import '../../features/world_cup/presentation/screens/standings_screen.dart';
 import '../../features/world_cup/presentation/screens/top_scorers_screen.dart';
@@ -83,7 +92,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: RoutePaths.profile,     builder: (_, __) => const ProfileScreen()),
       GoRoute(path: RoutePaths.settings,    builder: (_, __) => const SettingsScreen()),
+      GoRoute(
+        path: RoutePaths.notificationPrefs,
+        builder: (_, __) => const NotificationPreferencesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.notificationCenter,
+        builder: (_, __) => const NotificationCenterScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.supportedCountry,
+        builder: (_, __) => const SupportedCountryScreen(),
+      ),
       GoRoute(path: RoutePaths.bracket,     builder: (_, __) => const BracketScreen()),
+      GoRoute(
+        path: RoutePaths.bracketLeaderboard,
+        builder: (_, __) => const BracketLeaderboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.awardPicks,
+        builder: (_, __) => const AwardPicksScreen(),
+      ),
 
       // Fantasy / Global Cup / H2H
       GoRoute(
@@ -102,13 +131,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => FantasyLeaderboardScreen(
           slug: s.pathParameters['slug']!,
           gameweekId: s.pathParameters['gwId']!,
+          leagueId: s.uri.queryParameters['league'],
         ),
+      ),
+      GoRoute(
+        path: RoutePaths.fantasyLeagues,
+        builder: (_, s) => LeaguesScreen(slug: s.pathParameters['slug']!),
       ),
       GoRoute(
         path: RoutePaths.globalCup,
         builder: (_, s) => GlobalCupScreen(tournamentId: s.pathParameters['tournamentId']!),
       ),
       GoRoute(path: RoutePaths.h2h, builder: (_, __) => const H2HScreen()),
+      GoRoute(path: RoutePaths.h2hLadder, builder: (_, __) => const H2HLadderScreen()),
+      GoRoute(
+        path: RoutePaths.h2hInvite,
+        builder: (_, s) => H2HInviteScreen(token: s.pathParameters['token']!),
+      ),
       GoRoute(path: RoutePaths.predictionsBoard, builder: (_, __) => const PredictionsLeaderboardScreen()),
       GoRoute(path: RoutePaths.scoringRules, builder: (_, __) => const ScoringRulesScreen()),
       GoRoute(
@@ -122,6 +161,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.standings,   builder: (_, __) => const StandingsScreen(competitionId: 'WC2026')),
       GoRoute(path: RoutePaths.topScorers,  builder: (_, __) => const TopScorersScreen()),
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
+      GoRoute(path: RoutePaths.wallet,      builder: (_, __) => const WalletScreen()),
       GoRoute(path: RoutePaths.teamPicker,  builder: (_, __) => const TeamPickerScreen()),
       GoRoute(
         path: RoutePaths.playerProfile,

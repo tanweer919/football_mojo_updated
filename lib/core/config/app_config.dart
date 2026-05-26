@@ -8,6 +8,6 @@ class AppConfig {
 
 // Real builds wire these from --dart-define / Firebase Remote Config.
 final appConfigProvider = Provider<AppConfig>((_) => const AppConfig(
-      apiBaseUrl: String.fromEnvironment('API_BASE_URL', defaultValue: 'https://8ba2-223-181-24-190.ngrok-free.app/api'),
-      realtimeUrl: String.fromEnvironment('REALTIME_URL', defaultValue: 'https://8ba2-223-181-24-190.ngrok-free.app'),
+      apiBaseUrl: String.fromEnvironment('API_BASE_URL', defaultValue: 'https://945e-223-181-28-18.ngrok-free.app/api'),
+      realtimeUrl: String.fromEnvironment('REALTIME_URL', defaultValue: 'https://945e-223-181-28-18.ngrok-free.app'),
     ));

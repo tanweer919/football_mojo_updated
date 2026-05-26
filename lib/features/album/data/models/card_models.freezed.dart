@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CardTemplateDto {
 
- String get id; String get edition; CardRarity get rarity; int get totalSupply; int get mintedCount; String get artUrl; String get frameStyle; String? get playerName; String? get teamName; String? get teamCrestUrl;
+ String get id; String get edition; CardRarity get rarity; int get totalSupply; int get mintedCount; String get artUrl; String get frameStyle; String? get playerName; String? get teamName; String? get teamCrestUrl;// Scarcity primitives. All optional + defaulted so older payloads parse.
+ DateTime? get dropOpensAt; DateTime? get dropClosesAt; int? get maxPerUser; int get uniqueOwners;
 /// Create a copy of CardTemplateDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +29,16 @@ $CardTemplateDtoCopyWith<CardTemplateDto> get copyWith => _$CardTemplateDtoCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CardTemplateDto&&(identical(other.id, id) || other.id == id)&&(identical(other.edition, edition) || other.edition == edition)&&(identical(other.rarity, rarity) || other.rarity == rarity)&&(identical(other.totalSupply, totalSupply) || other.totalSupply == totalSupply)&&(identical(other.mintedCount, mintedCount) || other.mintedCount == mintedCount)&&(identical(other.artUrl, artUrl) || other.artUrl == artUrl)&&(identical(other.frameStyle, frameStyle) || other.frameStyle == frameStyle)&&(identical(other.playerName, playerName) || other.playerName == playerName)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamCrestUrl, teamCrestUrl) || other.teamCrestUrl == teamCrestUrl));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CardTemplateDto&&(identical(other.id, id) || other.id == id)&&(identical(other.edition, edition) || other.edition == edition)&&(identical(other.rarity, rarity) || other.rarity == rarity)&&(identical(other.totalSupply, totalSupply) || other.totalSupply == totalSupply)&&(identical(other.mintedCount, mintedCount) || other.mintedCount == mintedCount)&&(identical(other.artUrl, artUrl) || other.artUrl == artUrl)&&(identical(other.frameStyle, frameStyle) || other.frameStyle == frameStyle)&&(identical(other.playerName, playerName) || other.playerName == playerName)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamCrestUrl, teamCrestUrl) || other.teamCrestUrl == teamCrestUrl)&&(identical(other.dropOpensAt, dropOpensAt) || other.dropOpensAt == dropOpensAt)&&(identical(other.dropClosesAt, dropClosesAt) || other.dropClosesAt == dropClosesAt)&&(identical(other.maxPerUser, maxPerUser) || other.maxPerUser == maxPerUser)&&(identical(other.uniqueOwners, uniqueOwners) || other.uniqueOwners == uniqueOwners));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,edition,rarity,totalSupply,mintedCount,artUrl,frameStyle,playerName,teamName,teamCrestUrl);
+int get hashCode => Object.hash(runtimeType,id,edition,rarity,totalSupply,mintedCount,artUrl,frameStyle,playerName,teamName,teamCrestUrl,dropOpensAt,dropClosesAt,maxPerUser,uniqueOwners);
 
 @override
 String toString() {
-  return 'CardTemplateDto(id: $id, edition: $edition, rarity: $rarity, totalSupply: $totalSupply, mintedCount: $mintedCount, artUrl: $artUrl, frameStyle: $frameStyle, playerName: $playerName, teamName: $teamName, teamCrestUrl: $teamCrestUrl)';
+  return 'CardTemplateDto(id: $id, edition: $edition, rarity: $rarity, totalSupply: $totalSupply, mintedCount: $mintedCount, artUrl: $artUrl, frameStyle: $frameStyle, playerName: $playerName, teamName: $teamName, teamCrestUrl: $teamCrestUrl, dropOpensAt: $dropOpensAt, dropClosesAt: $dropClosesAt, maxPerUser: $maxPerUser, uniqueOwners: $uniqueOwners)';
 }
 
 
@@ -48,7 +49,7 @@ abstract mixin class $CardTemplateDtoCopyWith<$Res>  {
   factory $CardTemplateDtoCopyWith(CardTemplateDto value, $Res Function(CardTemplateDto) _then) = _$CardTemplateDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String edition, CardRarity rarity, int totalSupply, int mintedCount, String artUrl, String frameStyle, String? playerName, String? teamName, String? teamCrestUrl
+ String id, String edition, CardRarity rarity, int totalSupply, int mintedCount, String artUrl, String frameStyle, String? playerName, String? teamName, String? teamCrestUrl, DateTime? dropOpensAt, DateTime? dropClosesAt, int? maxPerUser, int uniqueOwners
 });
 
 
@@ -65,7 +66,7 @@ class _$CardTemplateDtoCopyWithImpl<$Res>
 
 /// Create a copy of CardTemplateDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? edition = null,Object? rarity = null,Object? totalSupply = null,Object? mintedCount = null,Object? artUrl = null,Object? frameStyle = null,Object? playerName = freezed,Object? teamName = freezed,Object? teamCrestUrl = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? edition = null,Object? rarity = null,Object? totalSupply = null,Object? mintedCount = null,Object? artUrl = null,Object? frameStyle = null,Object? playerName = freezed,Object? teamName = freezed,Object? teamCrestUrl = freezed,Object? dropOpensAt = freezed,Object? dropClosesAt = freezed,Object? maxPerUser = freezed,Object? uniqueOwners = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,edition: null == edition ? _self.edition : edition // ignore: cast_nullable_to_non_nullable
@@ -77,7 +78,11 @@ as String,frameStyle: null == frameStyle ? _self.frameStyle : frameStyle // igno
 as String,playerName: freezed == playerName ? _self.playerName : playerName // ignore: cast_nullable_to_non_nullable
 as String?,teamName: freezed == teamName ? _self.teamName : teamName // ignore: cast_nullable_to_non_nullable
 as String?,teamCrestUrl: freezed == teamCrestUrl ? _self.teamCrestUrl : teamCrestUrl // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,dropOpensAt: freezed == dropOpensAt ? _self.dropOpensAt : dropOpensAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,dropClosesAt: freezed == dropClosesAt ? _self.dropClosesAt : dropClosesAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,maxPerUser: freezed == maxPerUser ? _self.maxPerUser : maxPerUser // ignore: cast_nullable_to_non_nullable
+as int?,uniqueOwners: null == uniqueOwners ? _self.uniqueOwners : uniqueOwners // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -162,10 +167,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl,  DateTime? dropOpensAt,  DateTime? dropClosesAt,  int? maxPerUser,  int uniqueOwners)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CardTemplateDto() when $default != null:
-return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl);case _:
+return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl,_that.dropOpensAt,_that.dropClosesAt,_that.maxPerUser,_that.uniqueOwners);case _:
   return orElse();
 
 }
@@ -183,10 +188,10 @@ return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mint
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl,  DateTime? dropOpensAt,  DateTime? dropClosesAt,  int? maxPerUser,  int uniqueOwners)  $default,) {final _that = this;
 switch (_that) {
 case _CardTemplateDto():
-return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl);case _:
+return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl,_that.dropOpensAt,_that.dropClosesAt,_that.maxPerUser,_that.uniqueOwners);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +208,10 @@ return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mint
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String edition,  CardRarity rarity,  int totalSupply,  int mintedCount,  String artUrl,  String frameStyle,  String? playerName,  String? teamName,  String? teamCrestUrl,  DateTime? dropOpensAt,  DateTime? dropClosesAt,  int? maxPerUser,  int uniqueOwners)?  $default,) {final _that = this;
 switch (_that) {
 case _CardTemplateDto() when $default != null:
-return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl);case _:
+return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mintedCount,_that.artUrl,_that.frameStyle,_that.playerName,_that.teamName,_that.teamCrestUrl,_that.dropOpensAt,_that.dropClosesAt,_that.maxPerUser,_that.uniqueOwners);case _:
   return null;
 
 }
@@ -218,7 +223,7 @@ return $default(_that.id,_that.edition,_that.rarity,_that.totalSupply,_that.mint
 @JsonSerializable()
 
 class _CardTemplateDto implements CardTemplateDto {
-  const _CardTemplateDto({required this.id, required this.edition, required this.rarity, required this.totalSupply, required this.mintedCount, required this.artUrl, this.frameStyle = 'base', this.playerName, this.teamName, this.teamCrestUrl});
+  const _CardTemplateDto({required this.id, required this.edition, required this.rarity, required this.totalSupply, required this.mintedCount, required this.artUrl, this.frameStyle = 'base', this.playerName, this.teamName, this.teamCrestUrl, this.dropOpensAt, this.dropClosesAt, this.maxPerUser, this.uniqueOwners = 0});
   factory _CardTemplateDto.fromJson(Map<String, dynamic> json) => _$CardTemplateDtoFromJson(json);
 
 @override final  String id;
@@ -231,6 +236,11 @@ class _CardTemplateDto implements CardTemplateDto {
 @override final  String? playerName;
 @override final  String? teamName;
 @override final  String? teamCrestUrl;
+// Scarcity primitives. All optional + defaulted so older payloads parse.
+@override final  DateTime? dropOpensAt;
+@override final  DateTime? dropClosesAt;
+@override final  int? maxPerUser;
+@override@JsonKey() final  int uniqueOwners;
 
 /// Create a copy of CardTemplateDto
 /// with the given fields replaced by the non-null parameter values.
@@ -245,16 +255,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CardTemplateDto&&(identical(other.id, id) || other.id == id)&&(identical(other.edition, edition) || other.edition == edition)&&(identical(other.rarity, rarity) || other.rarity == rarity)&&(identical(other.totalSupply, totalSupply) || other.totalSupply == totalSupply)&&(identical(other.mintedCount, mintedCount) || other.mintedCount == mintedCount)&&(identical(other.artUrl, artUrl) || other.artUrl == artUrl)&&(identical(other.frameStyle, frameStyle) || other.frameStyle == frameStyle)&&(identical(other.playerName, playerName) || other.playerName == playerName)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamCrestUrl, teamCrestUrl) || other.teamCrestUrl == teamCrestUrl));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CardTemplateDto&&(identical(other.id, id) || other.id == id)&&(identical(other.edition, edition) || other.edition == edition)&&(identical(other.rarity, rarity) || other.rarity == rarity)&&(identical(other.totalSupply, totalSupply) || other.totalSupply == totalSupply)&&(identical(other.mintedCount, mintedCount) || other.mintedCount == mintedCount)&&(identical(other.artUrl, artUrl) || other.artUrl == artUrl)&&(identical(other.frameStyle, frameStyle) || other.frameStyle == frameStyle)&&(identical(other.playerName, playerName) || other.playerName == playerName)&&(identical(other.teamName, teamName) || other.teamName == teamName)&&(identical(other.teamCrestUrl, teamCrestUrl) || other.teamCrestUrl == teamCrestUrl)&&(identical(other.dropOpensAt, dropOpensAt) || other.dropOpensAt == dropOpensAt)&&(identical(other.dropClosesAt, dropClosesAt) || other.dropClosesAt == dropClosesAt)&&(identical(other.maxPerUser, maxPerUser) || other.maxPerUser == maxPerUser)&&(identical(other.uniqueOwners, uniqueOwners) || other.uniqueOwners == uniqueOwners));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,edition,rarity,totalSupply,mintedCount,artUrl,frameStyle,playerName,teamName,teamCrestUrl);
+int get hashCode => Object.hash(runtimeType,id,edition,rarity,totalSupply,mintedCount,artUrl,frameStyle,playerName,teamName,teamCrestUrl,dropOpensAt,dropClosesAt,maxPerUser,uniqueOwners);
 
 @override
 String toString() {
-  return 'CardTemplateDto(id: $id, edition: $edition, rarity: $rarity, totalSupply: $totalSupply, mintedCount: $mintedCount, artUrl: $artUrl, frameStyle: $frameStyle, playerName: $playerName, teamName: $teamName, teamCrestUrl: $teamCrestUrl)';
+  return 'CardTemplateDto(id: $id, edition: $edition, rarity: $rarity, totalSupply: $totalSupply, mintedCount: $mintedCount, artUrl: $artUrl, frameStyle: $frameStyle, playerName: $playerName, teamName: $teamName, teamCrestUrl: $teamCrestUrl, dropOpensAt: $dropOpensAt, dropClosesAt: $dropClosesAt, maxPerUser: $maxPerUser, uniqueOwners: $uniqueOwners)';
 }
 
 
@@ -265,7 +275,7 @@ abstract mixin class _$CardTemplateDtoCopyWith<$Res> implements $CardTemplateDto
   factory _$CardTemplateDtoCopyWith(_CardTemplateDto value, $Res Function(_CardTemplateDto) _then) = __$CardTemplateDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String edition, CardRarity rarity, int totalSupply, int mintedCount, String artUrl, String frameStyle, String? playerName, String? teamName, String? teamCrestUrl
+ String id, String edition, CardRarity rarity, int totalSupply, int mintedCount, String artUrl, String frameStyle, String? playerName, String? teamName, String? teamCrestUrl, DateTime? dropOpensAt, DateTime? dropClosesAt, int? maxPerUser, int uniqueOwners
 });
 
 
@@ -282,7 +292,7 @@ class __$CardTemplateDtoCopyWithImpl<$Res>
 
 /// Create a copy of CardTemplateDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? edition = null,Object? rarity = null,Object? totalSupply = null,Object? mintedCount = null,Object? artUrl = null,Object? frameStyle = null,Object? playerName = freezed,Object? teamName = freezed,Object? teamCrestUrl = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? edition = null,Object? rarity = null,Object? totalSupply = null,Object? mintedCount = null,Object? artUrl = null,Object? frameStyle = null,Object? playerName = freezed,Object? teamName = freezed,Object? teamCrestUrl = freezed,Object? dropOpensAt = freezed,Object? dropClosesAt = freezed,Object? maxPerUser = freezed,Object? uniqueOwners = null,}) {
   return _then(_CardTemplateDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,edition: null == edition ? _self.edition : edition // ignore: cast_nullable_to_non_nullable
@@ -294,7 +304,11 @@ as String,frameStyle: null == frameStyle ? _self.frameStyle : frameStyle // igno
 as String,playerName: freezed == playerName ? _self.playerName : playerName // ignore: cast_nullable_to_non_nullable
 as String?,teamName: freezed == teamName ? _self.teamName : teamName // ignore: cast_nullable_to_non_nullable
 as String?,teamCrestUrl: freezed == teamCrestUrl ? _self.teamCrestUrl : teamCrestUrl // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,dropOpensAt: freezed == dropOpensAt ? _self.dropOpensAt : dropOpensAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,dropClosesAt: freezed == dropClosesAt ? _self.dropClosesAt : dropClosesAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,maxPerUser: freezed == maxPerUser ? _self.maxPerUser : maxPerUser // ignore: cast_nullable_to_non_nullable
+as int?,uniqueOwners: null == uniqueOwners ? _self.uniqueOwners : uniqueOwners // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

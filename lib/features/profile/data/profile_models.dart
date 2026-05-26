@@ -169,6 +169,7 @@ class Profile {
     this.userTag,
     this.photoUrl,
     this.countryCode,
+    this.supportedCountryCode,
     required this.coins,
     required this.gems,
     this.proExpiresAt,
@@ -186,6 +187,10 @@ class Profile {
   final String? userTag;
   final String? photoUrl;
   final String? countryCode;
+  /// "Who I support at the World Cup" — distinct from `countryCode`
+  /// (nationality). Drives country-themed accent on home and the
+  /// country_<code> push topic subscription.
+  final String? supportedCountryCode;
   final int coins;
   final int gems;
   final DateTime? proExpiresAt;
@@ -208,6 +213,7 @@ class Profile {
         userTag: j['userTag'] as String?,
         photoUrl: j['photoUrl'] as String?,
         countryCode: j['countryCode'] as String?,
+        supportedCountryCode: j['supportedCountryCode'] as String?,
         coins: (j['coins'] as num?)?.toInt() ?? 0,
         gems: (j['gems'] as num?)?.toInt() ?? 0,
         proExpiresAt: j['proExpiresAt'] == null ? null : DateTime.parse(j['proExpiresAt'] as String),

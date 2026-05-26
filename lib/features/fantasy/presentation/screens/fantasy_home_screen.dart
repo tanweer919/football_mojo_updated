@@ -72,9 +72,21 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
       // Quick access to the scoring breakdown — was orphaned in the route
       // table before, no one could find it. Living up here keeps the
       // "how does this game work?" answer one tap away.
-      trailing: CircleIconButton(
-        icon: Icons.help_outline,
-        onPressed: () => context.push(RoutePaths.scoringRules),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleIconButton(
+            icon: Icons.groups_rounded,
+            onPressed: () => context.push(
+              RoutePaths.fantasyLeagues.replaceAll(':slug', resolvedSlug),
+            ),
+          ),
+          const SizedBox(width: 8),
+          CircleIconButton(
+            icon: Icons.help_outline,
+            onPressed: () => context.push(RoutePaths.scoringRules),
+          ),
+        ],
       ),
       child: tournament.when(
         loading: () => const _LoadingState(),
@@ -102,15 +114,17 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _AboutCard(tournament: t),
               ),
-              const SectionHead(title: 'Top-3 prizes', padding: EdgeInsets.fromLTRB(20, 24, 20, 12)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: _PrizeShelf(),
-              ),
+              if (t.prizes.isNotEmpty) ...[
+                const SectionHead(title: 'Prize tiers', padding: EdgeInsets.fromLTRB(20, 24, 20, 12)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _PrizeShelf(prizes: t.prizes),
+                ),
+              ],
               const SectionHead(title: 'Other formats', padding: EdgeInsets.fromLTRB(20, 24, 20, 12)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: _ComingSoonGrid(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _FormatsGrid(slug: t.slug),
               ),
               const SizedBox(height: 32),
             ],
@@ -452,90 +466,206 @@ class _AboutBullet extends StatelessWidget {
 // ─── PRIZE SHELF ───────────────────────────────────────────────────────────
 
 class _PrizeShelf extends StatelessWidget {
-  const _PrizeShelf();
+  const _PrizeShelf({required this.prizes});
+  final List<GlobalCupPrizeDto> prizes;
+
   @override
   Widget build(BuildContext context) {
+    // Show top 3 tiers — the rest live on the tournament's full prize screen
+    // if/when we build one. Three cards keep the layout tight.
+    final visible = prizes.take(3).toList(growable: false);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          Expanded(child: PCard(rarity: CardRarity.ICONIC,    rating: 99, name: 'Champion', position: '1ST', country: '2026')),
-          SizedBox(width: 8),
-          Expanded(child: PCard(rarity: CardRarity.LEGENDARY, rating: 95, name: 'Silver',   position: '2ND', country: '2026')),
-          SizedBox(width: 8),
-          Expanded(child: PCard(rarity: CardRarity.EPIC,      rating: 92, name: 'Bronze',   position: '3RD', country: '2026')),
+        children: [
+          for (var i = 0; i < visible.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _PrizeTile(prize: visible[i])),
+          ],
         ],
       ),
     );
   }
 }
 
-// ─── COMING SOON GRID ──────────────────────────────────────────────────────
+class _PrizeTile extends StatelessWidget {
+  const _PrizeTile({required this.prize});
+  final GlobalCupPrizeDto prize;
 
-class _ComingSoonGrid extends StatelessWidget {
-  const _ComingSoonGrid();
+  CardRarity get _rarity {
+    // Map the server's enum string to the Flutter enum. Default to ICONIC
+    // — prize tiers without a rarity should still render with the most
+    // dramatic frame so they read as a flex, not a placeholder.
+    if (prize.cardRarity == null) return CardRarity.ICONIC;
+    return CardRarity.values.firstWhere(
+      (r) => r.name == prize.cardRarity,
+      orElse: () => CardRarity.ICONIC,
+    );
+  }
+
+  String get _rankLabel {
+    final from = prize.rankFrom;
+    final to = prize.rankTo;
+    if (from == to) {
+      if (from == 1) return '1ST';
+      if (from == 2) return '2ND';
+      if (from == 3) return '3RD';
+      return '${from}TH';
+    }
+    return '$from–$to';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PCard(
+      rarity: _rarity,
+      rating: 99,
+      name: prize.description,
+      position: _rankLabel,
+      country: '',
+    );
+  }
+}
+
+/// Active formats grid. Anything that's already shipped routes you straight
+/// into it (private leagues, 1v1). Real "Coming Soon" items stay greyed.
+class _FormatsGrid extends StatelessWidget {
+  const _FormatsGrid({required this.slug});
+  final String slug;
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadii.r4),
         border: Border.all(color: AppColors.borderSoft),
         color: AppColors.surface2,
       ),
       child: Column(
-        children: const [
-          _SoonRow(icon: Icons.flash_on, label: '1v1 Ladder', desc: 'Quick weekly duels'),
-          SizedBox(height: 8),
-          _SoonRow(icon: Icons.sports_kabaddi, label: 'Friend leagues', desc: 'Round-robin or knockout'),
-          SizedBox(height: 8),
-          _SoonRow(icon: Icons.sort, label: 'Snake draft', desc: 'Live-pick squads'),
+        children: [
+          _FormatRow(
+            icon: Icons.sports_kabaddi,
+            label: '1v1 challenges',
+            desc: 'Quick head-to-head — share an invite link.',
+            onTap: () => context.push(RoutePaths.h2h),
+          ),
+          const Divider(height: 1, color: AppColors.borderSoft),
+          _FormatRow(
+            icon: Icons.groups_rounded,
+            label: 'Private leagues',
+            desc: 'Filter the leaderboard down to your friends.',
+            onTap: () => context.push(
+              RoutePaths.fantasyLeagues.replaceAll(':slug', slug),
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.borderSoft),
+          const _FormatRow(
+            icon: Icons.sort,
+            label: 'Snake draft',
+            desc: 'Live-pick squads.',
+            comingSoon: true,
+          ),
         ],
       ),
     );
   }
 }
 
-class _SoonRow extends StatelessWidget {
-  const _SoonRow({required this.icon, required this.label, required this.desc});
+class _FormatRow extends StatelessWidget {
+  const _FormatRow({
+    required this.icon,
+    required this.label,
+    required this.desc,
+    this.onTap,
+    this.comingSoon = false,
+  });
   final IconData icon;
   final String label;
   final String desc;
+  final VoidCallback? onTap;
+  final bool comingSoon;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: AppColors.surface3,
-            border: Border.all(color: AppColors.borderSoft),
-          ),
-          child: Icon(icon, size: 16, color: AppColors.muted),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    final disabled = comingSoon || onTap == null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: comingSoon ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Row(
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.fg,
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.surface3,
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Icon(icon, size: 16,
+                    color: disabled ? AppColors.muted : AppColors.gold),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: disabled ? AppColors.muted : AppColors.fg,
+                          ),
+                        ),
+                        if (comingSoon) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface3,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.borderSoft),
+                            ),
+                            child: const Text(
+                              'SOON',
+                              style: TextStyle(
+                                fontFamily: 'JetBrainsMono',
+                                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.muted,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      desc,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Eyebrow(desc, size: 10),
+              if (!comingSoon)
+                const Icon(Icons.chevron_right, color: AppColors.muted, size: 18),
             ],
           ),
         ),
-        const Eyebrow('Coming soon', size: 9),
-      ],
+      ),
     );
   }
 }
+

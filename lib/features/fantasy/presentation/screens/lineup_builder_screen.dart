@@ -16,7 +16,10 @@ import '../../../../core/widgets/premium_image.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
 import '../../data/models/fantasy_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
+import '../../../../core/share/share_service.dart';
 import '../providers/fantasy_providers.dart';
+import '../providers/live_scoring_provider.dart';
+import '../widgets/lineup_share_card.dart';
 import 'player_picker_sheet.dart';
 
 /// Build XI — focused, single-screen flow:
@@ -78,6 +81,35 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
     super.dispose();
   }
 
+  void _shareLineup(
+    BuildContext context,
+    FantasyLineupDto lineup,
+    Map<String, PlayerValuationDto> byId,
+    FantasyTournamentDto tournament,
+  ) {
+    final namesById = <String, String>{
+      for (final entry in byId.entries) entry.key: entry.value.player.name,
+    };
+    final teamsById = <String, String?>{
+      for (final entry in byId.entries)
+        entry.key: entry.value.player.team.shortName ?? entry.value.player.team.name,
+    };
+    final gwName = ref.read(currentGameweekProvider(widget.slug)).valueOrNull?.name ?? 'Gameweek';
+    ShareService.instance.shareArtifact(
+      context: context,
+      logicalSize: const Size(1080, 1350),
+      text: 'My PITCH lineup — ${lineup.totalPoints.toStringAsFixed(1)} pts',
+      filename: 'pitch_lineup.png',
+      builder: (_) => LineupShareCard(
+        lineup: lineup,
+        playerNamesById: namesById,
+        playerTeamsById: teamsById,
+        tournamentName: tournament.name,
+        gameweekName: gwName,
+      ),
+    );
+  }
+
   void _refreshCountdown() {
     final gw = ref.read(currentGameweekProvider(widget.slug)).valueOrNull;
     if (gw == null) return;
@@ -128,6 +160,12 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
     final players = ref.watch(selectablePlayersProvider(widget.slug));
     final mine = ref.watch(myLineupProvider((slug: widget.slug, gameweekId: widget.gameweekId)));
     final gw = ref.watch(currentGameweekProvider(widget.slug));
+    // Activate the live-polling stream — refreshes lineup + leaderboard every
+    // 30s while any match is LIVE. We don't display the badge here directly
+    // because the topbar is custom; the data refresh is what matters.
+    ref.watch(fantasyLivePollingProvider(
+      (slug: widget.slug, gameweekId: widget.gameweekId),
+    ));
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -166,6 +204,14 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
                       _picks = {for (final s in _Slot.values) s: null};
                       _captain = _Slot.fwd;
                     }),
+                    // Hide the share button on empty or zero-score lineups —
+                    // a 0.0 total looks broken in the shared image.
+                    onShare: mine.maybeWhen(
+                      data: (lineup) => (lineup == null || lineup.totalPoints <= 0)
+                          ? null
+                          : () => _shareLineup(context, lineup, byId, t),
+                      orElse: () => null,
+                    ),
                   ),
                   Expanded(
                     child: ListView(
@@ -349,10 +395,16 @@ extension<T> on Iterable<T> {
 // ─── TOPBAR ────────────────────────────────────────────────────────────────
 
 class _Topbar extends StatelessWidget {
-  const _Topbar({required this.gameweekNumber, required this.onBack, required this.onReset});
+  const _Topbar({
+    required this.gameweekNumber,
+    required this.onBack,
+    required this.onReset,
+    this.onShare,
+  });
   final int? gameweekNumber;
   final VoidCallback onBack;
   final VoidCallback onReset;
+  final VoidCallback? onShare;
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -369,6 +421,12 @@ class _Topbar extends StatelessWidget {
               ),
             ),
           ),
+          if (onShare != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: CircleIconButton(
+                  icon: Icons.ios_share_rounded, onPressed: onShare!),
+            ),
           CircleIconButton(icon: Icons.refresh, onPressed: onReset),
         ],
       ),

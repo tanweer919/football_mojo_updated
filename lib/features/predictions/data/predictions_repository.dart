@@ -68,9 +68,89 @@ class PredictionsRepository {
         .toList();
   }
 
-  Future<void> submitBracket(String competitionId, Map<String, String> picks) async {
-    await _dio.post('/v1/predictions/bracket', data: {'competitionId': competitionId, 'picks': picks});
+  Future<BracketDto> submitBracket(String competitionId, Map<String, String> picks) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/v1/predictions/bracket',
+      data: {'competitionId': competitionId, 'picks': picks},
+    );
+    return BracketDto.fromJson(res.data!);
   }
+
+  Future<BracketDto?> myBracket(String competitionId) async {
+    final res = await _dio.get<dynamic>(
+      '/v1/predictions/bracket/me',
+      queryParameters: {'competitionId': competitionId},
+    );
+    if (res.data == null) return null;
+    return BracketDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<List<BracketLeaderRow>> bracketLeaderboard(String competitionId) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/v1/predictions/bracket/leaderboard',
+      queryParameters: {'competitionId': competitionId},
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(BracketLeaderRow.fromJson)
+        .toList(growable: false);
+  }
+}
+
+class BracketDto {
+  BracketDto({
+    required this.id,
+    required this.competitionId,
+    required this.picks,
+    required this.pointsAwarded,
+    required this.isLocked,
+    this.lockedAt,
+    this.updatedAt,
+  });
+  final String id;
+  final String competitionId;
+  final Map<String, String> picks;
+  final int pointsAwarded;
+  final bool isLocked;
+  final DateTime? lockedAt;
+  final DateTime? updatedAt;
+
+  factory BracketDto.fromJson(Map<String, dynamic> j) => BracketDto(
+        id: j['id'] as String,
+        competitionId: j['competitionId'] as String,
+        picks: ((j['picks'] as Map?) ?? const {})
+            .map((k, v) => MapEntry(k as String, v as String)),
+        pointsAwarded: (j['pointsAwarded'] as num?)?.toInt() ?? 0,
+        isLocked: j['isLocked'] as bool? ?? false,
+        lockedAt: j['lockedAt'] == null ? null : DateTime.parse(j['lockedAt'] as String),
+        updatedAt: j['updatedAt'] == null ? null : DateTime.parse(j['updatedAt'] as String),
+      );
+}
+
+class BracketLeaderRow {
+  BracketLeaderRow({
+    required this.rank,
+    required this.userId,
+    required this.total,
+    this.displayName,
+    this.photoUrl,
+    this.countryCode,
+  });
+  final int rank;
+  final String userId;
+  final String? displayName;
+  final String? photoUrl;
+  final String? countryCode;
+  final int total;
+
+  factory BracketLeaderRow.fromJson(Map<String, dynamic> j) => BracketLeaderRow(
+        rank: (j['rank'] as num).toInt(),
+        userId: j['userId'] as String,
+        displayName: j['displayName'] as String?,
+        photoUrl: j['photoUrl'] as String?,
+        countryCode: j['countryCode'] as String?,
+        total: (j['total'] as num?)?.toInt() ?? 0,
+      );
 }
 
 final predictionsRepositoryProvider =
@@ -79,3 +159,10 @@ final myPredictionsProvider =
     FutureProvider<List<PredictionEntry>>((ref) => ref.read(predictionsRepositoryProvider).mine());
 final predictionsLeaderboardProvider =
     FutureProvider<List<PredictionLeaderRow>>((ref) => ref.read(predictionsRepositoryProvider).leaderboard());
+
+final myBracketProvider = FutureProvider.family<BracketDto?, String>(
+  (ref, competitionId) => ref.read(predictionsRepositoryProvider).myBracket(competitionId),
+);
+final bracketLeaderboardProvider = FutureProvider.family<List<BracketLeaderRow>, String>(
+  (ref, competitionId) => ref.read(predictionsRepositoryProvider).bracketLeaderboard(competitionId),
+);

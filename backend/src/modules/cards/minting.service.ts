@@ -23,6 +23,22 @@ export class MintingService {
         if (tpl.mintedCount >= tpl.totalSupply)
           throw new BadRequestException('template_sold_out');
 
+        // Drop window enforcement — refuse mints outside [opens, closes).
+        const now = new Date();
+        if (tpl.dropOpensAt && tpl.dropOpensAt.getTime() > now.getTime())
+          throw new BadRequestException('drop_not_open_yet');
+        if (tpl.dropClosesAt && tpl.dropClosesAt.getTime() <= now.getTime())
+          throw new BadRequestException('drop_closed');
+
+        // Per-user cap. Skip the count query when the cap isn't set.
+        if (tpl.maxPerUser != null) {
+          const owned = await tx.ownedCard.count({
+            where: { templateId: tpl.id, ownerId: params.ownerId },
+          });
+          if (owned >= tpl.maxPerUser)
+            throw new BadRequestException('per_user_cap_reached');
+        }
+
         const updated = await tx.cardTemplate.update({
           where: { id: params.templateId },
           data: { mintedCount: { increment: 1 } },

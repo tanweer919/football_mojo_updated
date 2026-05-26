@@ -1,17 +1,23 @@
-# Production Compose for Dokploy.
-# - Postgres and Redis are NOT defined here — they live in Dokploy's managed
-#   "Database" feature. Inject their connection URLs as env vars in the Dokploy
-#   Application → Environment tab.
-# - The `migrate` service runs once per deploy and gates api/worker so a failed
-#   migration fails the deploy loudly rather than starting a half-broken app.
-# - Resource limits sized for a single 28 GB Dokploy VM running other services
-#   alongside. Tighten/loosen per host.
+# Production Compose for Dokploy — APP TIER ONLY.
 #
-# Dokploy usage:
-#   1. Application → Source → point at this repo
-#   2. Compose file: backend/docker-compose.prod.yml
-#   3. Environment: paste all vars from .env.example (with real values)
-#   4. Deploy
+# This compose assumes Postgres and Redis are provisioned separately as
+# Dokploy "Databases" (Settings → Databases → New). Their connection URLs
+# get injected via env vars from Dokploy → Application → Environment.
+#
+# Prefer `docker-compose.prod.full.yml` when you want Postgres + Redis to
+# live in the same compose stack (cheaper, smaller blast radius).
+#
+# Full step-by-step in DOKPLOY.md.
+#
+# Notes:
+#   - `migrate` runs once per deploy and gates api/worker. A failed
+#     migration fails the deploy loudly. Prisma takes an advisory lock so
+#     concurrent boots don't fight.
+#   - Worker is replicas: 1. @nestjs/schedule cron jobs fire from every
+#     replica; multiple workers would multiply WC-digest pushes and
+#     bracket re-scores.
+#   - Resource limits sized for a 2-vCPU / 4 GB VM running other services
+#     alongside. Tighten/loosen per host in Dokploy → Advanced → Resources.
 
 services:
   # ── One-shot migration step ───────────────────────────────────────────────
@@ -45,13 +51,15 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
     restart: unless-stopped
     env_file: .env
-    ports:
-      - "3000:3000"
+    # `expose` (not `ports`) — Dokploy's Traefik handles the public
+    # 80/443 binding + SSL via the Domain you configure in the UI.
+    expose:
+      - "3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Healthcheck is also defined in the Dockerfile, but explicit here so
-    # Dokploy's Traefik integration picks it up for routing decisions.
+    # /health returns 503 (via HttpException) when DB or Redis is down so
+    # Traefik can route around an unhealthy replica.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
@@ -68,7 +76,8 @@ services:
           memory: 256M
     logging: *json-rolling
 
-  # ── BullMQ worker: scoring pipeline, FCM dispatcher, pricing cron ─────────
+  # ── BullMQ worker: scoring, FCM dispatcher, cron jobs ────────────────────
+  # Single replica only — multiple workers would multiply cron pushes.
   worker:
     build:
       context: .
@@ -91,6 +100,7 @@ services:
       retries: 3
       start_period: 30s
     deploy:
+      replicas: 1
       resources:
         limits:
           cpus: '1.5'

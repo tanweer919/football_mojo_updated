@@ -20,10 +20,29 @@ abstract class FantasyTournamentDto with _$FantasyTournamentDto {
     required DateTime startsAt,
     required DateTime endsAt,
     @Default(<FantasyGameweekDto>[]) List<FantasyGameweekDto> gameweeks,
+    @Default(<GlobalCupPrizeDto>[]) List<GlobalCupPrizeDto> prizes,
   }) = _FantasyTournamentDto;
 
   factory FantasyTournamentDto.fromJson(Map<String, dynamic> json) =>
       _$FantasyTournamentDtoFromJson(json);
+}
+
+/// Sorare-style rank-tier prize. Always tied to a specific [cardTemplateId]
+/// — the reward is a known card, not a random pull.
+@freezed
+abstract class GlobalCupPrizeDto with _$GlobalCupPrizeDto {
+  const factory GlobalCupPrizeDto({
+    required String id,
+    required int rankFrom,
+    required int rankTo,
+    required String description,
+    required String cardTemplateId,
+    String? cardArtUrl,
+    String? cardRarity,
+  }) = _GlobalCupPrizeDto;
+
+  factory GlobalCupPrizeDto.fromJson(Map<String, dynamic> json) =>
+      _$GlobalCupPrizeDtoFromJson(json);
 }
 
 @freezed
@@ -36,6 +55,9 @@ abstract class FantasyGameweekDto with _$FantasyGameweekDto {
     required DateTime lockAt,
     required DateTime endsAt,
     @Default(false) bool scored,
+    /// Number of matches in this gameweek that are currently LIVE.
+    /// Drives client-side live polling. 0 = no need to poll.
+    @Default(0) int liveMatchCount,
   }) = _FantasyGameweekDto;
 
   factory FantasyGameweekDto.fromJson(Map<String, dynamic> json) =>
@@ -43,6 +65,7 @@ abstract class FantasyGameweekDto with _$FantasyGameweekDto {
 
   bool get isLocked => DateTime.now().isAfter(lockAt);
   Duration get untilLock => lockAt.difference(DateTime.now());
+  bool get isLive => liveMatchCount > 0;
 }
 
 @freezed

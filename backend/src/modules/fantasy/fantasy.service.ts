@@ -24,22 +24,53 @@ export class FantasyService {
   async getTournament(slug: string) {
     const t = await this.prisma.fantasyTournament.findUnique({
       where: { slug },
-      include: { gameweeks: { orderBy: { number: 'asc' } }, prizes: { include: { cardTemplate: true } } },
+      include: {
+        gameweeks: { orderBy: { number: 'asc' } },
+        prizes: {
+          // Cheapest tier first so the UI can render 1st → 3rd top-down.
+          orderBy: [{ rankFrom: 'asc' }],
+          include: { cardTemplate: true },
+        },
+      },
     });
     if (!t) throw new NotFoundException('tournament_not_found');
-    return t;
+    // Flatten prize.cardTemplate so the mobile DTO can read art / rarity
+    // at the top level without nested types.
+    const { prizes, ...rest } = t;
+    return {
+      ...rest,
+      prizes: prizes.map((p) => ({
+        id: p.id,
+        rankFrom: p.rankFrom,
+        rankTo: p.rankTo,
+        description: p.description,
+        cardTemplateId: p.cardTemplateId,
+        cardArtUrl: p.cardTemplate?.artUrl ?? null,
+        cardRarity: p.cardTemplate?.rarity ?? null,
+      })),
+    };
   }
 
   async currentGameweek(tournamentId: string) {
     const now = new Date();
     // Earliest gameweek whose deadline is in the future, else the latest past one.
-    return (await this.prisma.fantasyGameweek.findFirst({
+    const gw = (await this.prisma.fantasyGameweek.findFirst({
       where: { tournamentId, lockAt: { gt: now } },
       orderBy: { number: 'asc' },
-    })) ?? this.prisma.fantasyGameweek.findFirst({
+    })) ?? (await this.prisma.fantasyGameweek.findFirst({
       where: { tournamentId },
       orderBy: { number: 'desc' },
-    });
+    }));
+    if (!gw) return null;
+    // Count matches currently LIVE so the client can decide whether to
+    // enable live polling. Cheap query — `matchIds` is bounded by the
+    // gameweek's fixtures.
+    const liveMatchCount = gw.matchIds.length === 0
+      ? 0
+      : await this.prisma.match.count({
+          where: { id: { in: gw.matchIds }, status: { in: ['LIVE', 'HALF_TIME'] } },
+        });
+    return { ...gw, liveMatchCount };
   }
 
   // ─── Selectable player pool ───────────────────────────────────────────────
@@ -203,20 +234,151 @@ export class FantasyService {
     return out;
   }
 
-  async leaderboard(gameweekId: string, limit = 100) {
+  async leaderboard(gameweekId: string, limit = 100, userIds?: string[]) {
     const lineups = await this.prisma.fantasyLineup.findMany({
-      where: { gameweekId },
+      where: {
+        gameweekId,
+        ...(userIds ? { userId: { in: userIds } } : {}),
+      },
       orderBy: [{ totalPoints: 'desc' }],
       take: limit,
       include: { user: { select: { id: true, displayName: true, photoUrl: true } } },
     });
     return lineups.map((l, i) => ({
-      rank: l.rank ?? i + 1,
+      // When scoped to a league we recompute rank locally — the stored global
+      // rank wouldn't be meaningful inside a private group.
+      rank: userIds ? i + 1 : (l.rank ?? i + 1),
       userId: l.userId,
       displayName: l.user.displayName,
       photoUrl: l.user.photoUrl,
       points: l.totalPoints,
       budgetUsed: l.budgetUsed,
     }));
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // PRIVATE LEAGUES
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async createLeague(ownerId: string, tournamentId: string, name: string) {
+    const trimmed = name.trim();
+    if (trimmed.length < 3 || trimmed.length > 40)
+      throw new BadRequestException('league_name_length');
+
+    const tournament = await this.prisma.fantasyTournament.findUnique({
+      where: { id: tournamentId },
+    });
+    if (!tournament) throw new NotFoundException('tournament_not_found');
+
+    // Generate a join code, retrying on the rare collision.
+    let joinCode = '';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      joinCode = this.generateJoinCode();
+      const clash = await this.prisma.fantasyLeague.findUnique({ where: { joinCode } });
+      if (!clash) break;
+      joinCode = '';
+    }
+    if (!joinCode) throw new BadRequestException('join_code_unavailable');
+
+    return this.prisma.fantasyLeague.create({
+      data: {
+        tournamentId,
+        ownerId,
+        name: trimmed,
+        joinCode,
+        members: { create: { userId: ownerId } },
+      },
+      include: { _count: { select: { members: true } } },
+    });
+  }
+
+  async joinLeague(userId: string, joinCode: string) {
+    const code = joinCode.trim().toUpperCase();
+    const league = await this.prisma.fantasyLeague.findUnique({
+      where: { joinCode: code },
+      include: { _count: { select: { members: true } } },
+    });
+    if (!league) throw new NotFoundException('league_not_found');
+
+    const already = await this.prisma.fantasyLeagueMember.findUnique({
+      where: { leagueId_userId: { leagueId: league.id, userId } },
+    });
+    if (already) return league;
+
+    if (league._count.members >= league.memberLimit)
+      throw new ForbiddenException('league_full');
+
+    await this.prisma.fantasyLeagueMember.create({
+      data: { leagueId: league.id, userId },
+    });
+    return this.prisma.fantasyLeague.findUnique({
+      where: { id: league.id },
+      include: { _count: { select: { members: true } } },
+    });
+  }
+
+  async leaveLeague(userId: string, leagueId: string) {
+    const league = await this.prisma.fantasyLeague.findUnique({ where: { id: leagueId } });
+    if (!league) throw new NotFoundException('league_not_found');
+    if (league.ownerId === userId)
+      throw new ForbiddenException('owner_cannot_leave');
+    await this.prisma.fantasyLeagueMember.delete({
+      where: { leagueId_userId: { leagueId, userId } },
+    });
+    return { ok: true };
+  }
+
+  async listMyLeagues(userId: string, tournamentId?: string) {
+    const memberships = await this.prisma.fantasyLeagueMember.findMany({
+      where: {
+        userId,
+        ...(tournamentId ? { league: { tournamentId } } : {}),
+      },
+      include: {
+        league: {
+          include: {
+            _count: { select: { members: true } },
+            tournament: { select: { slug: true, name: true } },
+          },
+        },
+      },
+      orderBy: { joinedAt: 'desc' },
+    });
+    return memberships.map((m) => ({
+      id: m.league.id,
+      tournamentId: m.league.tournamentId,
+      tournamentSlug: m.league.tournament.slug,
+      tournamentName: m.league.tournament.name,
+      name: m.league.name,
+      joinCode: m.league.joinCode,
+      memberCount: m.league._count.members,
+      memberLimit: m.league.memberLimit,
+      isOwner: m.league.ownerId === userId,
+      joinedAt: m.joinedAt,
+    }));
+  }
+
+  async leagueLeaderboard(userId: string, leagueId: string, gameweekId: string, limit = 100) {
+    const member = await this.prisma.fantasyLeagueMember.findUnique({
+      where: { leagueId_userId: { leagueId, userId } },
+    });
+    if (!member) throw new ForbiddenException('not_a_member');
+
+    const members = await this.prisma.fantasyLeagueMember.findMany({
+      where: { leagueId },
+      select: { userId: true },
+    });
+    const userIds = members.map((m) => m.userId);
+    return this.leaderboard(gameweekId, limit, userIds);
+  }
+
+  // 6-char join code: alphanumeric, easy to type, ambiguous chars removed.
+  private generateJoinCode(): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
+    let out = '';
+    for (let i = 0; i < 6; i++) {
+      out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return out;
   }
 }

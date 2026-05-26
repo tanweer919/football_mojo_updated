@@ -21,6 +21,18 @@ class ClaimTagBody {
   userTag!: string;
 }
 
+class FcmTokenBody {
+  @IsString()
+  @Length(8, 4096)
+  token!: string;
+}
+
+class SupportedCountryBody {
+  @IsString()
+  @Length(0, 4)
+  supportedCountryCode!: string;
+}
+
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -65,6 +77,105 @@ export class UsersController {
   @HttpCode(204)
   async unfollow(@CurrentUser('uid') uid: string, @Param('teamId') teamId: string) {
     await this.users.unfollowTeam(uid, teamId);
+  }
+
+  /// Register an FCM token against the signed-in user so the server can
+  /// push 1v1 / lineup / scoring notifications via `sendToTokens`.
+  /// Idempotent — duplicate tokens are silently de-duped server-side.
+  @UseGuards(FirebaseAuthGuard)
+  @Post('me/fcm-tokens')
+  @HttpCode(204)
+  async addFcmToken(
+    @CurrentUser('uid') uid: string,
+    @Body() body: FcmTokenBody,
+  ) {
+    await this.users.addFcmToken(uid, body.token);
+  }
+
+  /// Remove an FCM token (called on sign-out or token refresh).
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('me/fcm-tokens/:token')
+  @HttpCode(204)
+  async removeFcmToken(
+    @CurrentUser('uid') uid: string,
+    @Param('token') token: string,
+  ) {
+    await this.users.removeFcmToken(uid, token);
+  }
+
+  /// Set the country the user supports during the World Cup.
+  /// Pass empty string to clear.
+  @UseGuards(FirebaseAuthGuard)
+  @Patch('me/supported-country')
+  async setSupportedCountry(
+    @CurrentUser('uid') uid: string,
+    @Body() body: SupportedCountryBody,
+  ) {
+    return this.users.setSupportedCountry(
+      uid,
+      body.supportedCountryCode === '' ? null : body.supportedCountryCode,
+    );
+  }
+
+  /// Read notification opt-ins. Absent row → everything-on defaults.
+  @UseGuards(FirebaseAuthGuard)
+  @Get('me/notification-preferences')
+  notificationPreferences(@CurrentUser('uid') uid: string) {
+    return this.users.getNotificationPreferences(uid);
+  }
+
+  /// Patch notification opt-ins. Body is a partial — only sent flags change.
+  @UseGuards(FirebaseAuthGuard)
+  @Patch('me/notification-preferences')
+  async setNotificationPreferences(
+    @CurrentUser('uid') uid: string,
+    @Body() body: Record<string, boolean>,
+  ) {
+    // Whitelist the known categories so a malicious client can't write
+    // arbitrary columns into the preference row.
+    const allowed = [
+      'matchGoals', 'matchKickoff', 'matchFulltime', 'matchLineup',
+      'breakingNews', 'wcDailyRecap',
+      'fantasyResults', 'h2hInvites', 'h2hResults', 'cardDrops',
+    ];
+    const patch: Record<string, boolean> = {};
+    for (const key of allowed) {
+      if (typeof body[key] === 'boolean') patch[key] = body[key];
+    }
+    return this.users.setNotificationPreferences(uid, patch);
+  }
+
+  /// Paginated in-app notification history. Drives the notification
+  /// center screen. Reads are not implicit — call /read separately.
+  @UseGuards(FirebaseAuthGuard)
+  @Get('me/notifications')
+  notifications(
+    @CurrentUser('uid') uid: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.users.notificationHistory(uid, limit ? +limit : 30, cursor);
+  }
+
+  /// Unread count — for the home appbar bell badge.
+  @UseGuards(FirebaseAuthGuard)
+  @Get('me/notifications/unread-count')
+  unreadCount(@CurrentUser('uid') uid: string) {
+    return this.users.unreadNotificationCount(uid);
+  }
+
+  /// Mark read. POST `{ ids: [...] }` for a subset, or `{ all: true }` to
+  /// clear the badge in one shot.
+  @UseGuards(FirebaseAuthGuard)
+  @Post('me/notifications/read')
+  markRead(
+    @CurrentUser('uid') uid: string,
+    @Body() body: { ids?: string[]; all?: boolean },
+  ) {
+    return this.users.markNotificationsRead(
+      uid,
+      body.all === true ? null : (body.ids ?? []),
+    );
   }
 
   // ─── Public read routes ──────────────────────────────────────────────────

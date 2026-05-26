@@ -61,6 +61,11 @@ export class CardsController {
     return this.cards.purchaseCard(uid, body.templateId);
   }
 
+  @Get('store/featured')
+  featured() {
+    return this.cards.featuredForSale();
+  }
+
   @Post('sets/:setId/check-completion')
   checkSet(@CurrentUser('uid') uid: string, @Param('setId') setId: string) {
     return this.cards.checkSetCompletion(uid, setId);
