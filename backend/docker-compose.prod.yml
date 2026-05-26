@@ -63,6 +63,9 @@ services:
     restart: "no"
     env_file: .env
     command: ["npx", "prisma", "migrate", "deploy"]
+    networks:
+      - default
+      - dokploy
     deploy:
       resources:
         limits:
@@ -88,6 +91,9 @@ services:
     <<: *common-security
     expose:
       - "3000"
+    networks:
+      - default
+      - dokploy
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -147,6 +153,9 @@ services:
       # Reads SCORING_QUEUE_CONCURRENCY from the env_file when set.
       SCORING_QUEUE_CONCURRENCY: ${SCORING_QUEUE_CONCURRENCY:-8}
     <<: *common-security
+    networks:
+      - default
+      - dokploy
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -173,3 +182,19 @@ services:
           cpus: '1.0'
           memory: 1536M
     logging: *json-rolling
+
+# Networks
+# --------
+#   default — auto-created per-stack bridge for api ↔ worker chatter.
+#   dokploy — Dokploy's shared overlay where managed Postgres + Redis live.
+#             Marked `external: true` because Dokploy itself creates the
+#             network when you provision your first managed DB.
+#
+# If `docker network ls | grep dokploy` shows a different name on your
+# host (e.g. `dokploy_default`), override DOKPLOY_NETWORK in .env or
+# change the name below directly.
+networks:
+  default:
+  dokploy:
+    external: true
+    name: ${DOKPLOY_NETWORK:-dokploy-network}
