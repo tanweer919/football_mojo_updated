@@ -5,24 +5,54 @@
 # get injected via env vars from Dokploy → Application → Environment.
 #
 # Prefer `docker-compose.prod.full.yml` when you want Postgres + Redis to
-# live in the same compose stack (cheaper, smaller blast radius).
+# live in the same compose stack.
 #
 # Full step-by-step in DOKPLOY.md.
 #
-# Notes:
+# Resource sizing
+# ---------------
+# Tuned for a ~16-vCPU / 18+ GB Dokploy host. Resource budget:
+#   api      ×2 replicas   →  2 GB limit / 768 MB reserved each   → ~4 GB
+#   worker   ×1 replica    →  3 GB limit / 1.5 GB reserved        → ~3 GB
+#   Total reservation                                              ≈ 5.5 GB
+#   Total burst (under load)                                       ≈ 7 GB
+# Leaves >10 GB headroom for the host OS, Dokploy itself, and any
+# co-located services (Postgres + Redis, monitoring, etc.).
+#
+# Operational invariants
+# ----------------------
 #   - `migrate` runs once per deploy and gates api/worker. A failed
 #     migration fails the deploy loudly. Prisma takes an advisory lock so
 #     concurrent boots don't fight.
-#   - Worker is replicas: 1. @nestjs/schedule cron jobs fire from every
-#     replica; multiple workers would multiply WC-digest pushes and
-#     bracket re-scores.
-#   - Resource limits sized for a 2-vCPU / 4 GB VM running other services
-#     alongside. Tighten/loosen per host in Dokploy → Advanced → Resources.
+#   - Worker stays at replicas: 1. @nestjs/schedule cron jobs fire from
+#     every replica; multiple workers would multiply WC-digest pushes,
+#     bracket re-scores, and breaking-news broadcasts.
+#   - api can scale horizontally — it's stateless and BullMQ jobs flow
+#     through Redis. Default 2 gives zero-downtime deploys via Traefik
+#     drain + start-first.
+
+x-common-security: &common-security
+  # Drop privilege-escalation surface. Image already runs as `app` user
+  # (see Dockerfile L58); this caps blast radius if a dep is compromised.
+  security_opt:
+    - no-new-privileges:true
+  # Bump file descriptor ceiling — the WebSocket gateway + Socket.IO
+  # rooms + Prisma pool + Redis pubsub easily push past the 1024 default.
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+
+x-common-logging: &json-rolling
+  driver: json-file
+  options:
+    # 50 MB × 5 files = 250 MB retention per service. Catches a full
+    # day's worth of pino output even under peak match-day traffic.
+    max-size: "50m"
+    max-file: "5"
 
 services:
   # ── One-shot migration step ───────────────────────────────────────────────
-  # Runs before api/worker, exits 0 on success. Dokploy will not promote the
-  # deploy if this exits non-zero.
   migrate:
     build:
       context: .
@@ -32,14 +62,13 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
     restart: "no"
     env_file: .env
-    # `migrate deploy` only applies committed migrations; never generates.
-    # Safe under concurrent calls — Prisma takes an advisory lock.
     command: ["npx", "prisma", "migrate", "deploy"]
-    logging: &json-rolling
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging: *json-rolling
 
   # ── HTTP + WebSocket API ──────────────────────────────────────────────────
   api:
@@ -51,33 +80,53 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
     restart: unless-stopped
     env_file: .env
-    # `expose` (not `ports`) — Dokploy's Traefik handles the public
-    # 80/443 binding + SSL via the Domain you configure in the UI.
+    environment:
+      # Cap V8's old-space at ~1.75 GB so Node never tries to allocate
+      # past the container limit. Without this, V8 defaults to ~25% of
+      # *host* memory which can over-commit and trigger OOMKilled.
+      NODE_OPTIONS: --max-old-space-size=1792
+    <<: *common-security
     expose:
       - "3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
     # /health returns 503 (via HttpException) when DB or Redis is down so
-    # Traefik can route around an unhealthy replica.
+    # Traefik routes around unhealthy replicas. start_period at 45s gives
+    # Prisma + Firebase Admin SDK time to warm up on cold boot.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 45s
+    # 30s drain window — long enough for NestJS's enableShutdownHooks
+    # to close Socket.IO rooms, drain in-flight HTTP, flush Redis pubsub.
+    stop_grace_period: 30s
     deploy:
+      replicas: 2
+      # update_config only honoured under Swarm; left here for clarity
+      # and forward-compat. Dokploy handles rolling deploys via its own
+      # mechanism (drain → start-first).
+      update_config:
+        order: start-first
+        parallelism: 1
+        monitor: 60s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          cpus: '2.0'
+          memory: 2G
         reservations:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.5'
+          memory: 768M
     logging: *json-rolling
 
   # ── BullMQ worker: scoring, FCM dispatcher, cron jobs ────────────────────
-  # Single replica only — multiple workers would multiply cron pushes.
   worker:
     build:
       context: .
@@ -89,23 +138,38 @@ services:
     env_file: .env
     environment:
       WORKER_MODE: "true"
+      # Same V8 cap logic, slightly larger because the worker holds the
+      # BullMQ queue handles + Prisma pool + api-football response cache.
+      NODE_OPTIONS: --max-old-space-size=2560
+      # BullMQ concurrency. Bump as your api-football allowance permits:
+      #   RapidAPI free (30 req/min) → keep at 4
+      #   RapidAPI Pro / direct Pro  → 8–12
+      # Reads SCORING_QUEUE_CONCURRENCY from the env_file when set.
+      SCORING_QUEUE_CONCURRENCY: ${SCORING_QUEUE_CONCURRENCY:-8}
+    <<: *common-security
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Worker has no HTTP — check the Node process is alive instead.
     healthcheck:
       test: ["CMD", "pgrep", "-f", "node dist/main.js"]
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 45s
+    # Longer than api — give BullMQ time to finish in-flight jobs
+    # (the rollupLineups pass takes 10–20s on a busy gameweek).
+    stop_grace_period: 60s
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
       resources:
         limits:
-          cpus: '1.5'
-          memory: 1536M
+          cpus: '3.0'
+          memory: 3G
         reservations:
-          cpus: '0.5'
-          memory: 768M
+          cpus: '1.0'
+          memory: 1536M
     logging: *json-rolling

@@ -1,20 +1,63 @@
 # All-in-one production compose — Postgres + Redis + app in one stack.
 #
 # Use this when you want a single Dokploy Application that owns its data
-# stores (cheapest setup, smallest blast radius). For separate managed
-# stores via Dokploy → Databases, use `docker-compose.prod.yml` instead.
+# stores. For separate managed stores via Dokploy → Databases, use
+# `docker-compose.prod.yml` instead.
 #
 # Volumes are NAMED so Dokploy persists them across deploys. Back them up
 # from Dokploy → Volumes or via `docker compose exec postgres pg_dump`.
+#
+# Resource sizing
+# ---------------
+# Tuned for a ~16-vCPU / 18+ GB Dokploy host:
+#   postgres                →  4 GB limit / 1 GB reserved
+#   redis                   →  1 GB limit / 256 MB reserved
+#   api      ×2 replicas    →  2 GB limit / 768 MB reserved each (~4 GB)
+#   worker   ×1 replica     →  3 GB limit / 1.5 GB reserved
+#   Total reservation                                              ≈ 8.5 GB
+#   Total burst (under load)                                       ≈ 12 GB
+# Leaves >5 GB headroom for the host OS, Dokploy, and any monitoring.
+
+x-common-security: &common-security
+  security_opt:
+    - no-new-privileges:true
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+
+x-common-logging: &json-rolling
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    <<: *common-security
     environment:
       POSTGRES_USER:     ${POSTGRES_USER:-footballmojo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?password required}
       POSTGRES_DB:       ${POSTGRES_DB:-footballmojo}
+      # Postgres tuning for ~1 GB shared_buffers (≈25% of memory limit).
+      # Leave the rest to autovacuum + filesystem cache.
+      POSTGRES_INITDB_ARGS: --data-checksums
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - max_connections=200
+      - -c
+      - wal_compression=on
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Idempotent grants — runs ONCE per fresh volume. Avoids the P1010
@@ -25,22 +68,36 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    logging: &json-rolling
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging: *json-rolling
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    <<: *common-security
     command:
       - redis-server
       - --appendonly
       - "yes"
-      # Optional password — set REDIS_PASSWORD in env to enable.
       - --requirepass
       - ${REDIS_PASSWORD:-}
+      # Cap memory + use LRU so a misbehaving cache writer can't OOM
+      # the whole stack. 800M leaves headroom under the 1G limit.
+      - --maxmemory
+      - 800mb
+      - --maxmemory-policy
+      - allkeys-lru
+      # Slow log threshold (μs) — 100ms+ queries logged for inspection.
+      - --slowlog-log-slower-than
+      - "100000"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -48,6 +105,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     logging: *json-rolling
 
   migrate:
@@ -63,6 +129,11 @@ services:
       postgres:
         condition: service_healthy
     command: ["npx", "prisma", "migrate", "deploy"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     logging: *json-rolling
 
   api:
@@ -74,6 +145,9 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
     restart: unless-stopped
     env_file: .env
+    environment:
+      NODE_OPTIONS: --max-old-space-size=1792
+    <<: *common-security
     expose:
       - "3000"
     depends_on:
@@ -88,15 +162,26 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 45s
+    stop_grace_period: 30s
     deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        monitor: 60s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          cpus: '2.0'
+          memory: 2G
         reservations:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '0.5'
+          memory: 768M
     logging: *json-rolling
 
   worker:
@@ -110,6 +195,9 @@ services:
     env_file: .env
     environment:
       WORKER_MODE: "true"
+      NODE_OPTIONS: --max-old-space-size=2560
+      SCORING_QUEUE_CONCURRENCY: ${SCORING_QUEUE_CONCURRENCY:-8}
+    <<: *common-security
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,16 +210,21 @@ services:
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 45s
+    stop_grace_period: 60s
     deploy:
       replicas: 1
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
       resources:
         limits:
-          cpus: '1.5'
-          memory: 1536M
+          cpus: '3.0'
+          memory: 3G
         reservations:
-          cpus: '0.5'
-          memory: 768M
+          cpus: '1.0'
+          memory: 1536M
     logging: *json-rolling
 
 volumes:
