@@ -54,12 +54,21 @@ export class FantasyScoringWorker implements OnModuleInit {
     this.queue = new Queue<Job>(QUEUE_NAME, { connection: this.connection });
     if (!this.isWorker) return;
 
+    // Concurrency is configurable so a beefier VM can scale up; the
+    // hard ceiling is whatever api-football's per-minute cap tolerates
+    // (RapidAPI free = 30/min, Pro = 450+/min). Default 4 is safe for
+    // the free tier; bump SCORING_QUEUE_CONCURRENCY in prod once you've
+    // confirmed your upstream allowance.
+    const concurrency = Math.max(1, Math.min(64,
+      Number(process.env.SCORING_QUEUE_CONCURRENCY ?? 4),
+    ));
+    this.log.log(`BullMQ worker concurrency = ${concurrency}`);
     this.worker = new Worker<Job>(
       QUEUE_NAME,
       async (job) => this.dispatch(job.data),
       {
         connection: this.connection,
-        concurrency: 4,                             // respect api-football per-minute cap
+        concurrency,
         autorun: true,
         removeOnComplete: { age: 3600, count: 1000 },
         removeOnFail:     { age: 86_400 },
