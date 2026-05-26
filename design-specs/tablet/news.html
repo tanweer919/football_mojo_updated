@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH Tablet — Article</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<link rel="stylesheet" href="../css/tablet.css">
+<style>
+  .cover {
+    margin-bottom: 28px; height: 380px; position: relative; overflow: hidden; border-radius: var(--r-4);
+    background:
+      radial-gradient(60% 80% at 60% 30%, oklch(45% 0.16 85), transparent 70%),
+      radial-gradient(40% 50% at 100% 90%, oklch(35% 0.12 60), transparent 60%),
+      linear-gradient(180deg, oklch(28% 0.1 75), oklch(8% 0.02 60));
+    border: 1px solid var(--gold-hairline);
+  }
+  .cover::after { content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 0%, transparent 50%, oklch(8% 0.005 60) 100%);
+  }
+  .cover__lines { position: absolute; inset: 0; background:
+    repeating-linear-gradient(0deg, transparent 0 40px, oklch(85% 0.06 90 / 0.03) 40px 41px),
+    repeating-linear-gradient(90deg, transparent 0 40px, oklch(85% 0.06 90 / 0.03) 40px 41px); }
+  .cover__caption { position: absolute; bottom: 28px; left: 28px; right: 28px; z-index: 5; }
+  .cover__crest { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.22em; text-transform: uppercase; }
+  .cover__h1 { font-family: var(--font-display); margin-top: 12px; font-size: 48px; line-height: 0.95; font-weight: 800; letter-spacing: -0.045em; color: white; max-width: 580px; }
+  .cover__h1 em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+
+  .article-grid { display: grid; grid-template-columns: 1fr 280px; gap: 40px; }
+  .article-body { }
+  .article-body .meta { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; padding-bottom: 22px; border-bottom: 1px solid var(--border-soft); }
+  .author { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, oklch(50% 0.14 60), oklch(30% 0.08 60)); display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 16px; color: oklch(15% 0.02 70); box-shadow: 0 0 0 1.5px var(--gold-hairline); }
+  .meta__name { font-family: var(--font-display); font-weight: 700; font-size: 14px; }
+  .meta__sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; margin-top: 3px; }
+  .meta__chip { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; padding: 6px 12px; border: 1px solid var(--gold-hairline); border-radius: 999px; text-transform: uppercase; }
+
+  .article-body .lede { font-family: var(--font-serif); font-size: 22px; line-height: 1.4; color: var(--fg); font-weight: 500; margin-bottom: 28px; }
+  .article-body .lede::first-letter { font-family: var(--font-display); font-weight: 800; font-size: 64px; float: left; line-height: 0.9; padding: 4px 12px 0 0; color: var(--gold); }
+  .article-body p { font-size: 15px; line-height: 1.7; color: var(--fg-soft); margin-bottom: 18px; }
+  .pull { margin: 32px -8px; padding: 18px 22px; border-left: 3px solid var(--gold); font-family: var(--font-serif); font-size: 22px; line-height: 1.4; color: var(--fg); font-style: italic; font-weight: 500; }
+  .pull cite { display: block; margin-top: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.14em; font-style: normal; text-transform: uppercase; }
+
+  .data-inline { margin: 24px 0; padding: 20px; border-radius: var(--r-3); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); }
+  .data-inline__title { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 12px; }
+  .data-inline__row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px; }
+  .data-inline__row:last-child { border-bottom: 0; }
+  .data-inline__row b { font-family: var(--font-display); font-variant-numeric: tabular-nums; color: var(--gold); font-size: 14px; }
+
+  /* Sidebar */
+  .article-side { position: sticky; top: 0; }
+  .article-side h4 { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 14px; }
+  .side-card { padding: 18px; border-radius: var(--r-3); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); margin-bottom: 18px; }
+  .rel-item { padding: 12px 0; border-bottom: 1px solid var(--border-soft); }
+  .rel-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .rel-item__src { font-family: var(--font-mono); font-size: 9px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+  .rel-item__t { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin-top: 4px; color: var(--fg); }
+  .rel-item__meta { font-family: var(--font-mono); font-size: 9px; color: var(--muted-2); letter-spacing: 0.06em; margin-top: 4px; }
+
+  .react-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .react { padding: 14px; border-radius: 10px; background: oklch(14% 0.005 70); border: 1px solid var(--border-soft); text-align: center; }
+  .react b { font-family: var(--font-display); font-size: 16px; display: block; }
+  .react span { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="tablet"><div class="screen">
+    <div class="tab-shell">
+      <main class="main">
+        <div class="main-hd">
+          <div><h1>The <em>Pitch</em> · Long read</h1><div class="main-hd__date" style="margin-top:8px">14 May 2026 · 6 min read</div></div>
+          <div class="main-hd__right">
+            <button class="tab-iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5v14l7-4 7 4V5z"/></svg></button>
+            <button class="tab-iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg></button>
+            <a class="tab-avatar" href="profile.html" title="Jordan · Tier 4 Legend">JS</a>
+          </div>
+        </div>
+
+        <div class="t-section">
+          <section class="cover">
+            <div class="cover__lines"></div>
+            <div class="cover__caption">
+              <div class="cover__crest">Long read · The Pitch</div>
+              <h1 class="cover__h1">Mbappé's <em>first</em> World Cup as captain — France's high-wire act in New Jersey.</h1>
+            </div>
+          </section>
+
+          <div class="article-grid">
+            <article class="article-body">
+              <div class="meta">
+                <div class="author">MW</div>
+                <div><div class="meta__name">Marcus Wright</div><div class="meta__sub">SENIOR WRITER · UPDATED 14 MAY · 6 MIN</div></div>
+                <span class="meta__chip">Subscriber</span>
+              </div>
+
+              <p class="lede">In a tunnel beneath MetLife Stadium last week, Kylian Mbappé stood with the captain's armband in his hand and weighed it like it were heavier than the trophy it was meant to deliver. Twenty-eight days from now, France will run out for their World Cup opener — and for the first time in his career, the 27-year-old will lead them.</p>
+
+              <p>Didier Deschamps's decision, made quietly in February and confirmed without ceremony at Clairefontaine, was the worst-kept secret in French football. Antoine Griezmann had retired from the national team in November. Hugo Lloris's gloves had already been hung up in Los Angeles. The succession was clear; the only question was whether Mbappé wanted it.</p>
+
+              <p>He did. He always had.</p>
+
+              <div class="pull">
+                You don't ask Kylian to lead. He arrives leading, whether the room knows it yet or not.
+                <cite>— Didier Deschamps, France HC</cite>
+              </div>
+
+              <p>The high wire he now walks runs from Pasadena (group stage) to Atlanta (likely R16), then potentially to Dallas, to Foxborough, and finally, on 19 July, to the stadium in East Rutherford where Pelé played his last competitive match. France are seeded second behind Argentina. The bracket is kind for the first two rounds and brutal thereafter.</p>
+
+              <div class="data-inline">
+                <div class="data-inline__title">France — Group F path</div>
+                <div class="data-inline__row"><span>vs Senegal · Group opener</span><b>16 Jun · LA · 21:00 PT</b></div>
+                <div class="data-inline__row"><span>vs Iran</span><b>21 Jun · Dallas · 17:00 CT</b></div>
+                <div class="data-inline__row"><span>vs Mexico · Group decider</span><b>25 Jun · Monterrey · 20:00 CT</b></div>
+              </div>
+
+              <p>What's changed in the year since Mbappé's transfer to Madrid is harder to name than to feel. The boy who scored a Ligue 1 hat-trick at 17 is no longer the protégé of anyone. At Real, in the spring's biggest games, he has begun to drop deeper, dictate tempo, talk back. Once he was the gift; now, increasingly, he is the giver.</p>
+
+              <p>Whether that translates in a tournament he has approached three times and won once remains the question Deschamps cannot answer in May. It will answer itself in July — under floodlights, in front of cameras, in front of a country that has waited four years to be told who, exactly, France are.</p>
+            </article>
+
+            <aside class="article-side">
+              <h4>Reactions</h4>
+              <div class="side-card">
+                <div class="react-rail">
+                  <div class="react"><b>1.2K</b><span>Reactions</span></div>
+                  <div class="react"><b>342</b><span>Comments</span></div>
+                  <div class="react"><b>184</b><span>Shares</span></div>
+                  <div class="react"><b>—</b><span>Saved</span></div>
+                </div>
+              </div>
+
+              <h4>Continue reading</h4>
+              <div class="side-card">
+                <article class="rel-item">
+                  <span class="rel-item__src">Tactics</span>
+                  <div class="rel-item__t">Why Argentina's back three is the most asymmetric in the tournament.</div>
+                  <div class="rel-item__meta">Sofía Marín · 4 min</div>
+                </article>
+                <article class="rel-item">
+                  <span class="rel-item__src">Long read</span>
+                  <div class="rel-item__t">Vinicius and the new geometry of Brazil's left wing.</div>
+                  <div class="rel-item__meta">Diogo Almeida · 8 min</div>
+                </article>
+                <article class="rel-item">
+                  <span class="rel-item__src">Profile</span>
+                  <div class="rel-item__t">The quiet anchor: Aurélien Tchouaméni's redefinition of the deep six.</div>
+                  <div class="rel-item__meta">Marcus Wright · 5 min</div>
+                </article>
+              </div>
+            </aside>
+          </div>
+
+          <div style="height: 24px"></div>
+        </div>
+      </main>
+      <nav class="tab-tabbar">
+        <a class="tab-tabbar__item" href="home.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+          Home
+        </a>
+        <a class="tab-tabbar__item" href="world-cup.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>
+          World Cup
+        </a>
+        <a class="tab-tabbar__item" href="fantasy.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>
+          Fantasy
+        </a>
+        <a class="tab-tabbar__item" href="match.html">
+          <span class="badge badge--live">3</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="m12 7 1 6h-2zM8 17l4-3 4 3"/></svg>
+          Live
+        </a>
+        <a class="tab-tabbar__item is-active" href="news.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+          News
+        </a>
+        <a class="tab-tabbar__item" href="collection.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+          Cards
+        </a>
+        <a class="tab-tabbar__item" href="trade.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg>
+          Trade
+        </a>
+      </nav>
+    </div>
+  </div></div>
+</div>
+</body>
+</html>

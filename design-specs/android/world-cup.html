@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — World Cup 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<style>
+  .scroll { height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 110px; scrollbar-width: none; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 8px; }
+  .backbtn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: oklch(18% 0.005 70 / 0.6); border: 1px solid var(--border-soft); }
+  .topbar__title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; color: var(--gold); text-transform: uppercase; }
+
+  /* HERO */
+  .wc-page-hero {
+    margin: 0 16px 24px; padding: 24px 20px 28px; border-radius: var(--r-5);
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(120% 100% at 50% -20%, oklch(45% 0.16 145 / 0.35), transparent 60%),
+      radial-gradient(80% 60% at 100% 100%, oklch(40% 0.16 80 / 0.25), transparent 60%),
+      linear-gradient(180deg, oklch(13% 0.018 80), oklch(8% 0.01 70));
+    border: 1px solid var(--gold-hairline);
+    box-shadow: 0 32px 60px -28px oklch(0% 0 0 / 0.7);
+  }
+  .wc-page-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(45deg, transparent 0 40px, oklch(74% 0.18 145 / 0.04) 40px 41px); }
+  .wc-page-hero__crest { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 8px; }
+  .wc-page-hero__crest::before { content: '★'; }
+  .wc-page-hero__title { font-family: var(--font-display); margin-top: 14px; font-size: 36px; line-height: 0.95; font-weight: 800; letter-spacing: -0.045em; }
+  .wc-page-hero__title em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+  .wc-page-hero__meta { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  .wc-page-hero__meta span { display: flex; align-items: center; gap: 6px; }
+  .wc-page-hero__meta span::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+
+  /* Tabs */
+  .tabs { margin: 0 16px 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: oklch(14% 0.006 70); border: 1px solid var(--border-soft); border-radius: 14px; }
+  .tab { font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--muted); padding: 9px 0; border-radius: 10px; text-align: center; letter-spacing: -0.005em; }
+  .tab.is-active { background: linear-gradient(180deg, var(--surface-3), var(--surface-2)); color: var(--gold); box-shadow: 0 0 0 1px var(--gold-hairline) inset; }
+
+  /* Opening match feature */
+  .opening { margin: 0 16px 24px; padding: 20px; border-radius: var(--r-5); position: relative; overflow: hidden;
+    background:
+      radial-gradient(80% 60% at 50% 0%, oklch(35% 0.12 145 / 0.4), transparent 70%),
+      linear-gradient(180deg, oklch(14% 0.012 75), oklch(9% 0.008 70));
+    border: 1px solid var(--border);
+  }
+  .opening__crest { font-family: var(--font-mono); font-size: 10px; color: var(--pitch); letter-spacing: 0.16em; text-transform: uppercase; text-align: center; }
+  .opening__when { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-align: center; text-transform: uppercase; margin-top: 4px; }
+  .opening__match { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 22px 0 18px; }
+  .opening__team { text-align: center; }
+  .opening__flag { width: 56px; height: 40px; border-radius: 6px; margin: 0 auto 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px var(--border-soft) inset; }
+  .opening__team-name { font-family: var(--font-display); font-weight: 800; font-size: 16px; letter-spacing: -0.015em; }
+  .opening__team-rank { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.14em; margin-top: 4px; }
+  .opening__vs { font-family: var(--font-serif); font-style: italic; font-size: 18px; color: var(--gold); }
+  .opening__venue { padding-top: 14px; border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+
+  /* Section */
+  .sect-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 20px; margin: 24px 0 14px; }
+  .sect-head__title { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.015em; }
+  .sect-head__action { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* Groups */
+  .groups { display: flex; gap: 12px; padding: 0 16px 4px; overflow-x: auto; scrollbar-width: none; }
+  .groups::-webkit-scrollbar { display: none; }
+  .group { min-width: 280px; padding: 16px; border-radius: var(--r-4); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); scroll-snap-align: start; }
+  .group__hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .group__name { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; }
+  .group__name em { color: var(--gold); font-family: var(--font-serif); font-style: italic; font-weight: 500; }
+  .group__sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .group__row { display: grid; grid-template-columns: 16px 22px 1fr auto auto auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 12px; }
+  .group__row:last-child { border-bottom: 0; }
+  .group__pos { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  .group__team { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+  .group__stat { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-align: right; min-width: 16px; }
+  .group__pts { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--gold); text-align: right; min-width: 18px; }
+  .group__row.is-pos-1, .group__row.is-pos-2 { position: relative; }
+  .group__row.is-pos-1::before, .group__row.is-pos-2::before { content: ''; position: absolute; left: -4px; top: 50%; width: 2px; height: 14px; background: var(--gold); transform: translateY(-50%); }
+  .group__head { font-family: var(--font-mono); font-size: 9px; color: var(--muted-2); letter-spacing: 0.16em; text-transform: uppercase; }
+
+  /* Knockout bracket preview */
+  .bracket { padding: 16px; margin: 0 16px; border-radius: var(--r-4); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); position: relative; overflow: hidden; }
+  .bracket__title { font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 14px; }
+  .bracket__svg { width: 100%; height: 280px; }
+
+  /* Stadium grid */
+  .stadiums { padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stadium { padding: 14px; border-radius: var(--r-3); background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-soft); position: relative; overflow: hidden; }
+  .stadium::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 4px;
+    background: linear-gradient(180deg, var(--gold), oklch(45% 0.1 75)); opacity: .6; }
+  .stadium__city { font-family: var(--font-mono); font-size: 9px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; }
+  .stadium__name { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: -0.01em; margin-top: 4px; }
+  .stadium__cap { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em; }
+  .stadium__matches { margin-top: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-soft); }
+
+  /* Top scorers prediction */
+  .scorer-list { padding: 0 16px; }
+  .scorer { display: grid; grid-template-columns: 28px 50px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-soft); }
+  .scorer:last-child { border-bottom: 0; }
+  .scorer__rank { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .scorer__pcard { width: 50px; aspect-ratio: 0.66; border-radius: 6px; overflow: hidden; position: relative; }
+  .scorer__name { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: -0.015em; }
+  .scorer__sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; margin-top: 2px; }
+  .scorer__odds { text-align: right; }
+  .scorer__odds-v { font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .scorer__odds-l { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen"><div class="punch"></div>
+
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="sig">
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M2 4a7 7 0 0 1 14 0v1H2V4zm0 3h14v1H2V7zm2 3h10v1H4v-1z"/></svg>
+        <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"><rect x="1" y="2" width="20" height="8" rx="2"/><rect x="3" y="4" width="16" height="4" rx="0.5" fill="currentColor"/><rect x="22" y="4.5" width="1.5" height="3" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="scroll">
+
+      <div class="topbar">
+        <button class="backbtn" onclick="history.back()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="topbar__title">FIFA World Cup 2026</div>
+        <button class="backbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 17v.01M12 7a3 3 0 0 1 3 3c0 2-3 2-3 4"/></svg></button>
+      </div>
+
+      <section class="wc-page-hero">
+        <div class="wc-page-hero__crest">FIFA World Cup 2026</div>
+        <h1 class="wc-page-hero__title">North America<br>opens its <em>gates.</em></h1>
+        <div class="wc-page-hero__meta">
+          <span>48 nations</span>
+          <span>16 cities</span>
+          <span>104 matches</span>
+          <span>11 Jun – 19 Jul</span>
+        </div>
+      </section>
+
+      <nav class="tabs">
+        <button class="tab is-active">Overview</button>
+        <button class="tab">Groups</button>
+        <button class="tab">Bracket</button>
+        <button class="tab">Fixtures</button>
+      </nav>
+
+      <!-- Opening match -->
+      <article class="opening">
+        <div class="opening__crest">Opening match · Group A</div>
+        <div class="opening__when">Thu 11 Jun · 20:00 ET</div>
+        <div class="opening__match">
+          <div class="opening__team">
+            <div class="opening__flag flag flag--mx" style="height:40px;width:56px"></div>
+            <div class="opening__team-name">Mexico</div>
+            <div class="opening__team-rank">FIFA #14</div>
+          </div>
+          <div class="opening__vs">vs</div>
+          <div class="opening__team">
+            <div class="opening__flag flag flag--ma" style="height:40px;width:56px"></div>
+            <div class="opening__team-name">Morocco</div>
+            <div class="opening__team-rank">FIFA #11</div>
+          </div>
+        </div>
+        <div class="opening__venue">
+          <span>Estadio Azteca</span>
+          <span>87,000 cap</span>
+        </div>
+      </article>
+
+      <!-- Groups -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Groups</h3>
+        <span class="sect-head__action">All 12 →</span>
+      </div>
+
+      <div class="groups">
+        <div class="group">
+          <div class="group__hd">
+            <div class="group__name">Group <em>A</em></div>
+            <div class="group__sub">Mexico City · Guadalajara</div>
+          </div>
+          <div class="group__row group__head"><span>#</span><span></span><span>Team</span><span>P</span><span>GD</span><span></span><span>Pts</span></div>
+          <div class="group__row is-pos-1"><span class="group__pos">1</span><span class="flag flag--mx"></span><span class="group__team">Mexico</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row is-pos-2"><span class="group__pos">2</span><span class="flag flag--ma"></span><span class="group__team">Morocco</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">3</span><span class="flag flag--ur"></span><span class="group__team">Uruguay</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">4</span><span class="flag flag--sn"></span><span class="group__team">Senegal</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group__hd">
+            <div class="group__name">Group <em>B</em></div>
+            <div class="group__sub">Toronto · Vancouver</div>
+          </div>
+          <div class="group__row group__head"><span>#</span><span></span><span>Team</span><span>P</span><span>GD</span><span></span><span>Pts</span></div>
+          <div class="group__row is-pos-1"><span class="group__pos">1</span><span class="flag flag--ca"></span><span class="group__team">Canada</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row is-pos-2"><span class="group__pos">2</span><span class="flag flag--be"></span><span class="group__team">Belgium</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">3</span><span class="flag flag--hr"></span><span class="group__team">Croatia</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">4</span><span class="flag flag--jp"></span><span class="group__team">Japan</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group__hd">
+            <div class="group__name">Group <em>C</em></div>
+            <div class="group__sub">Los Angeles · Seattle</div>
+          </div>
+          <div class="group__row group__head"><span>#</span><span></span><span>Team</span><span>P</span><span>GD</span><span></span><span>Pts</span></div>
+          <div class="group__row is-pos-1"><span class="group__pos">1</span><span class="flag flag--us"></span><span class="group__team">USA</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row is-pos-2"><span class="group__pos">2</span><span class="flag flag--nl"></span><span class="group__team">Netherlands</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">3</span><span class="flag flag--pt"></span><span class="group__team">Portugal</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+          <div class="group__row"><span class="group__pos">4</span><span class="flag flag--jp"></span><span class="group__team">South Korea</span><span class="group__stat">0</span><span class="group__stat">—</span><span></span><span class="group__pts">—</span></div>
+        </div>
+      </div>
+
+      <!-- Bracket preview -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Path to MetLife</h3>
+        <span class="sect-head__action">Full bracket →</span>
+      </div>
+
+      <div class="bracket">
+        <div class="bracket__title">Predicted route · Final 19 Jul</div>
+        <svg class="bracket__svg" viewBox="0 0 360 280" fill="none">
+          <!-- Round of 32 -->
+          <g font-family="var(--font-mono)" font-size="8" fill="oklch(62% 0.01 70)" letter-spacing="0.1em">
+            <text x="0" y="14">R32</text>
+            <text x="80" y="14">R16</text>
+            <text x="160" y="14">QF</text>
+            <text x="240" y="14">SF</text>
+            <text x="320" y="14">FINAL</text>
+          </g>
+          <!-- Bracket lines -->
+          <g stroke="oklch(28% 0.01 65)" stroke-width="1" fill="none">
+            <line x1="0" y1="40" x2="60" y2="40"/>
+            <line x1="0" y1="70" x2="60" y2="70"/>
+            <line x1="0" y1="100" x2="60" y2="100"/>
+            <line x1="0" y1="130" x2="60" y2="130"/>
+            <line x1="0" y1="160" x2="60" y2="160"/>
+            <line x1="0" y1="190" x2="60" y2="190"/>
+            <line x1="0" y1="220" x2="60" y2="220"/>
+            <line x1="0" y1="250" x2="60" y2="250"/>
+            <line x1="60" y1="40" x2="60" y2="70"/>
+            <line x1="60" y1="100" x2="60" y2="130"/>
+            <line x1="60" y1="160" x2="60" y2="190"/>
+            <line x1="60" y1="220" x2="60" y2="250"/>
+            <line x1="60" y1="55" x2="140" y2="55"/>
+            <line x1="60" y1="115" x2="140" y2="115"/>
+            <line x1="60" y1="175" x2="140" y2="175"/>
+            <line x1="60" y1="235" x2="140" y2="235"/>
+            <line x1="140" y1="55" x2="140" y2="115"/>
+            <line x1="140" y1="175" x2="140" y2="235"/>
+            <line x1="140" y1="85" x2="220" y2="85"/>
+            <line x1="140" y1="205" x2="220" y2="205"/>
+            <line x1="220" y1="85" x2="220" y2="205"/>
+            <line x1="220" y1="145" x2="300" y2="145"/>
+          </g>
+          <!-- Gold path - England's predicted route -->
+          <g stroke="oklch(82% 0.135 88)" stroke-width="2" fill="none">
+            <line x1="0" y1="100" x2="60" y2="100"/>
+            <line x1="60" y1="100" x2="60" y2="115"/>
+            <line x1="60" y1="115" x2="140" y2="115"/>
+            <line x1="140" y1="115" x2="140" y2="85"/>
+            <line x1="140" y1="85" x2="220" y2="85"/>
+            <line x1="220" y1="85" x2="220" y2="145"/>
+            <line x1="220" y1="145" x2="300" y2="145"/>
+          </g>
+          <!-- Team chips -->
+          <g font-family="var(--font-display)" font-size="9" font-weight="700" fill="oklch(82% 0.008 75)">
+            <text x="3" y="38">ENG</text>
+            <text x="3" y="68">DEN</text>
+            <text x="3" y="98">BRA</text>
+            <text x="3" y="128">URU</text>
+            <text x="3" y="158">FRA</text>
+            <text x="3" y="188">CRO</text>
+            <text x="3" y="218">ARG</text>
+            <text x="3" y="248">NED</text>
+            <text x="62" y="53">ENG</text>
+            <text x="62" y="113">BRA</text>
+            <text x="62" y="173">FRA</text>
+            <text x="62" y="233">ARG</text>
+            <text x="142" y="83">ENG</text>
+            <text x="142" y="203">ARG</text>
+          </g>
+          <g font-family="var(--font-display)" font-size="11" font-weight="800" fill="oklch(82% 0.135 88)">
+            <text x="240" y="143">ENG vs ARG</text>
+            <text x="240" y="158" font-size="8" font-weight="500" fill="oklch(62% 0.01 70)">MetLife · 19 Jul</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Top scorer prediction -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">Golden Boot odds</h3>
+        <span class="sect-head__action">All odds →</span>
+      </div>
+
+      <div class="scorer-list">
+        <div class="scorer">
+          <div class="scorer__rank">1</div>
+          <div class="scorer__pcard pcard--legendary">
+            <div class="pcard__bg"></div>
+            <div class="pcard__glow" style="z-index:1"></div>
+          </div>
+          <div>
+            <div class="scorer__name">Kylian Mbappé</div>
+            <div class="scorer__sub">France · Real Madrid · ST</div>
+          </div>
+          <div class="scorer__odds">
+            <div class="scorer__odds-v">+450</div>
+            <div class="scorer__odds-l">Open</div>
+          </div>
+        </div>
+        <div class="scorer">
+          <div class="scorer__rank">2</div>
+          <div class="scorer__pcard pcard--iconic"><div class="pcard__bg"></div><div class="pcard__glow" style="z-index:1"></div></div>
+          <div>
+            <div class="scorer__name">Erling Haaland</div>
+            <div class="scorer__sub">Norway · DNQ — Watchlist</div>
+          </div>
+          <div class="scorer__odds">
+            <div class="scorer__odds-v">—</div>
+            <div class="scorer__odds-l">DNQ</div>
+          </div>
+        </div>
+        <div class="scorer">
+          <div class="scorer__rank">3</div>
+          <div class="scorer__pcard pcard--legendary"><div class="pcard__bg"></div><div class="pcard__glow" style="z-index:1"></div></div>
+          <div>
+            <div class="scorer__name">Vinicius Júnior</div>
+            <div class="scorer__sub">Brazil · Real Madrid · LW</div>
+          </div>
+          <div class="scorer__odds">
+            <div class="scorer__odds-v">+650</div>
+            <div class="scorer__odds-l">Open</div>
+          </div>
+        </div>
+        <div class="scorer">
+          <div class="scorer__rank">4</div>
+          <div class="scorer__pcard pcard--epic"><div class="pcard__bg"></div><div class="pcard__glow" style="z-index:1"></div></div>
+          <div>
+            <div class="scorer__name">Jude Bellingham</div>
+            <div class="scorer__sub">England · Real Madrid · AM</div>
+          </div>
+          <div class="scorer__odds">
+            <div class="scorer__odds-v">+800</div>
+            <div class="scorer__odds-l">Open</div>
+          </div>
+        </div>
+        <div class="scorer">
+          <div class="scorer__rank">5</div>
+          <div class="scorer__pcard pcard--epic"><div class="pcard__bg"></div><div class="pcard__glow" style="z-index:1"></div></div>
+          <div>
+            <div class="scorer__name">Julián Álvarez</div>
+            <div class="scorer__sub">Argentina · Atlético · ST</div>
+          </div>
+          <div class="scorer__odds">
+            <div class="scorer__odds-v">+1100</div>
+            <div class="scorer__odds-l">Open</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stadiums -->
+      <div class="sect-head">
+        <h3 class="sect-head__title">16 venues</h3>
+        <span class="sect-head__action">Map →</span>
+      </div>
+
+      <div class="stadiums">
+        <div class="stadium">
+          <div class="stadium__city">New York / NJ</div>
+          <div class="stadium__name">MetLife Stadium</div>
+          <div class="stadium__cap">82,500 capacity</div>
+          <div class="stadium__matches">Hosts Final · 19 Jul</div>
+        </div>
+        <div class="stadium">
+          <div class="stadium__city">Dallas, TX</div>
+          <div class="stadium__name">AT&T Stadium</div>
+          <div class="stadium__cap">80,000 capacity</div>
+          <div class="stadium__matches">9 matches · SF</div>
+        </div>
+        <div class="stadium">
+          <div class="stadium__city">Mexico City</div>
+          <div class="stadium__name">Estadio Azteca</div>
+          <div class="stadium__cap">87,000 capacity</div>
+          <div class="stadium__matches">Opener · 11 Jun</div>
+        </div>
+        <div class="stadium">
+          <div class="stadium__city">Toronto</div>
+          <div class="stadium__name">BMO Field</div>
+          <div class="stadium__cap">45,500 capacity</div>
+          <div class="stadium__matches">6 matches · R16</div>
+        </div>
+      </div>
+
+      <div style="height: 24px"></div>
+    </div>
+
+    <nav class="tabbar">
+      <a class="tabbar__item" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>Home</a>
+      <a class="tabbar__item is-active" href="world-cup.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.5 5.5l13 13M5.5 18.5l13-13"/></svg>World Cup</a>
+      <a class="tabbar__item" href="fantasy.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V8l6-5 6 5v13M9 21v-6h6v6"/></svg>Fantasy</a>
+      <a class="tabbar__item" href="collection.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Cards</a>
+      <a class="tabbar__item" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M3 21c0-4 4-7 9-7s9 3 9 7"/></svg>You</a>
+    </nav>
+
+    <div class="navbar"></div>
+  </div></div>
+</div>
+</body>
+</html>

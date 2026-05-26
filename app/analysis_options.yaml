@@ -1,0 +1,12 @@
+analyzer:
+  errors:
+    invalid_annotation_target: ignore
+  exclude:
+    - "**/*.freezed.dart"
+    - "**/*.g.dart"
+
+linter:
+  rules:
+    - prefer_const_constructors
+    - avoid_print
+    - require_trailing_commas

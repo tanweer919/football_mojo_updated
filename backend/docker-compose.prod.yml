@@ -1,0 +1,111 @@
+# Production Compose for Dokploy — APP TIER ONLY.
+#
+# This compose assumes Postgres and Redis are provisioned separately as
+# Dokploy "Databases" (Settings → Databases → New). Their connection URLs
+# get injected via env vars from Dokploy → Application → Environment.
+#
+# Prefer `docker-compose.prod.full.yml` when you want Postgres + Redis to
+# live in the same compose stack (cheaper, smaller blast radius).
+#
+# Full step-by-step in DOKPLOY.md.
+#
+# Notes:
+#   - `migrate` runs once per deploy and gates api/worker. A failed
+#     migration fails the deploy loudly. Prisma takes an advisory lock so
+#     concurrent boots don't fight.
+#   - Worker is replicas: 1. @nestjs/schedule cron jobs fire from every
+#     replica; multiple workers would multiply WC-digest pushes and
+#     bracket re-scores.
+#   - Resource limits sized for a 2-vCPU / 4 GB VM running other services
+#     alongside. Tighten/loosen per host in Dokploy → Advanced → Resources.
+
+services:
+  # ── One-shot migration step ───────────────────────────────────────────────
+  # Runs before api/worker, exits 0 on success. Dokploy will not promote the
+  # deploy if this exits non-zero.
+  migrate:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: "no"
+    env_file: .env
+    # `migrate deploy` only applies committed migrations; never generates.
+    # Safe under concurrent calls — Prisma takes an advisory lock.
+    command: ["npx", "prisma", "migrate", "deploy"]
+    logging: &json-rolling
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── HTTP + WebSocket API ──────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    env_file: .env
+    # `expose` (not `ports`) — Dokploy's Traefik handles the public
+    # 80/443 binding + SSL via the Domain you configure in the UI.
+    expose:
+      - "3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # /health returns 503 (via HttpException) when DB or Redis is down so
+    # Traefik can route around an unhealthy replica.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging: *json-rolling
+
+  # ── BullMQ worker: scoring, FCM dispatcher, cron jobs ────────────────────
+  # Single replica only — multiple workers would multiply cron pushes.
+  worker:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      WORKER_MODE: "true"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Worker has no HTTP — check the Node process is alive instead.
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "node dist/main.js"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+        reservations:
+          cpus: '0.5'
+          memory: 768M
+    logging: *json-rolling

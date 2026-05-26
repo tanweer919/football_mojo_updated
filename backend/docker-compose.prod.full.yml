@@ -1,0 +1,139 @@
+# All-in-one production compose — Postgres + Redis + app in one stack.
+#
+# Use this when you want a single Dokploy Application that owns its data
+# stores (cheapest setup, smallest blast radius). For separate managed
+# stores via Dokploy → Databases, use `docker-compose.prod.yml` instead.
+#
+# Volumes are NAMED so Dokploy persists them across deploys. Back them up
+# from Dokploy → Volumes or via `docker compose exec postgres pg_dump`.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-footballmojo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?password required}
+      POSTGRES_DB:       ${POSTGRES_DB:-footballmojo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Idempotent grants — runs ONCE per fresh volume. Avoids the P1010
+      # "denied access on public" problem we hit on Postgres 15+.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-footballmojo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: &json-rolling
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      # Optional password — set REDIS_PASSWORD in env to enable.
+      - --requirepass
+      - ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *json-rolling
+
+  migrate:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: "no"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npx", "prisma", "migrate", "deploy"]
+    logging: *json-rolling
+
+  api:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging: *json-rolling
+
+  worker:
+    build:
+      context: .
+      target: runtime
+      args:
+        BUILD_REF: ${BUILD_REF:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      WORKER_MODE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "node dist/main.js"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+        reservations:
+          cpus: '0.5'
+          memory: 768M
+    logging: *json-rolling
+
+volumes:
+  postgres_data:
+  redis_data:

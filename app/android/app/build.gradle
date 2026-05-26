@@ -1,0 +1,93 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must come AFTER android + kotlin (declarative DSL).
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
+    id "com.google.firebase.crashlytics"
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "com.footballmojo"
+    // compileSdk = 36 (Android 16) — required by many current plugins.
+    // targetSdk stays at 35 (Play Store mandate as of Aug 2025).
+    compileSdk = 36
+    // Pin the NDK so plugin compiles are reproducible. firebase_messaging,
+    // in_app_update and a few others bring their own native code.
+    ndkVersion = "27.0.12077973"
+
+    compileOptions {
+        // AGP 8 + Flutter 3.41 require Java 17.
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications and any other plugin that
+        // uses java.time / java.util.stream APIs — they get back-ported to
+        // older Android versions at build time.
+        coreLibraryDesugaringEnabled = true
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+    }
+
+    lintOptions {
+        disable "InvalidPackage"
+    }
+
+    defaultConfig {
+        applicationId = "com.footballmojo"
+        // 23 is the floor required by firebase_remote_config, in_app_purchase
+        // and clarity_flutter without minSdk warnings.
+        minSdkVersion = flutter.minSdkVersion
+        targetSdk = 35
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        multiDexEnabled = true
+        // Default = AdMob's official sample App ID. Safe to use in dev/CI —
+        // serves test ads. Release builds override this below with our real ID.
+        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+    }
+
+    // signingConfigs MUST be declared before buildTypes references it.
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties["keyAlias"]
+            keyPassword keystoreProperties["keyPassword"]
+            storeFile keystoreProperties["storeFile"]
+                ? file(keystoreProperties["storeFile"])
+                : null
+            storePassword keystoreProperties["storePassword"]
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            // Real production AdMob App ID — swapped in only for release builds.
+            // Debug uses the test ID from defaultConfig above.
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3528263454526689~2685435320"
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    // The new Flutter Gradle Plugin handles the Kotlin stdlib for us.
+    // AndroidX multidex — the old com.android.support version is dead.
+    implementation "androidx.multidex:multidex:2.0.1"
+    // Required by `compileOptions.coreLibraryDesugaringEnabled` above.
+    // Pulled in by flutter_local_notifications.
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
+}

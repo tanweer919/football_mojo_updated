@@ -1,5 +1,0 @@
-flutter_native_splash:
-  image: assets/images/splash_screen.png
-  color: "50C878"
-  android: true
-  fill: true

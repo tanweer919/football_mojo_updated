@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PITCH — Welcome</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+<style>
+  .ob {
+    width: 100%; height: 100%; position: relative; overflow: hidden;
+    background:
+      radial-gradient(80% 60% at 50% 0%, oklch(20% 0.04 80 / 0.5), transparent 60%),
+      radial-gradient(60% 60% at 100% 100%, oklch(20% 0.16 290 / 0.4), transparent 60%),
+      radial-gradient(60% 60% at 0% 100%, oklch(20% 0.16 200 / 0.3), transparent 60%),
+      linear-gradient(180deg, oklch(8% 0.005 70), oklch(5% 0.003 70));
+  }
+  .ob::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg, transparent 0 24px, oklch(82% 0.135 88 / 0.025) 24px 25px),
+                repeating-linear-gradient(0deg, transparent 0 24px, oklch(82% 0.135 88 / 0.02) 24px 25px);
+  }
+
+  /* Top brand */
+  .ob__brand { position: absolute; top: 50px; left: 0; right: 0; text-align: center; z-index: 10; }
+  .ob__brand .logo { font-size: 14px; }
+
+  /* Card stage */
+  .stage-3d {
+    position: absolute; top: 90px; left: 0; right: 0; height: 380px;
+    perspective: 1200px;
+    display: grid; place-items: center;
+    z-index: 5;
+  }
+  .stage-3d__wrap { position: relative; width: 200px; height: 300px; transform-style: preserve-3d; transform: rotateX(-8deg); }
+  .stage-3d__card { position: absolute; width: 200px; aspect-ratio: 0.66; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 30px 60px -15px rgba(0,0,0,.7), 0 0 0 1px oklch(100% 0 0 / 0.06);
+  }
+  .stage-3d__card--bg1 { transform: translateX(-72px) rotate(-12deg) translateZ(-100px); opacity: 0.85; }
+  .stage-3d__card--bg2 { transform: translateX(72px) rotate(12deg) translateZ(-100px); opacity: 0.85; }
+  .stage-3d__card--front { transform: translateZ(0); animation: floatY 6s ease-in-out infinite; }
+  @keyframes floatY {
+    0%, 100% { transform: translateY(0) rotateY(-6deg); }
+    50% { transform: translateY(-12px) rotateY(6deg); }
+  }
+
+  /* Floor glow */
+  .stage-3d__floor {
+    position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 80px; border-radius: 50%;
+    background: radial-gradient(50% 50% at 50% 50%, oklch(60% 0.16 80 / 0.45), transparent 70%);
+    filter: blur(8px);
+  }
+
+  /* Copy */
+  .ob__copy { position: absolute; bottom: 240px; left: 0; right: 0; padding: 0 28px; z-index: 10; text-align: center; }
+  .ob__eyebrow {
+    font-family: var(--font-mono); font-size: 10px; color: var(--gold); letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  .ob__h1 {
+    margin-top: 14px; font-family: var(--font-display);
+    font-size: 38px; line-height: 0.95; font-weight: 800; letter-spacing: -0.045em;
+  }
+  .ob__h1 em { font-family: var(--font-serif); font-style: italic; font-weight: 500; color: var(--gold); }
+  .ob__sub { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--muted); padding: 0 18px; }
+
+  /* Feature bullets */
+  .ob__bullets { position: absolute; bottom: 180px; left: 0; right: 0; padding: 0 28px; z-index: 10; }
+  .bullet { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 12px; color: var(--fg-soft); }
+  .bullet::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+
+  /* Progress dots */
+  .dots {
+    position: absolute; bottom: 156px; left: 0; right: 0; z-index: 10;
+    display: flex; gap: 6px; justify-content: center;
+  }
+  .dot { width: 22px; height: 4px; border-radius: 2px; background: oklch(25% 0.005 70); }
+  .dot.is-active { background: var(--gold); width: 32px; }
+
+  /* CTA stack */
+  .ob__cta {
+    position: absolute; bottom: 36px; left: 16px; right: 16px; z-index: 10;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .ob__cta .btn { width: 100%; height: 52px; font-size: 14px; }
+  .ob__btn-google, .ob__btn-apple {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 52px; border-radius: var(--r-3);
+    font-family: var(--font-display); font-size: 14px; font-weight: 600;
+    background: oklch(20% 0.005 70 / 0.7); border: 1px solid var(--border);
+    color: var(--fg); backdrop-filter: blur(20px);
+  }
+  .ob__divider { display: flex; align-items: center; gap: 12px; padding: 4px 4px; }
+  .ob__divider::before, .ob__divider::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+  .ob__divider span { font-family: var(--font-mono); font-size: 10px; color: var(--muted-2); letter-spacing: 0.14em; text-transform: uppercase; }
+  .ob__legal { font-family: var(--font-mono); font-size: 9px; color: var(--muted-2); letter-spacing: 0.06em; text-align: center; line-height: 1.5; margin-top: 6px; }
+  .ob__legal a { color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone"><div class="screen"><div class="punch"></div>
+
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="sig">
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+        <svg viewBox="0 0 18 12" fill="currentColor"><path d="M2 4a7 7 0 0 1 14 0v1H2V4zm0 3h14v1H2V7zm2 3h10v1H4v-1z"/></svg>
+        <svg viewBox="0 0 26 12" fill="none" stroke="currentColor"><rect x="1" y="2" width="20" height="8" rx="2"/><rect x="3" y="4" width="16" height="4" rx="0.5" fill="currentColor"/><rect x="22" y="4.5" width="1.5" height="3" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="ob">
+
+      <!-- Brand -->
+      <div class="ob__brand">
+        <div class="logo logo-mark"><span>PITCH</span></div>
+      </div>
+
+      <!-- 3D Card stage -->
+      <div class="stage-3d">
+        <div class="stage-3d__wrap">
+          <!-- Back left -->
+          <div class="stage-3d__card stage-3d__card--bg1">
+            <article class="pcard pcard--legendary" style="aspect-ratio: 0.66; height: 100%;">
+              <div class="pcard__bg"></div>
+              <div class="pcard__glow"></div>
+              <div class="pcard__chrome">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                  <div class="pcard__rating">93</div>
+                  <span class="rarity rarity--legendary">L</span>
+                </div>
+                <div style="margin-top:auto">
+                  <div class="pcard__name">Mbappé</div>
+                  <div class="pcard__meta"><span>ST</span><span>FRA</span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+          <!-- Back right -->
+          <div class="stage-3d__card stage-3d__card--bg2">
+            <article class="pcard pcard--epic" style="aspect-ratio: 0.66; height: 100%;">
+              <div class="pcard__bg"></div>
+              <div class="pcard__glow"></div>
+              <div class="pcard__chrome">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                  <div class="pcard__rating">89</div>
+                  <span class="rarity rarity--epic">E</span>
+                </div>
+                <div style="margin-top:auto">
+                  <div class="pcard__name">Bellingham</div>
+                  <div class="pcard__meta"><span>AM</span><span>ENG</span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+          <!-- Front (Iconic) -->
+          <div class="stage-3d__card stage-3d__card--front">
+            <article class="pcard pcard--iconic" style="aspect-ratio: 0.66; height: 100%;">
+              <div class="pcard__bg"></div>
+              <div class="pcard__glow"></div>
+              <div class="pcard__shine"></div>
+              <div class="pcard__chrome">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                  <div class="pcard__rating" style="font-size: 38px">95</div>
+                  <span class="rarity rarity--iconic">1/1</span>
+                </div>
+                <div style="margin-top:auto">
+                  <div class="pcard__name" style="font-size: 16px">Yamal</div>
+                  <div class="pcard__meta"><span>RW</span><span>ESP</span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div class="stage-3d__floor"></div>
+      </div>
+
+      <!-- Headline -->
+      <div class="ob__copy">
+        <div class="ob__eyebrow">Welcome to PITCH</div>
+        <h1 class="ob__h1">Where football<br>is <em>played,</em> not<br>just watched.</h1>
+      </div>
+
+      <!-- Bullets -->
+      <div class="ob__bullets">
+        <div class="bullet">Live scores, news & World Cup 2026 in one home</div>
+        <div class="bullet">Global Cup, 1v1 ladders, friend leagues</div>
+        <div class="bullet">Earn iconic player cards — yours forever</div>
+      </div>
+
+      <!-- Progress dots -->
+      <div class="dots">
+        <div class="dot is-active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+
+      <!-- CTA -->
+      <div class="ob__cta">
+        <button class="btn btn--gold">Continue with email</button>
+        <div class="ob__divider"><span>or</span></div>
+        <button class="ob__btn-apple">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.04c-.02-2.28 1.86-3.39 1.95-3.44-1.06-1.55-2.71-1.77-3.3-1.79-1.41-.14-2.74.83-3.45.83-.72 0-1.81-.81-2.97-.79-1.53.02-2.94.89-3.72 2.26-1.59 2.75-.4 6.83 1.13 9.06.75 1.1 1.65 2.33 2.81 2.28 1.13-.05 1.55-.73 2.92-.73s1.75.73 2.95.71c1.22-.02 1.99-1.12 2.74-2.22.87-1.27 1.22-2.5 1.24-2.56-.03-.01-2.38-.91-2.4-3.61zM14.93 5.27c.62-.75 1.04-1.79.92-2.83-.89.04-1.97.59-2.61 1.34-.57.66-1.07 1.71-.94 2.73.99.08 2-.5 2.63-1.24z"/></svg>
+          Continue with Apple
+        </button>
+        <button class="ob__btn-google">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 11.1H12v3.2h5.35c-.24 1.5-1.7 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.9s2.63-5.9 5.85-5.9c1.83 0 3.05.78 3.75 1.45l2.55-2.45C16.5 4.5 14.45 3.5 12 3.5c-5.05 0-9.15 4.1-9.15 9.15S6.95 21.8 12 21.8c5.3 0 8.8-3.73 8.8-8.97 0-.6-.07-1.07-.15-1.73z"/></svg>
+          Continue with Google
+        </button>
+        <div class="ob__legal">
+          By continuing you agree to PITCH's <a href="#">Terms</a> and <a href="#">Privacy</a>.<br>
+          No gambling. Cards are collectibles only.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="navbar"></div>
+  </div></div>
+</div>
+</body>
+</html>
