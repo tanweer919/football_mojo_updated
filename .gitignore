@@ -20,32 +20,32 @@
 # is commented out by default.
 #.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter/Dart/Pub related — patterns are root-agnostic so they catch the
+# new app/ layout AND any future workspaces (e.g. admin/) without edits.
 **/doc/api/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
 
-# Web related
-lib/generated_plugin_registrant.dart
+# Generated plugin registrant
+**/lib/generated_plugin_registrant.dart
 
-# Symbolication related
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
-lib/secret.dart
-android/app/google-services.json
-android/local.properties
-android/key.properties
+# Secrets — present under app/ now that Flutter moved.
+**/lib/secret.dart
+**/android/app/google-services.json
+**/android/local.properties
+**/android/key.properties
 
-# FVM Version Cache
-.fvm/
+# FVM version cache (whether at root or under app/)
+**/.fvm/
