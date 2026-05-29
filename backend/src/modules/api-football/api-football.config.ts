@@ -23,13 +23,19 @@ export interface ApiFootballAxiosConfig {
 const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
 
 export function resolveApiFootballConfig(env: NodeJS.ProcessEnv = process.env): ApiFootballAxiosConfig {
-  const key = env.API_FOOTBALL_KEY;
+  const key = env.API_FOOTBALL_KEY?.trim();
   if (!key) throw new Error('API_FOOTBALL_KEY is required');
 
-  const provider = (env.API_FOOTBALL_PROVIDER ?? 'direct').toLowerCase();
+  const provider = (env.API_FOOTBALL_PROVIDER ?? 'direct').trim().toLowerCase();
+  // Treat empty strings as "not set" — Dokploy / docker-compose's `KEY=`
+  // syntax produces empty-string env vars which `??` (nullish coalescing)
+  // doesn't fall back on. We need explicit truthy check so the auto-derive
+  // defaults still kick in when the user leaves the var blank in their
+  // .env file.
+  const baseOverride = env.API_FOOTBALL_BASE?.trim() || undefined;
   if (provider === 'rapidapi') {
     return {
-      baseURL: env.API_FOOTBALL_BASE ?? `https://${RAPIDAPI_HOST}/v3`,
+      baseURL: baseOverride ?? `https://${RAPIDAPI_HOST}/v3`,
       headers: {
         'x-rapidapi-host': RAPIDAPI_HOST,
         'x-rapidapi-key':  key,
@@ -37,7 +43,7 @@ export function resolveApiFootballConfig(env: NodeJS.ProcessEnv = process.env): 
     };
   }
   return {
-    baseURL: env.API_FOOTBALL_BASE ?? 'https://v3.football.api-sports.io',
+    baseURL: baseOverride ?? 'https://v3.football.api-sports.io',
     headers: { 'x-apisports-key': key },
   };
 }
