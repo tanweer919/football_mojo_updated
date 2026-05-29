@@ -19,8 +19,52 @@ export class FirebaseAdminService implements OnModuleInit {
       // Production deploys MUST provide the env var.
       return;
     }
-    const json = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-    this.app = admin.initializeApp({ credential: admin.credential.cert(json) });
+
+    // Decode + validate explicitly so a bad env var produces an actionable
+    // error instead of a cryptic `SyntaxError: Unexpected token`. Two common
+    // foot-guns we explicitly catch:
+    //   1. Raw JSON pasted instead of base64-encoded text.
+    //   2. base64 with embedded whitespace / quotes from a paste mishap.
+    const cleaned = b64.trim().replace(/\s+/g, '');
+    if (cleaned.startsWith('{')) {
+      throw new Error(
+        'FIREBASE_SERVICE_ACCOUNT_B64 looks like raw JSON — base64-encode it first: ' +
+        '`base64 -i service-account.json | tr -d "\\n"`',
+      );
+    }
+
+    let decoded: string;
+    try {
+      decoded = Buffer.from(cleaned, 'base64').toString('utf8');
+    } catch (e) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_B64 is not valid base64: ${(e as Error).message}`,
+      );
+    }
+
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(decoded) as Record<string, unknown>;
+    } catch (e) {
+      throw new Error(
+        'FIREBASE_SERVICE_ACCOUNT_B64 decoded to non-JSON. The value is likely ' +
+        'corrupted (line breaks during paste, wrong file, or double-encoded). ' +
+        `First 60 decoded chars: ${decoded.slice(0, 60).replace(/[\x00-\x1f]/g, '?')}`,
+      );
+    }
+    if (!json.project_id || !json.client_email || !json.private_key) {
+      throw new Error(
+        'FIREBASE_SERVICE_ACCOUNT_B64 decoded JSON is missing project_id / client_email / private_key. ' +
+        'Verify it\'s a Firebase Admin SDK service account (Console → Project Settings → ' +
+        'Service accounts → Generate new private key), not an OAuth client secret.',
+      );
+    }
+
+    this.app = admin.initializeApp({
+      // `cert()` expects ServiceAccount shape; cast is safe after we've
+      // validated the three required fields above.
+      credential: admin.credential.cert(json as admin.ServiceAccount),
+    });
   }
 
   async verifyIdToken(token: string) {

@@ -7,7 +7,11 @@ WORKDIR /app
 # - libc6-compat: shims glibc-style binary deps (some Prisma engines need it on musl)
 # - tini: PID-1 init so the api/worker propagates signals cleanly under Docker/Dokploy
 # - wget: HEALTHCHECK probe (busybox wget is included; explicit for clarity)
-RUN apk add --no-cache openssl libc6-compat tini wget
+# - bash: Dokploy's terminal feature default-execs `bash`; without this the
+#   "OCI runtime exec failed: exec: bash" error blocks easy in-container debugging.
+# - postgresql-client: for one-off `psql` checks against managed Postgres
+#   (DB connectivity smoke-test, manual seed runs). ~6 MB, worth the size.
+RUN apk add --no-cache openssl libc6-compat tini wget bash postgresql-client
 
 # ─── Full dependencies for build ──────────────────────────────────────────────
 FROM base AS deps
