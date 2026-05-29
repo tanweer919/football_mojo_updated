@@ -23,18 +23,27 @@ import 'dotenv/config';
 const prisma = new PrismaClient();
 
 const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
+// NOTE: kept inline (not imported from src/) because the prod runtime
+// image only ships dist/ + prisma/. Keep this in sync with the canonical
+// version in src/modules/api-football/api-football.config.ts.
+//
+// `||` (not `??`) is deliberate — empty-string env vars from docker-
+// compose's `KEY=` syntax must fall through to the default. The earlier
+// `??`-based version produced baseURL: '' on prod and crashed every
+// request with "Invalid URL".
 function resolveApiFootballConfig() {
-  const key = process.env.API_FOOTBALL_KEY;
+  const key = process.env.API_FOOTBALL_KEY?.trim();
   if (!key) throw new Error('API_FOOTBALL_KEY is required');
-  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').toLowerCase();
+  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').trim().toLowerCase();
+  const baseOverride = process.env.API_FOOTBALL_BASE?.trim() || undefined;
   if (provider === 'rapidapi') {
     return {
-      baseURL: process.env.API_FOOTBALL_BASE ?? `https://${RAPIDAPI_HOST}/v3`,
+      baseURL: baseOverride ?? `https://${RAPIDAPI_HOST}/v3`,
       headers: { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': key },
     };
   }
   return {
-    baseURL: process.env.API_FOOTBALL_BASE ?? 'https://v3.football.api-sports.io',
+    baseURL: baseOverride ?? 'https://v3.football.api-sports.io',
     headers: { 'x-apisports-key': key },
   };
 }
