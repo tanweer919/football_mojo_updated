@@ -70,21 +70,25 @@ function defaultPriceFor(position: PlayerPosition): number {
   return position === 'GK' ? 10 : position === 'DEF' ? 11 : position === 'MID' ? 12 : 13;
 }
 
-// api-football accepts the same shape via direct + RapidAPI proxy. Pulled
-// from existing seed-wc-roster.ts so the env vars stay consistent.
+// NOTE: kept inline (not imported from src/) because the prod runtime
+// image only ships dist/ + prisma/. Keep this in sync with the canonical
+// version in src/modules/api-football/api-football.config.ts.
+//
+// `||` (not `??`) deliberate so empty-string env vars fall through.
 const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
 function resolveApiFootballConfig() {
-  const key = process.env.API_FOOTBALL_KEY;
+  const key = process.env.API_FOOTBALL_KEY?.trim();
   if (!key) throw new Error('API_FOOTBALL_KEY is required');
-  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').toLowerCase();
+  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').trim().toLowerCase();
+  const baseOverride = process.env.API_FOOTBALL_BASE?.trim() || undefined;
   if (provider === 'rapidapi') {
     return {
-      baseURL: process.env.API_FOOTBALL_BASE ?? `https://${RAPIDAPI_HOST}/v3`,
+      baseURL: baseOverride ?? `https://${RAPIDAPI_HOST}/v3`,
       headers: { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': key },
     };
   }
   return {
-    baseURL: process.env.API_FOOTBALL_BASE ?? 'https://v3.football.api-sports.io',
+    baseURL: baseOverride ?? 'https://v3.football.api-sports.io',
     headers: { 'x-apisports-key': key },
   };
 }

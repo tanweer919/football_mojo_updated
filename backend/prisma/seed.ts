@@ -23,19 +23,22 @@ const prisma = new PrismaClient();
 // ships dist/, not src/, so ts-node can't reach into the source tree at run
 // time. If you change the canonical version in src/, sync this too.
 // ─────────────────────────────────────────────────────────────────────────────
+// `||` (not `??`) deliberate so empty-string env vars from docker-compose's
+// `KEY=` syntax fall through to the defaults instead of producing baseURL: ''.
 const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
 function resolveApiFootballConfig() {
-  const key = process.env.API_FOOTBALL_KEY;
+  const key = process.env.API_FOOTBALL_KEY?.trim();
   if (!key) throw new Error('API_FOOTBALL_KEY is required');
-  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').toLowerCase();
+  const provider = (process.env.API_FOOTBALL_PROVIDER ?? 'direct').trim().toLowerCase();
+  const baseOverride = process.env.API_FOOTBALL_BASE?.trim() || undefined;
   if (provider === 'rapidapi') {
     return {
-      baseURL: process.env.API_FOOTBALL_BASE ?? `https://${RAPIDAPI_HOST}/v3`,
+      baseURL: baseOverride ?? `https://${RAPIDAPI_HOST}/v3`,
       headers: { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': key },
     };
   }
   return {
-    baseURL: process.env.API_FOOTBALL_BASE ?? 'https://v3.football.api-sports.io',
+    baseURL: baseOverride ?? 'https://v3.football.api-sports.io',
     headers: { 'x-apisports-key': key },
   };
 }
