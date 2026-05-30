@@ -1,9 +1,9 @@
-import { Controller, Get, HttpCode, HttpException, HttpStatus, Inject } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpException, HttpStatus, Inject, VERSION_NEUTRAL } from '@nestjs/common';
 import Redis from 'ioredis';
 import { PrismaService } from './prisma.service';
 import { REDIS_PUB } from './redis.module';
 
-@Controller({ path: 'health', version: undefined })
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
