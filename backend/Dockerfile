@@ -67,7 +67,7 @@ EXPOSE 3000
 # Healthcheck: api exposes /health (db + redis ping); worker has no HTTP — its
 # compose service overrides this with a process check.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:3000/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
 # tini gets a clean SIGTERM to Node so Nest's enableShutdownHooks() runs
 # (closes Redis, Prisma, Socket.IO before SIGKILL hits).
