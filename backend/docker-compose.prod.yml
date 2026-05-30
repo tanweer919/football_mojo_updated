@@ -101,7 +101,7 @@ services:
     # Traefik routes around unhealthy replicas. start_period at 45s gives
     # Prisma + Firebase Admin SDK time to warm up on cold boot.
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
