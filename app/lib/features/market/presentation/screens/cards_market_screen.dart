@@ -119,7 +119,6 @@ class _CardsMarketScreenState extends ConsumerState<CardsMarketScreen> {
         onPressed: () => context.go('/album'),
       ),
       scrollable: false,
-      withinTabShell: false,
       child: Column(
         children: [
           _SearchAndFilterBar(

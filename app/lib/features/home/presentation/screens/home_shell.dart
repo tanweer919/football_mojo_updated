@@ -6,6 +6,7 @@ import '../../../../core/bootstrap/deferred_bootstrap.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/router/route_paths.dart';
+import '../../../../core/widgets/pitch_scaffold.dart';
 import '../widgets/pitch_tabbar.dart';
 
 /// Shell that overlays the floating PITCH tabbar on top of the routed screen.
@@ -40,7 +41,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           Positioned.fill(
             child: CenteredContent(
               maxWidth: context.isMobile ? double.infinity : 540,
-              child: widget.child,
+              child: TabShellScope(child: widget.child),
             ),
           ),
           if (!hideTabbar)

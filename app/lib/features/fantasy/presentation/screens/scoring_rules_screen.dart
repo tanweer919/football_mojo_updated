@@ -29,7 +29,6 @@ class ScoringRulesScreen extends ConsumerWidget {
     return PitchScreen(
       title: 'How scoring works',
       scrollable: false,
-      withinTabShell: false,
       onBack: () => context.canPop() ? context.pop() : context.go('/fantasy'),
       child: async.when(
         loading: () => const Padding(
