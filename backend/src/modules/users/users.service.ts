@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { EXCLUDE_PLACEHOLDER_TEAMS, isPlaceholderTeamId } from '../../common/team-filters';
 import { mintWelcomeCard } from '../auth/welcome-card';
 
 /// Allowed shape for a user-facing handle.
@@ -200,6 +201,7 @@ export class UsersService {
   /// against rapid double-tap, so a read-modify-write is fine here.
   async followTeam(uid: string, teamId: string) {
     if (!teamId.trim()) throw new BadRequestException('team_id_required');
+    if (isPlaceholderTeamId(teamId)) throw new BadRequestException('cannot_follow_placeholder_team');
     const team = await this.prisma.team.findUnique({ where: { id: teamId }, select: { id: true } });
     if (!team) throw new NotFoundException('team_not_found');
     const u = await this.prisma.user.findUnique({
@@ -380,7 +382,7 @@ export class UsersService {
         AND: [
           // Exclude synthetic placeholder teams created by seed-wc-2026.ts
           // (knockout slot labels like "A2", "W74", "3rd A/B/C/D/F", etc.).
-          { NOT: { id: { startsWith: 'WC2026-PH-' } } },
+          EXCLUDE_PLACEHOLDER_TEAMS,
           opts.competitionId ? { competitionId: opts.competitionId } : {},
           q
             ? {
@@ -460,8 +462,12 @@ export class UsersService {
       select: { favouriteTeams: true },
     });
     if (!user || !user.favouriteTeams.length) return [];
+    // Filter out any placeholder teams the user might have followed before
+    // we added the guard — they shouldn't see ghost entries on their profile.
+    const realIds = user.favouriteTeams.filter((id) => !isPlaceholderTeamId(id));
+    if (!realIds.length) return [];
     return this.prisma.team.findMany({
-      where: { id: { in: user.favouriteTeams } },
+      where: { id: { in: realIds } },
       select: {
         id: true, name: true, shortName: true, countryCode: true, crestUrl: true,
         competition: { select: { id: true, name: true } },
