@@ -458,10 +458,29 @@ export class MarketService {
     if (i.positions?.length) playerWhere.position = { in: i.positions };
     if (i.countries?.length) playerWhere.nationality = { in: i.countries };
     if (i.teamIds?.length) playerWhere.teamId = { in: i.teamIds };
-    if (i.search?.trim()) playerWhere.name = { contains: i.search.trim(), mode: 'insensitive' };
+    if (i.search?.trim()) {
+      const raw = i.search.trim();
+      const norm = this._stripAccents(raw);
+      // Accent-insensitive: find player IDs whose normalized name contains the
+      // normalized search term. With ~1300 WC players the in-memory filter is
+      // trivial vs requiring a PostgreSQL `unaccent` extension or schema change.
+      const allPlayers = await this.prisma.player.findMany({
+        select: { id: true, name: true },
+      });
+      const matchIds = allPlayers
+        .filter((p) => this._stripAccents(p.name).includes(norm))
+        .map((p) => p.id);
+      if (matchIds.length === 0) matchIds.push('__no_match__');
+      playerWhere.id = { in: matchIds };
+    }
     if (Object.keys(playerWhere).length) AND.push({ player: playerWhere });
 
     return AND.length ? { AND } : {};
+  }
+
+  /** NFD-decompose + strip combining marks + lowercase. "Mbappé" → "mbappe". */
+  private _stripAccents(s: string): string {
+    return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
   }
 
   private _buildOrderBy(sort?: MarketListInput['sort']): Prisma.CardTemplateOrderByWithRelationInput[] {

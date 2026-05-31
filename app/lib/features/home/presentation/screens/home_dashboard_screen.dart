@@ -33,6 +33,7 @@ import '../../../iap/presentation/widgets/gem_chip.dart';
 import '../../../profile/presentation/widgets/notification_bell.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
+import '../../../../core/config/remote_app_config.dart';
 import '../providers/home_dashboard_providers.dart';
 
 /// PITCH home dashboard. Layout matches `design-specs/android/home.html`,
@@ -119,17 +120,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 10),
             const _LiveStrip(),
 
-            // European leagues — recent results + upcoming fixtures grouped
-            // by competition. Always rich pre-WC because PL/LaLiga/Serie A/
-            // Bundesliga/Ligue 1 + UCL/UEL run from August to late May.
-            const SizedBox(height: 16),
-            _SectionHead(
-              title: 'European leagues',
-              action: 'Full schedule →',
-              onAction: () => context.push(RoutePaths.matches),
-            ),
-            const SizedBox(height: 10),
-            const _LeagueDigest(),
+            // European leagues — hidden during WC mode since all domestic
+            // seasons are over and the section is empty.
+            _EuroLeaguesSection(wcMode: ref.watch(wcModeProvider)),
 
             // Group spotlight — surfaces the seeded WC2026 standings so
             // pre-tournament the home page already shows draw structure.
@@ -1479,6 +1472,31 @@ class _NoLiveNowTile extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EUROPEAN LEAGUES DIGEST — recent results + upcoming fixtures per league
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Wraps the European leagues section so it can be hidden during WC mode.
+class _EuroLeaguesSection extends StatelessWidget {
+  const _EuroLeaguesSection({required this.wcMode});
+  final bool wcMode;
+  @override
+  Widget build(BuildContext context) {
+    if (wcMode) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        _SectionHead(
+          title: 'European leagues',
+          action: 'Full schedule →',
+          onAction: () => context.push(RoutePaths.matches),
+        ),
+        const SizedBox(height: 10),
+        const _LeagueDigest(),
+      ],
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Groups the home fixtures window (yesterday → day-after) by `competitionId`

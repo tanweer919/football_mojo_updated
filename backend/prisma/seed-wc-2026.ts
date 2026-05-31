@@ -386,10 +386,74 @@ async function run() {
   await seedGroups();
   await seedGroupFixtures();
   await seedKnockoutFixtures();
+  await migrateFromPlaceholders();
 
   const matchCount = await prisma.match.count({ where: { competitionId: COMPETITION_ID } });
   const groupCount = await prisma.group.count({ where: { competitionId: COMPETITION_ID } });
   console.log(`\n✓ done — ${groupCount} groups · ${matchCount} matches in WC 2026`);
+}
+
+/**
+ * After all groups/fixtures are seeded, check if any placeholder team
+ * references can be replaced with real api-football team IDs.
+ *
+ * This handles the common case where `seed-wc-roster` ran after `seed-wc-2026`
+ * and created real Team rows. Running `seed-wc-2026` again now migrates all
+ * GroupStanding + Match rows from WC2026-PH-* to the real numeric IDs.
+ */
+async function migrateFromPlaceholders() {
+  console.log('\n▸ Migrating placeholder team references…');
+  // Find all placeholder teams
+  const placeholders = await prisma.team.findMany({
+    where: { id: { startsWith: SYNTHETIC_PREFIX } },
+    select: { id: true, name: true },
+  });
+  if (!placeholders.length) {
+    console.log('  No placeholders found — all teams are real.');
+    return;
+  }
+
+  let migrated = 0;
+  for (const ph of placeholders) {
+    // Try to find a real team matching the placeholder's name
+    const aliases = TEAM_ALIASES[ph.name] ?? [ph.name];
+    const real = await prisma.team.findFirst({
+      where: {
+        name: { in: aliases },
+        NOT: { id: { startsWith: SYNTHETIC_PREFIX } },
+      },
+      select: { id: true },
+    });
+    if (!real) continue;
+
+    // Migrate GroupStanding rows
+    const standingsUpdated = await prisma.groupStanding.updateMany({
+      where: { teamId: ph.id },
+      data: { teamId: real.id },
+    });
+    // Migrate Match rows (home + away)
+    const homeUpdated = await prisma.match.updateMany({
+      where: { homeTeamId: ph.id },
+      data: { homeTeamId: real.id },
+    });
+    const awayUpdated = await prisma.match.updateMany({
+      where: { awayTeamId: ph.id },
+      data: { awayTeamId: real.id },
+    });
+    const total = standingsUpdated.count + homeUpdated.count + awayUpdated.count;
+    if (total > 0) {
+      console.log(`  ${ph.name}: ${ph.id} → ${real.id} (${total} rows)`);
+      migrated += total;
+    }
+
+    // Delete the now-orphaned placeholder team
+    try {
+      await prisma.team.delete({ where: { id: ph.id } });
+    } catch {
+      // May still be referenced elsewhere — leave it
+    }
+  }
+  console.log(`  Migrated ${migrated} references from ${placeholders.length} placeholder(s).`);
 }
 
 run()
@@ -398,3 +462,4 @@ run()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+
