@@ -68,12 +68,14 @@ class _PitchHeroStackState extends State<PitchHeroStack>
               opacity: 0.85,
               child: SizedBox(
                 width: widget.cardWidth,
-                child: const PCard(
+                child: PCard(
                   rarity: CardRarity.LEGENDARY,
                   rating: 93,
                   name: 'MBAPPÉ',
                   position: 'ST',
                   country: 'FRA',
+                  photoUrl: 'https://media.api-sports.io/football/players/278.png',
+                  clubCrestUrl: 'https://media.api-sports.io/football/teams/541.png',
                 ),
               ),
             ),
@@ -90,12 +92,14 @@ class _PitchHeroStackState extends State<PitchHeroStack>
               opacity: 0.85,
               child: SizedBox(
                 width: widget.cardWidth,
-                child: const PCard(
+                child: PCard(
                   rarity: CardRarity.EPIC,
                   rating: 89,
                   name: 'BELLINGHAM',
                   position: 'AM',
                   country: 'ENG',
+                  photoUrl: 'https://media.api-sports.io/football/players/762.png',
+                  clubCrestUrl: 'https://media.api-sports.io/football/teams/541.png',
                 ),
               ),
             ),
@@ -116,12 +120,14 @@ class _PitchHeroStackState extends State<PitchHeroStack>
                   ..rotateY(ry),
                 child: SizedBox(
                   width: widget.cardWidth,
-                  child: const PCard(
+                  child: PCard(
                     rarity: CardRarity.ICONIC,
                     rating: 95,
                     name: 'YAMAL',
                     position: 'RW',
                     country: 'ESP',
+                    photoUrl: 'https://media.api-sports.io/football/players/401324.png',
+                    clubCrestUrl: 'https://media.api-sports.io/football/teams/529.png',
                   ),
                 ),
               );

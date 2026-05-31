@@ -43,13 +43,13 @@ if [[ "$LIGHT" == "1" ]]; then
   exit 0
 fi
 
-step "WC tournament shell (competition + teams + groups)"
-npm run seed:wc
-ok "WC2026 seeded"
-
-step "WC roster (player photos)"
+step "WC roster (teams + squads + player photos from api-football)"
 npm run seed:roster
-ok "Roster seeded — wait ~30s for api-football rate limits"
+ok "Roster seeded — real teams now in DB"
+
+step "WC tournament shell (competition + groups + fixtures)"
+npm run seed:wc
+ok "WC2026 seeded — groups + fixtures linked to real teams"
 
 step "Card templates per player"
 npm run seed:cards
