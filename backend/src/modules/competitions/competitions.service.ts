@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { isPlaceholderTeamId } from '../../common/team-filters';
 
 /**
  * Single source of truth for "what competitions does this app know about?"
@@ -146,18 +147,22 @@ export class CompetitionsService {
       name: g.name,
       // "Group A" → "A"
       letter: g.name.replace(/^Group\s+/i, '').trim() || g.name,
-      standings: g.standings.map((s) => ({
-        position: s.position,
-        team: s.team,
-        played: s.played,
-        won: s.won,
-        drawn: s.drawn,
-        lost: s.lost,
-        goalsFor: s.goalsFor,
-        goalsAgainst: s.goalsAg,
-        goalDiff: s.goalsFor - s.goalsAg,
-        points: s.points,
-      })),
+      standings: g.standings
+        // Hide synthetic placeholder teams (knockout slot labels like
+        // "A2", "W74") that ended up in group standings.
+        .filter((s) => !isPlaceholderTeamId(s.team.id))
+        .map((s) => ({
+          position: s.position,
+          team: s.team,
+          played: s.played,
+          won: s.won,
+          drawn: s.drawn,
+          lost: s.lost,
+          goalsFor: s.goalsFor,
+          goalsAgainst: s.goalsAg,
+          goalDiff: s.goalsFor - s.goalsAg,
+          points: s.points,
+        })),
     }));
   }
 }
