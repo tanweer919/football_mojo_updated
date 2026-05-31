@@ -26,6 +26,8 @@
     "seed:cards": "tsx prisma/seed-wc-cards.ts",
     "seed:wc-stages": "tsx prisma/seed-wc-stage-cards.ts",
     "seed:notification-prefs": "tsx prisma/seed-notification-prefs.ts",
+    "seed:wc-roster": "tsx prisma/seed-wc-roster.ts",
+    "seed:wc-2026": "tsx prisma/seed-wc-2026.ts",
     "refresh:photos": "tsx prisma/refresh-player-photos.ts",
     "admin:promote": "tsx prisma/promote-admin.ts",
     "reprice:players": "tsx prisma/reprice-players.ts",
