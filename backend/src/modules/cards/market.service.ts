@@ -39,7 +39,7 @@ export class MarketService {
 
   async list(uid: string | null, input: MarketListInput) {
     const limit = Math.min(Math.max(input.limit ?? 24, 1), 60);
-    const where = this._buildWhere(input);
+    const where = await this._buildWhere(input);
     const orderBy = this._buildOrderBy(input.sort);
 
     // Cursor pagination: deterministic via (sort key, id) — Prisma handles
@@ -429,7 +429,7 @@ export class MarketService {
   // INTERNAL
   // ────────────────────────────────────────────────────────────────────────
 
-  private _buildWhere(i: MarketListInput): Prisma.CardTemplateWhereInput {
+  private async _buildWhere(i: MarketListInput): Promise<Prisma.CardTemplateWhereInput> {
     const AND: Prisma.CardTemplateWhereInput[] = [];
 
     // Always exclude templates without a player — set-master / reward-only
