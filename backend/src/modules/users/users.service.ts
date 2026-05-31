@@ -378,6 +378,9 @@ export class UsersService {
     return this.prisma.team.findMany({
       where: {
         AND: [
+          // Exclude synthetic placeholder teams created by seed-wc-2026.ts
+          // (knockout slot labels like "A2", "W74", "3rd A/B/C/D/F", etc.).
+          { NOT: { id: { startsWith: 'WC2026-PH-' } } },
           opts.competitionId ? { competitionId: opts.competitionId } : {},
           q
             ? {

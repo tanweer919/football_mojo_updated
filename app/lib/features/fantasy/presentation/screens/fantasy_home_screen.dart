@@ -519,9 +519,9 @@ class _PrizeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return PCard(
       rarity: _rarity,
-      rating: 99,
-      name: prize.description,
-      position: _rankLabel,
+      name: _rankLabel,
+      editionLabel: prize.description,
+      position: _rarity.name,
       country: '',
     );
   }
