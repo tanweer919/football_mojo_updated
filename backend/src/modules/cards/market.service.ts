@@ -432,8 +432,21 @@ export class MarketService {
   private _buildWhere(i: MarketListInput): Prisma.CardTemplateWhereInput {
     const AND: Prisma.CardTemplateWhereInput[] = [];
 
+    // Always exclude templates without a player — set-master / reward-only
+    // cards that have no playerId show up as blank "untitled" cards.
+    AND.push({ playerId: { not: null } });
+
     if (i.rarities?.length) AND.push({ rarity: { in: i.rarities } });
-    if (i.editions?.length) AND.push({ edition: { in: i.editions } });
+
+    // When no edition filter is provided, default to the BASE edition so
+    // the grid doesn't show the same player 7x (once per stage edition).
+    // Users can explicitly select stage editions from the filter sheet.
+    if (i.editions?.length) {
+      AND.push({ edition: { in: i.editions } });
+    } else {
+      AND.push({ edition: 'WC2026-BASE' });
+    }
+
     if (i.availability === 'available') {
       AND.push({ mintedCount: { lt: this.prisma.cardTemplate.fields.totalSupply } });
     }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Query } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Query } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 
 /**
@@ -16,24 +16,18 @@ export class PhotoBatchController {
   ) {
     const p = Math.max(1, Number(page ?? 1));
     const ps = Math.min(200, Math.max(1, Number(pageSize ?? 100)));
-    const where = {
-      OR: [
-        { photoUrl: null },
-        { photoUrl: { not: { contains: 'thesportsdb.com' } } },
-      ],
-    };
+    // Return ALL players — the local script handles skip logic.
     const [rows, total] = await Promise.all([
       this.prisma.player.findMany({
-        where,
         select: {
           id: true, name: true, photoUrl: true, nationality: true,
-          team: { select: { name: true } },
+          team: { select: { name: true, shortName: true } },
         },
         orderBy: { name: 'asc' },
         take: ps,
         skip: (p - 1) * ps,
       }),
-      this.prisma.player.count({ where }),
+      this.prisma.player.count(),
     ]);
     return { rows, total, page: p, pageSize: ps };
   }
