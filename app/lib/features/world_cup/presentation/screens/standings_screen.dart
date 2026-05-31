@@ -24,6 +24,7 @@ class StandingsScreen extends ConsumerWidget {
     final groups = ref.watch(wcGroupsProvider(competitionId));
     return PitchScreen(
       title: 'Group standings',
+      scrollable: false,
       onBack: () => context.canPop() ? context.pop() : context.go('/world-cup'),
       child: groups.when(
         loading: () => const Padding(

@@ -27,8 +27,6 @@
     "seed:wc-stages": "tsx prisma/seed-wc-stage-cards.ts",
     "seed:notification-prefs": "tsx prisma/seed-notification-prefs.ts",
     "refresh:photos": "tsx prisma/refresh-player-photos.ts",
-    "refresh:photos:remote": "tsx scripts/refresh-photos-remote.ts",
-    "test:notifications": "tsx prisma/test-notifications.ts",
     "admin:promote": "tsx prisma/promote-admin.ts",
     "reprice:players": "tsx prisma/reprice-players.ts",
     "ingest:form": "tsx prisma/ingest-player-form.ts"

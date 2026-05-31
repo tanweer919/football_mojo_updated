@@ -15,7 +15,6 @@ import '../../../album/data/models/card_models.dart';
 import '../../data/market_models.dart';
 import '../../data/market_repository.dart';
 import '../widgets/market_filter_sheet.dart';
-import '../widgets/player_form_widgets.dart';
 
 /// `CardsMarketScreen` — public, anonymous-friendly browse of every minted
 /// template in the catalogue. Two-column grid of `PCard`s with a sticky
@@ -446,9 +445,9 @@ class _MarketGrid extends StatelessWidget {
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisSpacing: 20,
-              crossAxisSpacing: 16,
-              childAspectRatio: 0.50, // pcard 0.66 + badges + price below
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.56,
             ),
             delegate: SliverChildBuilderDelegate(
               (ctx, i) => _MarketTile(card: cards[i], onTap: () => onTap(cards[i])),
@@ -579,6 +578,23 @@ class _MarketTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
+          // Player name
+          if (p?.name != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                p!.name!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.fg,
+                  height: 1.3,
+                ),
+              ),
+            ),
           // Sorare-style stat badges + supply info
           _TileBadgeRow(card: card),
         ],
@@ -597,76 +613,51 @@ class _TileBadgeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasForm = card.formScore != null;
     final bonus = card.bonusPct;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        // Badge row
-        Row(
-          children: [
-            if (hasForm) ...[
-              ScoreHexBadge(score: card.formScore!, size: 26),
-              const SizedBox(width: 4),
-            ],
-            if (bonus > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.muted2.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppColors.borderSoft),
-                ),
-                child: Text(
-                  '+$bonus%',
-                  style: const TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-            const Spacer(),
-            Text(
-              '${card.mintedCount}/${card.totalSupply}',
+        // Supply counter
+        Text(
+          '${card.mintedCount}/${card.totalSupply}',
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.muted,
+          ),
+        ),
+        if (bonus > 0) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.pitch.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '+$bonus%',
               style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 9,
+                fontFamily: 'Inter',
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: AppColors.muted,
+                color: AppColors.pitch,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+        const Spacer(),
         // Gem price
         if (card.gemPrice != null && card.purchasable) ...[
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              const Icon(Icons.diamond_outlined, size: 13, color: AppColors.gold),
-              const SizedBox(width: 3),
-              Text(
-                '${card.gemPrice}',
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.fg,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                'gems',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
+          const Icon(Icons.diamond_outlined, size: 12, color: AppColors.gold),
+          const SizedBox(width: 3),
+          Text(
+            '${card.gemPrice}',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+            ),
           ),
         ],
       ],
@@ -685,9 +676,9 @@ class _GridSkeleton extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 20,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.54,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.56,
       ),
       itemCount: 6,
       itemBuilder: (_, __) => const Skeleton(height: double.infinity, radius: 16),

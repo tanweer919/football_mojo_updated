@@ -12,7 +12,6 @@ import { AdminUsersController } from './users.controller';
 import { AdminUsersService } from './users.service';
 import { AdminTeamsController } from './teams.controller';
 import { AdminTeamsService } from './teams.service';
-import { PhotoBatchController } from './photo-batch.controller';
 
 /**
  * Admin API. Every controller in here is double-guarded:
@@ -37,7 +36,6 @@ import { PhotoBatchController } from './photo-batch.controller';
     AdminUsersController,
     AdminTeamsController,
     AdminAwardsController,
-    PhotoBatchController, // TEMP — remove after photo migration
   ],
 })
 export class AdminModule {}
