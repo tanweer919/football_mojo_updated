@@ -29,6 +29,7 @@
     "seed:wc-roster": "tsx prisma/seed-wc-roster.ts",
     "seed:wc-2026": "tsx prisma/seed-wc-2026.ts",
     "refresh:photos": "tsx prisma/refresh-player-photos.ts",
+    "refresh:photos:remote": "tsx scripts/refresh-photos-remote.ts",
     "admin:promote": "tsx prisma/promote-admin.ts",
     "reprice:players": "tsx prisma/reprice-players.ts",
     "ingest:form": "tsx prisma/ingest-player-form.ts"

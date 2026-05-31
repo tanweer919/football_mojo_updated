@@ -132,8 +132,7 @@ class _TeamPickerScreenState extends ConsumerState<TeamPickerScreen> {
       // height and render a blank picker.
       scrollable: false,
       // Picker manages its own bottom inset (the list pads its own
-      // bottom) — disable the tabbar reserve to avoid a visible gap.
-      withinTabShell: false,
+      // bottom) — tabbar reserve is auto-detected via TabShellScope.
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

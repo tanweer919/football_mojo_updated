@@ -4,6 +4,25 @@ import '../design/app_colors.dart';
 import 'eyebrow.dart';
 import 'pitch_buttons.dart';
 
+// ─── InheritedWidget for tab-shell detection ────────────────────────────
+
+/// Wrap a subtree in [TabShellScope] to tell [PitchScreen] children that
+/// a floating tabbar is present and they need extra bottom padding.
+/// [HomeShell] wraps its child in this. Pushed screens outside the shell
+/// never see it → [PitchScreen] gives 0 tabbar inset → no black bar.
+class TabShellScope extends InheritedWidget {
+  const TabShellScope({super.key, required super.child});
+
+  static bool of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<TabShellScope>() != null;
+  }
+
+  @override
+  bool updateShouldNotify(TabShellScope old) => false;
+}
+
+// ─── PitchScreen ────────────────────────────────────────────────────────
+
 /// Standard secondary-screen scaffold matching the spec's `.topbar` pattern:
 /// back button (or none) · gold-mono title · trailing icon button (or none).
 ///
@@ -16,7 +35,6 @@ class PitchScreen extends StatelessWidget {
     required this.child,
     this.onBack,
     this.trailing,
-    this.withinTabShell = true,
     this.scrollable = true,
   });
 
@@ -24,20 +42,16 @@ class PitchScreen extends StatelessWidget {
   final Widget child;
   final VoidCallback? onBack;
   final Widget? trailing;
-  final bool withinTabShell;
   final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
     final viewPadding = MediaQuery.viewPaddingOf(context);
-    // Reserve space for the system status bar at the top, the floating
-    // tabbar (when in shell) plus the OS gesture-pill / 3-button bar at
-    // the bottom. With edge-to-edge mode enabled in main.dart the Scaffold
-    // background paints all the way under both — so the `bg` colour fills
-    // every pixel and there's no black band.
     final topInset = viewPadding.top;
     final bottomGesture = viewPadding.bottom;
-    final bottomInset = (withinTabShell ? 110.0 : 0.0) + bottomGesture + 16;
+    // Auto-detect: only add tabbar padding when inside HomeShell's TabShellScope.
+    final inTabShell = TabShellScope.of(context);
+    final bottomInset = (inTabShell ? 110.0 : 0.0) + bottomGesture + 16;
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
