@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/design/motion.dart';
 import '../../../../core/design/rarity_theme.dart';
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/share/share_service.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/foil_overlay.dart';
@@ -79,13 +80,16 @@ class _CardDetailScreenState extends ConsumerState<CardDetailScreen>
               return IconButton(
                 tooltip: 'Share',
                 icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
-                onPressed: () => ShareService.instance.shareArtifact(
-                  context: context,
-                  logicalSize: const Size(1080, 1350),
-                  text: 'Pulled ${card.template.playerName ?? card.template.edition} on PITCH',
-                  filename: 'pitch_card.png',
-                  builder: (_) => CardPullShareCard(card: card),
-                ),
+                onPressed: () {
+                  // Share player card with ChottuLink deep link.
+                  final playerName = card.template.playerName ?? card.template.edition;
+                  ChottuLinkService.instance.sharePlayer(
+                    playerId: card.template.id,
+                    playerName: playerName,
+                    photoUrl: card.template.artUrl.isNotEmpty ? card.template.artUrl : null,
+                    teamName: card.template.teamName,
+                  );
+                },
               );
             },
           ),

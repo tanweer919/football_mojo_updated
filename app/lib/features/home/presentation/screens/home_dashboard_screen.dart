@@ -29,7 +29,7 @@ import '../../../news/presentation/providers/news_feed_provider.dart';
 import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
 import '../../../profile/data/profile_repository.dart' show myProfileProvider;
-import '../../../iap/presentation/widgets/gem_chip.dart';
+
 import '../../../profile/presentation/widgets/notification_bell.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
@@ -135,6 +135,22 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 10),
             const _GroupSpotlight(),
 
+            // WC upcoming schedule — next 4 WC matches
+            const SizedBox(height: 16),
+            _SectionHead(
+              title: 'WC schedule',
+              action: 'Full draw →',
+              onAction: () => context.push(RoutePaths.matches),
+            ),
+            const SizedBox(height: 10),
+            const _WcUpcomingMatches(),
+
+            // Host venues — the 3 host nations + venue count
+            const SizedBox(height: 16),
+            const _SectionHead(title: 'Host venues'),
+            const SizedBox(height: 10),
+            const _WcHostVenues(),
+
             // Featured Iconic / Legendary cards — pulled from the seeded
             // market catalogue (works pre-WC because cards are seeded).
             const SizedBox(height: 16),
@@ -217,8 +233,6 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const GemChip(),
-          const SizedBox(width: 6),
           const NotificationBell(),
           const SizedBox(width: 4),
           GestureDetector(
@@ -278,7 +292,7 @@ class _Greeting extends StatelessWidget {
             text: const TextSpan(
               style: h1Style,
               children: [
-                TextSpan(text: 'Welcome back to\n'),
+                TextSpan(text: 'Welcome back to '),
                 TextSpan(
                   text: 'PITCH.',
                   style: TextStyle(
@@ -2063,13 +2077,13 @@ class _FollowedTeamsRail extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Fixtures — results + upcoming
-            _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
-            const SizedBox(height: 6),
+            // Team news — headlines from ALL followed teams (most engaging content first)
+            for (final team in teams)
+              _FollowedTeamNews(teamId: team.id),
             Container(height: 1, color: AppColors.borderSoft),
             const SizedBox(height: 8),
-            // Team news — headlines from the first followed team
-            _FollowedTeamNews(teamId: teams.first.id),
+            // Fixtures — results + upcoming
+            _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
           ],
         ),
       ),
@@ -2498,6 +2512,230 @@ class _GroupTeamCell extends StatelessWidget {
             fontSize: 9,
             fontWeight: FontWeight.w700,
             color: row.played > 0 ? AppColors.gold : AppColors.muted2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WC UPCOMING MATCHES — next 4 WC2026 fixtures
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Shows the next 4 WC2026 matches from the home fixtures provider.
+/// Falls back to a friendly empty state before the tournament starts.
+class _WcUpcomingMatches extends ConsumerWidget {
+  const _WcUpcomingMatches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(homeFixturesProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: async.when(
+        loading: () => const Skeleton(height: 160, radius: 16),
+        error: (_, __) => const _StripEmpty(
+          title: 'Schedule unavailable',
+          subtitle: "Couldn't reach the fixtures feed. Pull to refresh.",
+        ),
+        data: (f) {
+          final wcMatches = f.upcoming
+              .where((m) => m.competitionId == 'WC2026')
+              .take(4)
+              .toList();
+          if (wcMatches.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadii.r4),
+                border: Border.all(color: AppColors.borderSoft),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.event_note, color: AppColors.gold, size: 22),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'World Cup fixtures drop when the draw is finalised.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: AppColors.muted,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Check back closer to June 2026.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: AppColors.muted2,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              border: Border.all(color: AppColors.borderSoft),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final m in wcMatches) _LeagueFixtureRow(match: m),
+                const SizedBox(height: 6),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WC HOST VENUES — 3 host countries
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Static host-cities strip — USA / Mexico / Canada with venue counts.
+class _WcHostVenues extends StatelessWidget {
+  const _WcHostVenues();
+
+  static const _hosts = [
+    _HostCountry(
+      flag: '🇺🇸',
+      name: 'United States',
+      venues: 11,
+      cities: 'New York, LA, Dallas, Miami, Seattle …',
+    ),
+    _HostCountry(
+      flag: '🇲🇽',
+      name: 'Mexico',
+      venues: 3,
+      cities: 'Mexico City, Monterrey, Guadalajara',
+    ),
+    _HostCountry(
+      flag: '🇨🇦',
+      name: 'Canada',
+      venues: 2,
+      cities: 'Toronto, Vancouver',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          children: [
+            for (var i = 0; i < _hosts.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: 8),
+                Container(height: 1, color: AppColors.borderSoft),
+                const SizedBox(height: 8),
+              ],
+              _HostRow(host: _hosts[i]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HostCountry {
+  const _HostCountry({
+    required this.flag,
+    required this.name,
+    required this.venues,
+    required this.cities,
+  });
+  final String flag;
+  final String name;
+  final int venues;
+  final String cities;
+}
+
+class _HostRow extends StatelessWidget {
+  const _HostRow({required this.host});
+  final _HostCountry host;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(host.flag, style: const TextStyle(fontSize: 26)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    host.name,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '${host.venues} ${host.venues == 1 ? 'venue' : 'venues'}',
+                      style: const TextStyle(
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                host.cities,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11.5,
+                  color: AppColors.muted,
+                  height: 1.3,
+                ),
+              ),
+            ],
           ),
         ),
       ],

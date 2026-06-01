@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
@@ -18,6 +17,7 @@ import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/models/match_stats_dto.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
+import '../../../../core/deeplink/chottu_link_service.dart';
 
 /// Match detail — single scrollable page with hero + stats + events + lineups
 /// stacked vertically. Each section handles its own loading/error/empty
@@ -139,8 +139,12 @@ class _Topbar extends StatelessWidget {
           ),
           CircleIconButton(
             icon: Icons.share_outlined,
-            onPressed: () => SharePlus.instance.share(
-              ShareParams(text: '${match.homeTeam.name} vs ${match.awayTeam.name}'),
+            onPressed: () => ChottuLinkService.instance.shareMatch(
+              matchId: match.id,
+              homeTeam: match.homeTeam.name,
+              awayTeam: match.awayTeam.name,
+              homeScore: match.isLive || match.isFinished ? match.homeScore : null,
+              awayScore: match.isLive || match.isFinished ? match.awayScore : null,
             ),
           ),
         ],

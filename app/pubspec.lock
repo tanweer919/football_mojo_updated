@@ -185,6 +185,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.3"
+  chottu_link:
+    dependency: "direct main"
+    description:
+      name: chottu_link
+      sha256: c13bf0b9fc641e8d9def7c8c39a364ca145336378123354f13b65f02d82ede45
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   ci:
     dependency: transitive
     description:

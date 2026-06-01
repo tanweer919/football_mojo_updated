@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../data/models/league_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
@@ -286,6 +287,16 @@ class LeaguesScreen extends ConsumerWidget {
             },
             child: const Text('Copy'),
           ),
+          TextButton(
+            onPressed: () {
+              ChottuLinkService.instance.shareLeague(
+                leagueId: league.id,
+                leagueName: league.name,
+                slug: slug,
+              );
+            },
+            child: const Text('Invite friends'),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Done'),
@@ -356,6 +367,17 @@ class _LeagueCard extends ConsumerWidget {
                   Clipboard.setData(ClipboardData(text: league.joinCode));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Code "${league.joinCode}" copied')),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Invite',
+                icon: const Icon(Icons.share_rounded),
+                onPressed: () {
+                  ChottuLinkService.instance.shareLeague(
+                    leagueId: league.id,
+                    leagueName: league.name,
+                    slug: slug,
                   );
                 },
               ),

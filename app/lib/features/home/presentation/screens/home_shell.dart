@@ -41,7 +41,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           Positioned.fill(
             child: CenteredContent(
               maxWidth: context.isMobile ? double.infinity : 540,
-              child: TabShellScope(child: widget.child),
+              child: hideTabbar
+                  ? widget.child
+                  : TabShellScope(child: widget.child),
             ),
           ),
           if (!hideTabbar)

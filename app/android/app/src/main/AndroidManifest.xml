@@ -52,6 +52,15 @@
                 <category
                     android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
+            <!-- ChottuLink deep links — opens footballmojo.chottu.link URLs in the app -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="footballmojo.chottu.link"/>
+            </intent-filter>
             <meta-data
                 android:name="com.google.firebase.messaging.default_notification_channel_id"
                 android:value="@string/default_notification_channel_id"/>
