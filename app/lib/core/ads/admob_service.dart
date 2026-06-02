@@ -86,7 +86,7 @@ class AdmobService {
   // ── Init ─────────────────────────────────────────────────────────────
 
   static Future<void> initialise() async {
-    if (kIsWeb) return;
+    if (kIsWeb || instance._initialised) return;
     await MobileAds.instance.initialize();
     await MobileAds.instance.updateRequestConfiguration(
       RequestConfiguration(
