@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/ads/admob_service.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/router/route_paths.dart';
@@ -17,7 +18,9 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
+import '../../../album/data/repositories/album_repository.dart';
 import '../../../competitions/data/competitions_repository.dart';
+import '../../../iap/data/iap_service.dart';
 import '../../../fantasy/data/models/fantasy_models.dart';
 import '../../../fantasy/presentation/providers/fantasy_providers.dart';
 import '../../../insights/data/standings_repository.dart';
@@ -44,7 +47,8 @@ import '../providers/home_dashboard_providers.dart';
 class HomeDashboardScreen extends ConsumerStatefulWidget {
   const HomeDashboardScreen({super.key});
   @override
-  ConsumerState<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+  ConsumerState<HomeDashboardScreen> createState() =>
+      _HomeDashboardScreenState();
 }
 
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
@@ -92,7 +96,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ]);
       },
       child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.only(bottom: 110),
         // Section rhythm: _SectionHead now owns its own top/bottom
         // padding (see widget definition) so the column body doesn't
@@ -126,6 +132,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _BracketCard(),
+            ),
+
+            // Free-card CTA — watch a rewarded ad for a free card. Hides
+            // itself when ads are off or the user is Pro.
+            const _SectionGap(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _FreeCardCta(),
             ),
 
             // Your teams — followed-team digest (crests + news + their
@@ -198,11 +212,16 @@ class _Appbar extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 22, height: 22,
+            width: 22,
+            height: 22,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [Color(0xFFF1E4B6), Color(0xFFE5C26B), Color(0xFF8E6422)],
+                colors: [
+                  Color(0xFFF1E4B6),
+                  Color(0xFFE5C26B),
+                  Color(0xFF8E6422),
+                ],
                 stops: [0.2, 0.6, 1.0],
                 center: Alignment(-0.3, -0.4),
               ),
@@ -210,10 +229,12 @@ class _Appbar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           ShaderMask(
-            shaderCallback: (rect) => const LinearGradient(
-              colors: [AppColors.goldSoft, AppColors.goldDeep],
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            ).createShader(rect),
+            shaderCallback:
+                (rect) => const LinearGradient(
+                  colors: [AppColors.goldSoft, AppColors.goldDeep],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ).createShader(rect),
             child: const Text(
               'PITCH',
               style: TextStyle(
@@ -226,6 +247,8 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          const _GemChip(),
+          const SizedBox(width: 8),
           const NotificationBell(),
           const SizedBox(width: 4),
           GestureDetector(
@@ -235,6 +258,225 @@ class _Appbar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Compact gem-balance pill in the app bar. Taps through to the wallet.
+/// Shows nothing until the profile (and thus the balance) has loaded so
+/// it never flashes a "0".
+class _GemChip extends ConsumerWidget {
+  const _GemChip();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gems = ref.watch(myProfileProvider).maybeWhen(
+          data: (p) => p?.gems,
+          orElse: () => null,
+        );
+    if (gems == null) return const SizedBox.shrink();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push(RoutePaths.wallet),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.gold.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: AppColors.goldHairline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.diamond, size: 13, color: AppColors.gold),
+            const SizedBox(width: 5),
+            Text(
+              _compact(gems),
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.gold,
+                letterSpacing: -0.2,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 1234 → "1.2k" so the pill never grows wide.
+  static String _compact(int n) {
+    if (n < 1000) return '$n';
+    if (n < 1000000) {
+      final k = n / 1000;
+      return '${k.toStringAsFixed(k >= 100 ? 0 : 1)}k';
+    }
+    return '${(n / 1000000).toStringAsFixed(1)}M';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FREE-CARD CTA — watch a rewarded ad, get a card
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// "Watch a short ad → free card" entry point. Opt-in, so it's the most
+/// user-friendly ad format and a strong revenue driver. Hidden entirely
+/// when ads are remotely disabled or the user has PITCH Pro.
+class _FreeCardCta extends ConsumerStatefulWidget {
+  const _FreeCardCta();
+  @override
+  ConsumerState<_FreeCardCta> createState() => _FreeCardCtaState();
+}
+
+class _FreeCardCtaState extends ConsumerState<_FreeCardCta> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final adsEnabled = ref.watch(adsEnabledProvider);
+    final isPro = ref.watch(isProActiveProvider);
+    if (!adsEnabled || isPro) return const SizedBox.shrink();
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _busy ? null : _watchForCard,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.goldHairline),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF221C14), Color(0xFF12100D)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.gold.withValues(alpha: 0.16),
+                border: Border.all(color: AppColors.goldHairline),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.card_giftcard, color: AppColors.gold, size: 20),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Free card',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Watch a short ad to add a card to your album',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: AppColors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            if (_busy)
+              const SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF1E1810)),
+                    SizedBox(width: 2),
+                    Text(
+                      'Watch',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E1810),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _watchForCard() {
+    setState(() => _busy = true);
+    var earned = false;
+    AdmobService.instance.showRewarded(
+      onReward: (_) {
+        earned = true;
+        _claimCard();
+      },
+      onNotReady: () {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        _toast('Ad not ready yet — try again in a moment.');
+      },
+      onDismissed: () {
+        // Reward already handled in onReward (which fires first). If the
+        // user closed early without earning, just release the button.
+        if (!mounted) return;
+        if (!earned) setState(() => _busy = false);
+      },
+    );
+  }
+
+  Future<void> _claimCard() async {
+    try {
+      // ssvToken is the AdMob server-side-verification callback; the client
+      // doesn't have it here, so we pass empty and the server grants
+      // (SSV validation is enforced server-side only when ADMOB_SSV_ENABLED).
+      final card = await ref.read(albumRepositoryProvider).claimRewardedAd('');
+      ref.invalidate(albumProvider);
+      ref.invalidate(myProfileProvider);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      context.push('/album/${card.id}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final msg = '$e';
+      if (msg.contains('daily_cap')) {
+        _toast("That's all the free cards for today — come back tomorrow!");
+      } else if (msg.contains('album_complete')) {
+        _toast('You already own every card in this tier — nice!');
+      } else {
+        _toast('Could not grant your card. Please try again.');
+      }
+    }
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 }
 
@@ -303,7 +545,7 @@ class _WcHero extends StatelessWidget {
     final secs = remaining.inSeconds % 60;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
@@ -327,8 +569,14 @@ class _WcHero extends StatelessWidget {
                 children: [
                   Row(
                     children: const [
-                      Text('★ ',
-                          style: TextStyle(color: AppColors.goldDeep, fontSize: 10, height: 1)),
+                      Text(
+                        '★ ',
+                        style: TextStyle(
+                          color: AppColors.goldDeep,
+                          fontSize: 10,
+                          height: 1,
+                        ),
+                      ),
                       Flexible(
                         child: Eyebrow('WORLD CUP 2026', gold: true, size: 10),
                       ),
@@ -363,8 +611,11 @@ class _WcHero extends StatelessWidget {
                           ),
                         ),
                         SizedBox(width: 2),
-                        Icon(Icons.arrow_forward,
-                            color: AppColors.gold, size: 12),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: AppColors.gold,
+                          size: 12,
+                        ),
                       ],
                     ),
                   ),
@@ -376,13 +627,13 @@ class _WcHero extends StatelessWidget {
               flex: 7,
               child: Row(
                 children: [
-                  Expanded(child: _CountdownCell(n: days,  l: 'D')),
+                  Expanded(child: _CountdownCell(n: days, l: 'D')),
                   const SizedBox(width: 4),
                   Expanded(child: _CountdownCell(n: hours, l: 'H')),
                   const SizedBox(width: 4),
-                  Expanded(child: _CountdownCell(n: mins,  l: 'M')),
+                  Expanded(child: _CountdownCell(n: mins, l: 'M')),
                   const SizedBox(width: 4),
-                  Expanded(child: _CountdownCell(n: secs,  l: 'S')),
+                  Expanded(child: _CountdownCell(n: secs, l: 'S')),
                 ],
               ),
             ),
@@ -465,7 +716,7 @@ class _SectionHead extends StatelessWidget {
       // Self-contained spacing: 18px above for separation from the
       // previous section, 10px below to its own content. Callers never
       // need to wrap this in a SizedBox.
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -522,11 +773,12 @@ class _NextMatchHero extends ConsumerWidget {
 
     final liveList = live.valueOrNull;
     final fixtureBundle = fixtures.valueOrNull;
-    final MatchDto? selected = liveList != null && liveList.isNotEmpty
-        ? liveList.first
-        : (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty
-            ? fixtureBundle.upcoming.first
-            : null);
+    final MatchDto? selected =
+        liveList != null && liveList.isNotEmpty
+            ? liveList.first
+            : (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty
+                ? fixtureBundle.upcoming.first
+                : null);
 
     if (selected == null) {
       return const Padding(
@@ -574,39 +826,47 @@ class _MatchFeatureCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(AppRadii.r4),
             border: Border.all(
-              color: isLive
-                  ? AppColors.live.withValues(alpha: 0.5)
-                  : AppColors.goldHairline,
+              color:
+                  isLive
+                      ? AppColors.live.withValues(alpha: 0.5)
+                      : AppColors.goldHairline,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _MatchHeroBadge(match: match),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
+              // Symmetric three-column layout (mirrors the World Cup
+              // opening-match card): each team is a centred crest-above-
+              // name column, the score / kickoff chip sits dead centre.
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _MatchHeroSide(team: match.homeTeam, alignEnd: true)),
-                  const SizedBox(width: 12),
+                  Expanded(child: _MatchHeroSide(team: match.homeTeam)),
                   _MatchHeroCenter(match: match),
-                  const SizedBox(width: 12),
-                  Expanded(child: _MatchHeroSide(team: match.awayTeam, alignEnd: false)),
+                  Expanded(child: _MatchHeroSide(team: match.awayTeam)),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 10),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(child: _MatchHeroStatus(match: match)),
-                  if (match.venue != null && match.venue!.isNotEmpty)
-                    Expanded(
+                  Flexible(child: _MatchHeroStatus(match: match)),
+                  if (match.venue != null && match.venue!.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    const Text(
+                      '·',
+                      style: TextStyle(color: AppColors.muted, fontSize: 11),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
                       child: Text(
                         match.venue!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
@@ -615,6 +875,7 @@ class _MatchFeatureCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ],
@@ -675,55 +936,51 @@ class _MatchHeroBadge extends StatelessWidget {
   static String _competitionLabel(String? id) {
     if (id == null) return 'MATCH';
     const map = <String, String>{
-      'PL_2025':         'PREMIER LEAGUE',
-      'LALIGA_2025':     'LA LIGA',
+      'PL_2025': 'PREMIER LEAGUE',
+      'LALIGA_2025': 'LA LIGA',
       'BUNDESLIGA_2025': 'BUNDESLIGA',
-      'SERIEA_2025':     'SERIE A',
-      'LIGUE1_2025':     'LIGUE 1',
-      'UCL_2025':        'UCL',
-      'UEL_2025':        'UEL',
-      'WC2026':          'WORLD CUP 2026',
+      'SERIEA_2025': 'SERIE A',
+      'LIGUE1_2025': 'LIGUE 1',
+      'UCL_2025': 'UCL',
+      'UEL_2025': 'UEL',
+      'WC2026': 'WORLD CUP 2026',
     };
     return map[id] ?? id.toUpperCase();
   }
 }
 
 class _MatchHeroSide extends StatelessWidget {
-  const _MatchHeroSide({required this.team, required this.alignEnd});
+  const _MatchHeroSide({required this.team});
   final TeamDto team;
-  final bool alignEnd;
 
   @override
   Widget build(BuildContext context) {
-    final crest = SizedBox(
-      width: 44,
-      height: 44,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-      ),
-    );
-    final name = Text(
-      team.shortName ?? team.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-      style: const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        color: AppColors.fg,
-        letterSpacing: -0.2,
-        height: 1.1,
-      ),
-    );
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        crest,
-        const SizedBox(height: 8),
-        name,
+        SizedBox(
+          width: 52,
+          height: 52,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          team.shortName ?? team.name,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.fg,
+            letterSpacing: -0.2,
+            height: 1.15,
+          ),
+        ),
       ],
     );
   }
@@ -734,49 +991,39 @@ class _MatchHeroCenter extends StatelessWidget {
   final MatchDto match;
   @override
   Widget build(BuildContext context) {
-    // Live or finished → show the score; upcoming → show kickoff time.
+    // Live or finished → show the score; upcoming → the kickoff time.
     final isLiveOrFinished = match.isLive || match.isFinished;
-    if (isLiveOrFinished) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0x8C0F0E0D),
-          borderRadius: BorderRadius.circular(AppRadii.r3),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Text(
-          '${match.homeScore}  –  ${match.awayScore}',
-          style: const TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.fg,
-            letterSpacing: -0.4,
-            fontFeatures: [FontFeature.tabularFigures()],
+    final label =
+        isLiveOrFinished
+            ? '${match.homeScore} – ${match.awayScore}'
+            : DateFormat('HH:mm').format(match.kickoffAt.toLocal());
+    // Sized to the crest height (52) so the chip sits centred against the
+    // crests in the symmetric three-column row.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SizedBox(
+        height: 52,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0x8C0F0E0D),
+              borderRadius: BorderRadius.circular(AppRadii.r3),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: isLiveOrFinished ? 20 : 17,
+                fontWeight: FontWeight.w800,
+                color: isLiveOrFinished ? AppColors.fg : AppColors.gold,
+                letterSpacing: -0.4,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
           ),
-        ),
-      );
-    }
-    // Upcoming — show the kickoff time chip in user timezone.
-    final local = match.kickoffAt.toLocal();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0x8C0F0E0D),
-        borderRadius: BorderRadius.circular(AppRadii.r3),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Text(
-        DateFormat('HH:mm').format(local),
-        style: const TextStyle(
-          fontFamily: 'JetBrainsMono',
-          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: AppColors.gold,
-          letterSpacing: -0.3,
-          fontFeatures: [FontFeature.tabularFigures()],
         ),
       ),
     );
@@ -816,12 +1063,16 @@ class _MatchHeroStatus extends StatelessWidget {
     }
     final local = match.kickoffAt.toLocal();
     final now = DateTime.now();
-    final daysAhead = DateTime(local.year, local.month, local.day)
-        .difference(DateTime(now.year, now.month, now.day))
-        .inDays;
-    final dayLabel = daysAhead == 0
-        ? 'TODAY'
-        : daysAhead == 1
+    final daysAhead =
+        DateTime(
+          local.year,
+          local.month,
+          local.day,
+        ).difference(DateTime(now.year, now.month, now.day)).inDays;
+    final dayLabel =
+        daysAhead == 0
+            ? 'TODAY'
+            : daysAhead == 1
             ? 'TOMORROW'
             : DateFormat('EEE d MMM').format(local).toUpperCase();
     final tzAbbrev = local.timeZoneName;
@@ -838,12 +1089,8 @@ class _MatchHeroStatus extends StatelessWidget {
   }
 }
 
-
 class _StripEmpty extends StatelessWidget {
-  const _StripEmpty({
-    required this.title,
-    required this.subtitle,
-  });
+  const _StripEmpty({required this.title, required this.subtitle});
   final String title;
   final String subtitle;
   static const EmptyGlyph glyph = EmptyGlyph.football;
@@ -857,7 +1104,8 @@ class _StripEmpty extends StatelessWidget {
           border: Border.all(color: AppColors.borderSoft),
           gradient: const LinearGradient(
             colors: [AppColors.surface2, AppColors.surface],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: PitchEmptyState(title: title, subtitle: subtitle, glyph: glyph),
@@ -865,7 +1113,6 @@ class _StripEmpty extends StatelessWidget {
     );
   }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FANTASY CARD — wired to currentGameweek + myLineup
@@ -879,9 +1126,11 @@ class _FantasyCard extends ConsumerWidget {
     final tournament = ref.watch(tournamentProvider(slug));
     final gw = ref.watch(currentGameweekProvider(slug));
     final lineupAsync = gw.maybeWhen<AsyncValue<FantasyLineupDto?>>(
-      data: (g) => g == null
-          ? const AsyncValue.data(null)
-          : ref.watch(myLineupProvider((slug: slug, gameweekId: g.id))),
+      data:
+          (g) =>
+              g == null
+                  ? const AsyncValue.data(null)
+                  : ref.watch(myLineupProvider((slug: slug, gameweekId: g.id))),
       orElse: () => const AsyncValue.data(null),
     );
 
@@ -904,7 +1153,8 @@ class _FantasyCard extends ConsumerWidget {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF1F1814), Color(0xFF110C09)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(AppRadii.r4),
               border: Border.all(color: AppColors.goldHairline),
@@ -917,9 +1167,18 @@ class _FantasyCard extends ConsumerWidget {
                 ),
               ],
             ),
-            child: hasLineup
-                ? _FantasyLive(tournament: t, gameweek: gw.valueOrNull, lineup: lineup)
-                : _FantasyCta(tournament: t, gameweekNum: gameweekNum, gameweek: gw.valueOrNull),
+            child:
+                hasLineup
+                    ? _FantasyLive(
+                      tournament: t,
+                      gameweek: gw.valueOrNull,
+                      lineup: lineup,
+                    )
+                    : _FantasyCta(
+                      tournament: t,
+                      gameweekNum: gameweekNum,
+                      gameweek: gw.valueOrNull,
+                    ),
           ),
         );
       },
@@ -929,14 +1188,19 @@ class _FantasyCard extends ConsumerWidget {
 
 /// State A — user has a lineup. Show their rank + GW points + spend.
 class _FantasyLive extends StatelessWidget {
-  const _FantasyLive({required this.tournament, required this.gameweek, required this.lineup});
+  const _FantasyLive({
+    required this.tournament,
+    required this.gameweek,
+    required this.lineup,
+  });
   final FantasyTournamentDto tournament;
   final FantasyGameweekDto? gameweek;
   final FantasyLineupDto lineup;
   @override
   Widget build(BuildContext context) {
     final budget = tournament.budget;
-    final pct = budget == 0 ? 0.0 : (lineup.budgetUsed / budget).clamp(0.0, 1.0);
+    final pct =
+        budget == 0 ? 0.0 : (lineup.budgetUsed / budget).clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -977,10 +1241,12 @@ class _FantasyLive extends StatelessWidget {
                     const Eyebrow('Manager rank', size: 9),
                     const SizedBox(height: 2),
                     ShaderMask(
-                      shaderCallback: (r) => const LinearGradient(
-                        colors: [AppColors.goldSoft, AppColors.goldDeep],
-                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                      ).createShader(r),
+                      shaderCallback:
+                          (r) => const LinearGradient(
+                            colors: [AppColors.goldSoft, AppColors.goldDeep],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ).createShader(r),
                       child: Text(
                         lineup.rank == null ? '—' : '#${lineup.rank}',
                         style: const TextStyle(
@@ -1026,7 +1292,11 @@ class _FantasyLive extends StatelessWidget {
           // Budget bar — exact spend with the budget context.
           Row(
             children: [
-              Eyebrow('Budget · ${lineup.budgetUsed.toStringAsFixed(1)} / $budget', size: 9, gold: true),
+              Eyebrow(
+                'Budget · ${lineup.budgetUsed.toStringAsFixed(1)} / $budget',
+                size: 9,
+                gold: true,
+              ),
               const Spacer(),
               Text(
                 '${(pct * 100).round()}%',
@@ -1072,7 +1342,11 @@ class _FantasyLive extends StatelessWidget {
 /// "Build your XI" button. Replaces the previous "rank: —, points: 0,
 /// status: Build XI" feel-bad zeros.
 class _FantasyCta extends StatelessWidget {
-  const _FantasyCta({required this.tournament, required this.gameweekNum, required this.gameweek});
+  const _FantasyCta({
+    required this.tournament,
+    required this.gameweekNum,
+    required this.gameweek,
+  });
   final FantasyTournamentDto tournament;
   final int? gameweekNum;
   final FantasyGameweekDto? gameweek;
@@ -1080,9 +1354,7 @@ class _FantasyCta extends StatelessWidget {
   Widget build(BuildContext context) {
     // Compute the deadline string. "Locks Sun 14:00" beats "locks at
     // 2026-06-11T16:00:00Z" for at-a-glance scanning.
-    final lockLabel = gameweek == null
-        ? null
-        : _formatLock(gameweek!.lockAt);
+    final lockLabel = gameweek == null ? null : _formatLock(gameweek!.lockAt);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -1093,13 +1365,19 @@ class _FantasyCta extends StatelessWidget {
             children: [
               Expanded(
                 child: Eyebrow(
-                  gameweekNum == null ? tournament.name : '${tournament.name} · GW $gameweekNum',
-                  gold: true, size: 10,
+                  gameweekNum == null
+                      ? tournament.name
+                      : '${tournament.name} · GW $gameweekNum',
+                  gold: true,
+                  size: 10,
                 ),
               ),
               if (lockLabel != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surface2,
                     borderRadius: BorderRadius.circular(99),
@@ -1108,7 +1386,11 @@ class _FantasyCta extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.schedule, size: 11, color: AppColors.muted),
+                      const Icon(
+                        Icons.schedule,
+                        size: 11,
+                        color: AppColors.muted,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         lockLabel,
@@ -1166,7 +1448,10 @@ class _FantasyCta extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.gold,
                   borderRadius: BorderRadius.circular(99),
@@ -1184,7 +1469,11 @@ class _FantasyCta extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 5),
-                    Icon(Icons.arrow_forward, size: 14, color: Color(0xFF1E1810)),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: Color(0xFF1E1810),
+                    ),
                   ],
                 ),
               ),
@@ -1200,15 +1489,28 @@ class _FantasyCta extends StatelessWidget {
   static String _formatLock(DateTime t) {
     final local = t.toLocal();
     final now = DateTime.now();
-    final isToday = local.year == now.year && local.month == now.month && local.day == now.day;
-    final isTomorrow = local.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
+    final isToday =
+        local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final isTomorrow =
+        local.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
     final hh = local.hour.toString().padLeft(2, '0');
     final mm = local.minute.toString().padLeft(2, '0');
-    final prefix = isToday
-        ? 'Today'
-        : isTomorrow
+    final prefix =
+        isToday
+            ? 'Today'
+            : isTomorrow
             ? 'Tmrw'
-            : const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][local.weekday - 1];
+            : const [
+              'Mon',
+              'Tue',
+              'Wed',
+              'Thu',
+              'Fri',
+              'Sat',
+              'Sun',
+            ][local.weekday - 1];
     return '$prefix $hh:$mm';
   }
 }
@@ -1230,7 +1532,11 @@ class _StatusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(locked ? Icons.lock_outline : Icons.edit_outlined, size: 10, color: color),
+          Icon(
+            locked ? Icons.lock_outline : Icons.edit_outlined,
+            size: 10,
+            color: color,
+          ),
           const SizedBox(width: 4),
           Text(
             locked ? 'LOCKED' : 'EDITABLE',
@@ -1258,7 +1564,8 @@ class _FantasyEmpty extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1F1814), Color(0xFF110C09)],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(AppRadii.r4),
         border: Border.all(color: AppColors.borderSoft),
@@ -1286,25 +1593,28 @@ class _NewsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(homeNewsProvider);
     return feed.when(
-      loading: () => const Column(
-        children: [
-          _NewsHeroSkeleton(),
-          SizedBox(height: 10),
-          NewsTileSkeleton(),
-          SizedBox(height: 10),
-          NewsTileSkeleton(),
-        ],
-      ),
-      error: (_, __) => const _ListEmpty(
-        title: 'News on a tea break',
-        subtitle: 'Couldn’t reach the news feed. Pull to refresh.',
-        glyph: EmptyGlyph.paper,
-      ),
+      loading:
+          () => const Column(
+            children: [
+              _NewsHeroSkeleton(),
+              SizedBox(height: 10),
+              NewsTileSkeleton(),
+              SizedBox(height: 10),
+              NewsTileSkeleton(),
+            ],
+          ),
+      error:
+          (_, __) => const _ListEmpty(
+            title: 'News on a tea break',
+            subtitle: 'Couldn’t reach the news feed. Pull to refresh.',
+            glyph: EmptyGlyph.paper,
+          ),
       data: (page) {
         if (page.items.isEmpty) {
           return const _ListEmpty(
             title: 'No stories yet',
-            subtitle: 'Sources update every 10 minutes — fresh headlines land here automatically.',
+            subtitle:
+                'Sources update every 10 minutes — fresh headlines land here automatically.',
             glyph: EmptyGlyph.paper,
           );
         }
@@ -1348,10 +1658,7 @@ class _NewsHero extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  NewsThumb(
-                    imageUrl: article.imageUrl,
-                    source: article.source,
-                  ),
+                  NewsThumb(imageUrl: article.imageUrl, source: article.source),
                   // Bottom scrim so the source pill stays legible over
                   // both photo + branded-fallback backgrounds.
                   const DecoratedBox(
@@ -1365,11 +1672,15 @@ class _NewsHero extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                    left: 12, bottom: 12,
+                    left: 12,
+                    bottom: 12,
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(99),
@@ -1387,7 +1698,10 @@ class _NewsHero extends StatelessWidget {
                         if (isBreaking) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.live,
                               borderRadius: BorderRadius.circular(99),
@@ -1427,7 +1741,8 @@ class _NewsHero extends StatelessWidget {
                       height: 1.25,
                     ),
                   ),
-                  if (article.summary != null && article.summary!.isNotEmpty) ...[
+                  if (article.summary != null &&
+                      article.summary!.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
                       article.summary!,
@@ -1444,7 +1759,11 @@ class _NewsHero extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.schedule, size: 12, color: AppColors.muted2),
+                      const Icon(
+                        Icons.schedule,
+                        size: 12,
+                        color: AppColors.muted2,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         relativeTime(article.publishedAt),
@@ -1490,7 +1809,8 @@ class _NewsRow extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: SizedBox(
-                    width: 104, height: 78,
+                    width: 104,
+                    height: 78,
                     child: NewsThumb(
                       imageUrl: article.imageUrl,
                       source: article.source,
@@ -1521,7 +1841,11 @@ class _NewsRow extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.schedule, size: 11, color: AppColors.muted2),
+                          const Icon(
+                            Icons.schedule,
+                            size: 11,
+                            color: AppColors.muted2,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             relativeTime(article.publishedAt),
@@ -1599,7 +1923,8 @@ class _ListEmpty extends StatelessWidget {
         border: Border.all(color: AppColors.borderSoft),
         gradient: const LinearGradient(
           colors: [AppColors.surface2, AppColors.surface],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
       child: PitchEmptyState(title: title, subtitle: subtitle, glyph: glyph),
@@ -1644,13 +1969,18 @@ class _NoLiveNowTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: AppColors.muted2.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.borderSoft),
               ),
-              child: const Icon(Icons.schedule, color: AppColors.muted, size: 18),
+              child: const Icon(
+                Icons.schedule,
+                color: AppColors.muted,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1708,50 +2038,60 @@ class _LeagueDigest extends ConsumerWidget {
   /// Friendly names for the seeded competition codes. Anything not in this
   /// map falls back to the raw id (e.g., a new league added later).
   static const _competitionNames = <String, String>{
-    'PL_2025':       'Premier League',
-    'LALIGA_2025':   'La Liga',
+    'PL_2025': 'Premier League',
+    'LALIGA_2025': 'La Liga',
     'BUNDESLIGA_2025': 'Bundesliga',
-    'SERIEA_2025':   'Serie A',
-    'LIGUE1_2025':   'Ligue 1',
-    'UCL_2025':      'UEFA Champions League',
-    'UEL_2025':      'UEFA Europa League',
-    'WC2026':        'FIFA World Cup 2026',
+    'SERIEA_2025': 'Serie A',
+    'LIGUE1_2025': 'Ligue 1',
+    'UCL_2025': 'UEFA Champions League',
+    'UEL_2025': 'UEFA Europa League',
+    'WC2026': 'FIFA World Cup 2026',
   };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(homeFixturesProvider);
     return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Skeleton(height: 220, radius: 16),
-      ),
-      error: (_, __) => const _StripEmpty(
-        title: 'League schedule unavailable',
-        subtitle: 'Couldn’t reach the fixtures feed. Pull to refresh.',
-      ),
+      loading:
+          () => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Skeleton(height: 220, radius: 16),
+          ),
+      error:
+          (_, __) => const _StripEmpty(
+            title: 'League schedule unavailable',
+            subtitle: 'Couldn’t reach the fixtures feed. Pull to refresh.',
+          ),
       data: (f) {
         // Group recent + upcoming by competitionId. Skip the WC: it has
         // its own spotlight section below.
         final byComp = <String, _CompBucket>{};
         for (final m in f.recent) {
           if (m.competitionId == 'WC2026') continue;
-          byComp.putIfAbsent(m.competitionId, () => _CompBucket()).recent.add(m);
+          byComp
+              .putIfAbsent(m.competitionId, () => _CompBucket())
+              .recent
+              .add(m);
         }
         for (final m in f.upcoming) {
           if (m.competitionId == 'WC2026') continue;
-          byComp.putIfAbsent(m.competitionId, () => _CompBucket()).upcoming.add(m);
+          byComp
+              .putIfAbsent(m.competitionId, () => _CompBucket())
+              .upcoming
+              .add(m);
         }
         if (byComp.isEmpty) {
           return const _StripEmpty(
             title: 'No European fixtures in the window',
-            subtitle: 'No matches between yesterday and the day after tomorrow. Check back closer to the weekend.',
+            subtitle:
+                'No matches between yesterday and the day after tomorrow. Check back closer to the weekend.',
           );
         }
         // Sort: leagues with the most rows first (gives the user the most
         // immediately interesting content up top). Cap at 3 cards on home.
-        final ranked = byComp.entries.toList()
-          ..sort((a, b) => (b.value.total).compareTo(a.value.total));
+        final ranked =
+            byComp.entries.toList()
+              ..sort((a, b) => (b.value.total).compareTo(a.value.total));
         final top = ranked.take(3).toList();
 
         return Padding(
@@ -1802,7 +2142,8 @@ class _LeagueCard extends StatelessWidget {
         border: Border.all(color: AppColors.borderSoft),
         gradient: const LinearGradient(
           colors: [Color(0xFF1A1815), Color(0xFF120F0D)],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
       child: Column(
@@ -1877,9 +2218,10 @@ class _LeagueResultRow extends StatelessWidget {
             _ScoreBlock(
               home: match.homeScore,
               away: match.awayScore,
-              winner: match.homeScore > match.awayScore
-                  ? _Winner.home
-                  : match.awayScore > match.homeScore
+              winner:
+                  match.homeScore > match.awayScore
+                      ? _Winner.home
+                      : match.awayScore > match.homeScore
                       ? _Winner.away
                       : _Winner.draw,
             ),
@@ -1940,7 +2282,11 @@ class _LeagueFixtureRow extends StatelessWidget {
 enum _Winner { home, away, draw }
 
 class _ScoreBlock extends StatelessWidget {
-  const _ScoreBlock({required this.home, required this.away, required this.winner});
+  const _ScoreBlock({
+    required this.home,
+    required this.away,
+    required this.winner,
+  });
   final int home;
   final int away;
   final _Winner winner;
@@ -2035,7 +2381,8 @@ class _PickTeamsPrompt extends StatelessWidget {
             border: Border.all(color: AppColors.goldHairline),
             gradient: const LinearGradient(
               colors: [Color(0xFF221C14), Color(0xFF12100D)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
@@ -2052,7 +2399,10 @@ class _PickTeamsPrompt extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.gold.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(99),
@@ -2067,7 +2417,11 @@ class _PickTeamsPrompt extends StatelessWidget {
                           'PERSONALISE',
                           style: TextStyle(
                             fontFamily: 'JetBrainsMono',
-                            fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                            fontFamilyFallback: [
+                              'SF Mono',
+                              'Menlo',
+                              'monospace',
+                            ],
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
                             color: AppColors.gold,
@@ -2078,7 +2432,11 @@ class _PickTeamsPrompt extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.chevron_right, color: AppColors.gold, size: 22),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.gold,
+                    size: 22,
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -2134,7 +2492,10 @@ class _PickTeamsPrompt extends StatelessWidget {
                   ],
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.gold,
                       borderRadius: BorderRadius.circular(99),
@@ -2152,7 +2513,11 @@ class _PickTeamsPrompt extends StatelessWidget {
                           ),
                         ),
                         SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 12, color: Color(0xFF1E1810)),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 12,
+                          color: Color(0xFF1E1810),
+                        ),
                       ],
                     ),
                   ),
@@ -2176,7 +2541,8 @@ class _MockCrest extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36, height: 36,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: tint.withValues(alpha: 0.20),
@@ -2216,10 +2582,13 @@ class _FollowedTeamsRail extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.goldHairline.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: AppColors.goldHairline.withValues(alpha: 0.5),
+          ),
           gradient: const LinearGradient(
             colors: [Color(0xFF1A1815), Color(0xFF110F0D)],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: Column(
@@ -2262,7 +2631,7 @@ class _FollowedTeamsRail extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Team news — headlines from ALL followed teams (most engaging content first)
+            // Team news — headlines from ALL followed teams.
             for (final team in teams)
               _FollowedTeamNews(teamId: team.id),
             Container(height: 1, color: AppColors.borderSoft),
@@ -2323,8 +2692,12 @@ class _TeamNewsRow extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: SizedBox(
-                  width: 48, height: 48,
-                  child: PremiumImage(url: article.imageUrl!, fit: BoxFit.cover),
+                  width: 48,
+                  height: 48,
+                  child: PremiumImage(
+                    url: article.imageUrl!,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -2367,7 +2740,8 @@ class _CrestPill extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 36, height: 36,
+          width: 36,
+          height: 36,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
@@ -2406,10 +2780,11 @@ class _FollowedTeamFixtures extends ConsumerWidget {
     if (teamIds.isEmpty) return const SizedBox.shrink();
     final async = ref.watch(homeFixturesProvider);
     return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Skeleton(height: 32, radius: 8),
-      ),
+      loading:
+          () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Skeleton(height: 32, radius: 8),
+          ),
       error: (_, __) => const SizedBox.shrink(),
       data: (f) {
         bool involvesFollowed(MatchDto m) =>
@@ -2421,7 +2796,11 @@ class _FollowedTeamFixtures extends ConsumerWidget {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'No fixtures found for your teams. Check back soon.',
-              style: TextStyle(color: AppColors.muted, fontSize: 11.5, height: 1.4),
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 11.5,
+                height: 1.4,
+              ),
             ),
           );
         }
@@ -2437,7 +2816,10 @@ class _FollowedTeamFixtures extends ConsumerWidget {
             ],
             if (upcoming.isNotEmpty) ...[
               Padding(
-                padding: EdgeInsets.only(bottom: 4, top: recent.isNotEmpty ? 8 : 4),
+                padding: EdgeInsets.only(
+                  bottom: 4,
+                  top: recent.isNotEmpty ? 8 : 4,
+                ),
                 child: const Eyebrow('Coming up', gold: true, size: 9),
               ),
               for (final m in upcoming) _LeagueFixtureRow(match: m),
@@ -2458,7 +2840,8 @@ class _TeamCellInline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final crest = SizedBox(
-      width: 18, height: 18,
+      width: 18,
+      height: 18,
       child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
     );
     final label = Text(
@@ -2475,10 +2858,12 @@ class _TeamCellInline extends StatelessWidget {
     );
     return Expanded(
       child: Row(
-        mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: alignEnd
-            ? [Flexible(child: label), const SizedBox(width: 8), crest]
-            : [crest, const SizedBox(width: 8), Flexible(child: label)],
+        mainAxisAlignment:
+            alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children:
+            alignEnd
+                ? [Flexible(child: label), const SizedBox(width: 8), crest]
+                : [crest, const SizedBox(width: 8), Flexible(child: label)],
       ),
     );
   }
@@ -2500,13 +2885,13 @@ class _FeaturedCardsStrip extends ConsumerWidget {
   const _FeaturedCardsStrip();
 
   static int _ratingFor(CardRarity r) => switch (r) {
-        CardRarity.COMMON => 75,
-        CardRarity.UNCOMMON => 79,
-        CardRarity.RARE => 84,
-        CardRarity.EPIC => 88,
-        CardRarity.LEGENDARY => 92,
-        CardRarity.ICONIC => 95,
-      };
+    CardRarity.COMMON => 75,
+    CardRarity.UNCOMMON => 79,
+    CardRarity.RARE => 84,
+    CardRarity.EPIC => 88,
+    CardRarity.LEGENDARY => 92,
+    CardRarity.ICONIC => 95,
+  };
 
   static String _shortEdition(String edition) {
     final dash = edition.indexOf('-');
@@ -2519,17 +2904,23 @@ class _FeaturedCardsStrip extends ConsumerWidget {
     return SizedBox(
       height: 240,
       child: async.when(
-        loading: () => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: 4,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (_, __) => const SizedBox(width: 140, child: Skeleton(height: 240, radius: 14)),
-        ),
-        error: (_, __) => const _StripEmpty(
-          title: 'Cards unavailable',
-          subtitle: 'Couldn’t load the catalogue. Pull to refresh.',
-        ),
+        loading:
+            () => ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 4,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder:
+                  (_, __) => const SizedBox(
+                    width: 140,
+                    child: Skeleton(height: 240, radius: 14),
+                  ),
+            ),
+        error:
+            (_, __) => const _StripEmpty(
+              title: 'Cards unavailable',
+              subtitle: 'Couldn’t load the catalogue. Pull to refresh.',
+            ),
         data: (page) {
           // Server might be empty if seed:cards hasn't run — surface
           // a CTA instead of a flat blank tile.
@@ -2598,24 +2989,28 @@ class _GroupSpotlight extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(standingsProvider);
     return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Skeleton(height: 160, radius: 16),
-      ),
-      error: (_, __) => const _StripEmpty(
-        title: 'Group draws loading',
-        subtitle: 'Couldn’t reach the tournament feed. Pull to refresh.',
-      ),
+      loading:
+          () => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Skeleton(height: 160, radius: 16),
+          ),
+      error:
+          (_, __) => const _StripEmpty(
+            title: 'Group draws loading',
+            subtitle: 'Couldn’t reach the tournament feed. Pull to refresh.',
+          ),
       data: (groups) {
         if (groups.isEmpty) {
           return const _StripEmpty(
             title: 'Group draws not seeded yet',
-            subtitle: 'Run npm run seed:wc in backend/ to populate the tournament.',
+            subtitle:
+                'Run npm run seed:wc in backend/ to populate the tournament.',
           );
         }
         // Pick a stable group for the current day so it doesn't flicker
         // between rebuilds, but rotates across visits over the week.
-        final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
+        final dayOfYear =
+            DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
         final group = groups[dayOfYear % groups.length];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2629,7 +3024,8 @@ class _GroupSpotlight extends ConsumerWidget {
                 border: Border.all(color: AppColors.borderSoft),
                 gradient: const LinearGradient(
                   colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
               child: Column(
@@ -2641,7 +3037,10 @@ class _GroupSpotlight extends ConsumerWidget {
                       const Spacer(),
                       const Text(
                         '→',
-                        style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -2673,7 +3072,11 @@ class _GroupTeamCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SizedBox(width: 36, height: 36, child: PremiumImage(url: row.teamLogo, fit: BoxFit.contain)),
+        SizedBox(
+          width: 36,
+          height: 36,
+          child: PremiumImage(url: row.teamLogo, fit: BoxFit.contain),
+        ),
         const SizedBox(height: 6),
         Text(
           row.teamName,
@@ -2774,14 +3177,18 @@ class _BracketCta extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 40, height: 40,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.gold.withValues(alpha: 0.16),
                   border: Border.all(color: AppColors.goldHairline),
                 ),
-                child: const Icon(Icons.account_tree_outlined,
-                    size: 20, color: AppColors.gold),
+                child: const Icon(
+                  Icons.account_tree_outlined,
+                  size: 20,
+                  color: AppColors.gold,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -2858,23 +3265,28 @@ class _BracketStatus extends StatelessWidget {
                 children: [
                   // Champion crest or trophy fallback.
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.gold.withValues(alpha: 0.16),
                       border: Border.all(color: AppColors.goldHairline),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: champion?.crestUrl != null
-                        ? Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: PremiumImage(
-                              url: champion!.crestUrl,
-                              fit: BoxFit.contain,
+                    child:
+                        champion?.crestUrl != null
+                            ? Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: PremiumImage(
+                                url: champion!.crestUrl,
+                                fit: BoxFit.contain,
+                              ),
+                            )
+                            : const Icon(
+                              Icons.emoji_events_rounded,
+                              size: 20,
+                              color: AppColors.gold,
                             ),
-                          )
-                        : const Icon(Icons.emoji_events_rounded,
-                            size: 20, color: AppColors.gold),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2903,7 +3315,9 @@ class _BracketStatus extends StatelessWidget {
                   if (scored)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.gold.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(99),

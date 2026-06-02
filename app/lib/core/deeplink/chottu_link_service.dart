@@ -190,14 +190,17 @@ class ChottuLinkService {
   }) async {
     final hasChampion = championName != null && championName.isNotEmpty;
     final title = hasChampion
-        ? 'My WC 2026 bracket — $championName for the cup'
-        : 'My WC 2026 bracket on FootballMojo';
+        ? 'My World Cup 2026 prediction — $championName for the cup'
+        : 'My World Cup 2026 prediction';
     final description = pointsAwarded != null && pointsAwarded > 0
-        ? '$pointsAwarded pts so far. Build yours and beat me.'
-        : 'Build yours and see if you can beat me.';
+        ? '$pointsAwarded pts so far. Make yours on FootballMojo.'
+        : 'Make yours on FootballMojo.';
+    // Requested copy: "Here is my World Cup prediction. Make yours now on
+    // FootballMojo" + link (the link is appended by _createAndShare).
     final shareText = hasChampion
-        ? "I've got $championName lifting the cup 🏆 Make your bracket:\n\n"
-        : "My WC 2026 bracket is in. Make yours:\n\n";
+        ? 'Here is my World Cup 2026 prediction 🏆 — $championName lifting the trophy. '
+            'Make yours now on FootballMojo:\n\n'
+        : 'Here is my World Cup 2026 prediction 🏆 Make yours now on FootballMojo:\n\n';
     _createAndShare(
       deepLink: '$_baseUrl/bracket',
       utmCampaign: 'bracket_share',

@@ -8,15 +8,22 @@ import '../network/dio_provider.dart';
 /// Cached in memory for the app session. Falls back to sensible defaults
 /// if the network request fails (offline, server error, etc.).
 class RemoteAppConfig {
-  const RemoteAppConfig({this.wcMode = true});
+  const RemoteAppConfig({this.wcMode = true, this.adsEnabled = true});
 
   /// When true the home screen hides dormant European-league sections
   /// and promotes World Cup content. Driven by the server env `WC_MODE`.
   final bool wcMode;
 
+  /// Master ad kill-switch from the server env `ADS_ENABLED`. When false,
+  /// the app skips AdMob init and hides every ad surface (banner +
+  /// rewarded entry points) instantly on the next config fetch — no app
+  /// release required.
+  final bool adsEnabled;
+
   factory RemoteAppConfig.fromJson(Map<String, dynamic> json) {
     return RemoteAppConfig(
       wcMode: json['wcMode'] as bool? ?? true,
+      adsEnabled: json['adsEnabled'] as bool? ?? true,
     );
   }
 }
@@ -39,4 +46,11 @@ final remoteAppConfigProvider = FutureProvider<RemoteAppConfig>((ref) async {
 /// Convenience accessor: true when World Cup mode is active.
 final wcModeProvider = Provider<bool>((ref) {
   return ref.watch(remoteAppConfigProvider).valueOrNull?.wcMode ?? true;
+});
+
+/// Convenience accessor: true when ads should be shown. Defaults to true
+/// until the config resolves so we never block the first banner on a slow
+/// fetch; the server flag flips it off within one fetch when needed.
+final adsEnabledProvider = Provider<bool>((ref) {
+  return ref.watch(remoteAppConfigProvider).valueOrNull?.adsEnabled ?? true;
 });

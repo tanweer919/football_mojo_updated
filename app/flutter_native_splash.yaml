@@ -9,15 +9,16 @@ flutter_native_splash:
   ios: true
   web: false
 
-  # Android 12+ renders the icon inside a CIRCULAR mask (288dp circle,
-  # 240dp safe zone). Using the full splash_screen.png here clips the
-  # text and edges. Use a compact icon-only image instead — the ball +
-  # "FM" mark with generous padding fits cleanly inside the circle.
+  # Android 12+ renders the icon inside a CIRCULAR mask (the visible area
+  # is roughly the inner 2/3 ≈ 66.7% of the supplied image). No wordmark
+  # here (text would get clipped by the circle) — just the white football
+  # mark, scaled to ~64% on the brand background so it's as large as
+  # possible while sitting fully inside the safe circle, uncut.
   android_12:
     color:      "#0F0E0D"
     color_dark: "#0F0E0D"
-    image:      assets/images/splash_icon.png
-    image_dark: assets/images/splash_icon.png
+    image:      assets/images/splash_icon_a12.png
+    image_dark: assets/images/splash_icon_a12.png
     icon_background_color:      "#0F0E0D"
     icon_background_color_dark: "#0F0E0D"
 

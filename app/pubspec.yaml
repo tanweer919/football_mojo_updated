@@ -84,6 +84,7 @@ dependencies:
   connectivity_plus: ^6.1.4
   share_plus: ^11.0.0
   chottu_link: ^1.1.0
+  gal: ^2.3.0                        # save share graphics to the device gallery
 
   # App updates
   in_app_update: ^4.2.3              # Android Play Store in-app updates (Android-only)
@@ -109,13 +110,21 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/app_icon_foreground.png"
-  # Adaptive icon layers (Android 8+) — this is what makes the icon
-  # render full-size with your branded dark background instead of
-  # being shrunk inside a white circle.
-  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"
-  adaptive_icon_background: "#0F0E0D"
+  # iOS + legacy (pre-Android-8) launcher icon: white wireframe football on
+  # black, flattened to a full square.
+  image_path: "assets/images/app_icon8_full.png"
+  # Adaptive icon layers (Android 8+). Foreground is the white wireframe
+  # ball (assets/images/app.png as-is — white linework, black panels) on
+  # transparency, scaled to ~66% (inside the 66.7% safe zone so no mask
+  # clips it). The black panels merge into the black background layer,
+  # leaving the white wireframe on black.
+  adaptive_icon_foreground: "assets/images/app_icon8_foreground.png"
+  adaptive_icon_background: "#000000"
+  # Foreground is ALREADY padded into the safe zone, so suppress the
+  # package's default 16% inset (it would double-pad and shrink the ball).
+  adaptive_icon_foreground_inset: 0
   min_sdk_android: 21
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

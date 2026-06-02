@@ -8,14 +8,12 @@ import '../../../../core/design/app_spacing.dart';
 import '../../../../core/design/motion.dart';
 import '../../../../core/design/rarity_theme.dart';
 import '../../../../core/deeplink/chottu_link_service.dart';
-import '../../../../core/share/share_service.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/foil_overlay.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../data/models/card_models.dart';
 import '../../data/repositories/album_repository.dart';
-import '../widgets/card_pull_share_card.dart';
 
 /// Premium card detail. Top half is a 3D-tilted player card with foil/holo
 /// overlay, drag the card to tilt, tap to flip, with rarity-driven background

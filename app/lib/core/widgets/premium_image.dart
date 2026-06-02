@@ -12,12 +12,17 @@ class PremiumImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.fallback,
     this.borderRadius,
+    this.fadeInDuration = const Duration(milliseconds: 220),
   });
 
   final String? url;
   final BoxFit fit;
   final Widget? fallback;
   final BorderRadius? borderRadius;
+  /// Fade-in for the loaded image. Set to [Duration.zero] when capturing
+  /// the widget to a PNG (off-screen RepaintBoundary) so crests paint
+  /// fully on the first frame instead of mid-fade.
+  final Duration fadeInDuration;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +44,7 @@ class PremiumImage extends StatelessWidget {
       image = CachedNetworkImage(
         imageUrl: url!,
         fit: fit,
-        fadeInDuration: const Duration(milliseconds: 220),
+        fadeInDuration: fadeInDuration,
         placeholder: (_, __) => placeholder,
         errorWidget: (_, __, ___) => fb,
       );

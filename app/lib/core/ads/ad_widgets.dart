@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../config/remote_app_config.dart';
 import '../design/app_colors.dart';
+import '../../features/iap/data/iap_service.dart';
 import 'admob_service.dart';
 
 /// Reusable banner ad widget that matches PITCH's dark theme.
@@ -11,24 +14,57 @@ import 'admob_service.dart';
 ///   const PitchBannerAd(),
 ///   ```
 ///
-/// Handles loading, error, and disposal automatically. Renders as a
+/// Renders nothing (and never even creates an ad) when the remote
+/// `adsEnabled` flag is off or the user has PITCH Pro. Otherwise handles
+/// loading, error, and disposal automatically, rendering as a
 /// `SizedBox.shrink()` while loading or if the ad fails — zero layout
-/// impact on error so the screen doesn't jump.
-class PitchBannerAd extends StatefulWidget {
+/// impact so the screen doesn't jump.
+class PitchBannerAd extends ConsumerWidget {
   const PitchBannerAd({super.key, this.padding});
   final EdgeInsetsGeometry? padding;
 
   @override
-  State<PitchBannerAd> createState() => _PitchBannerAdState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final adsEnabled = ref.watch(adsEnabledProvider);
+    final isPro = ref.watch(isProActiveProvider);
+    if (!adsEnabled || isPro) return const SizedBox.shrink();
+    return _BannerBody(padding: padding);
+  }
 }
 
-class _PitchBannerAdState extends State<PitchBannerAd> {
+class _BannerBody extends StatefulWidget {
+  const _BannerBody({this.padding});
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  State<_BannerBody> createState() => _BannerBodyState();
+}
+
+class _BannerBodyState extends State<_BannerBody> {
   BannerAd? _ad;
   bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
+    // Only request the banner once UMP consent is resolved and the SDK is
+    // ready. If it isn't yet, wait for the `ready` notifier to flip so we
+    // never fire an ad request without consent.
+    final ads = AdmobService.instance;
+    if (ads.canRequestAds) {
+      _create();
+    } else {
+      ads.ready.addListener(_onReady);
+    }
+  }
+
+  void _onReady() {
+    if (AdmobService.instance.canRequestAds && _ad == null && mounted) {
+      _create();
+    }
+  }
+
+  void _create() {
     _ad = AdmobService.instance.createBanner(
       onLoaded: () {
         if (mounted) setState(() => _loaded = true);
@@ -41,6 +77,7 @@ class _PitchBannerAdState extends State<PitchBannerAd> {
 
   @override
   void dispose() {
+    AdmobService.instance.ready.removeListener(_onReady);
     _ad?.dispose();
     super.dispose();
   }

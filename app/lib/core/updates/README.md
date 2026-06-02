@@ -25,11 +25,15 @@ Android "recommended" updates intentionally have **no Flutter UI** — Play's na
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/shorebirdtech/install/main/install.sh | bash
 shorebird login
-cd /Users/gb11/Documents/flutter/FootballMojo  # the MAIN repo, not the worktree
+# Run init inside app/ — the Flutter module lives there after the
+# app/ + backend/ restructure (this is NOT the repo root).
+cd /Users/gb11/Documents/flutter/FootballMojo/app
 shorebird init
 ```
 
-`shorebird init` creates `shorebird.yaml` at the repo root and registers it under `flutter.assets` in `pubspec.yaml`. Commit both.
+`shorebird init` creates `app/shorebird.yaml` (with the app_id) and registers
+it under `flutter.assets` in `app/pubspec.yaml`. Commit both. Build/patch
+commands must also be run from `app/`.
 
 ## Release & patch
 

@@ -20,6 +20,10 @@ export class AppConfigController {
       // sections and promotes World Cup content. Toggle off via env
       // WC_MODE=false after the tournament ends.
       wcMode: this.cfg.get<string>('WC_MODE', 'true') === 'true',
+      // Master ad kill-switch. Set ADS_ENABLED=false to instantly hide
+      // every ad (banners, interstitials, rewarded) across all clients on
+      // the next config fetch — no app release needed. Defaults on.
+      adsEnabled: this.cfg.get<string>('ADS_ENABLED', 'true') === 'true',
     };
   }
 }

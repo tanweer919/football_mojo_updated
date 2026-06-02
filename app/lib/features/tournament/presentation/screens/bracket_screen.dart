@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/deeplink/chottu_link_service.dart';
@@ -9,7 +11,7 @@ import '../../../predictions/data/predictions_repository.dart';
 import '../../../world_cup/data/world_cup_models.dart';
 import '../../../world_cup/data/world_cup_repository.dart';
 import '../../data/wc2026_bracket.dart';
-import '../widgets/bracket_share_card.dart';
+import '../widgets/bracket_prediction_card.dart';
 
 /// World Cup bracket predictor — Telegraph-style.
 ///
@@ -95,6 +97,20 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       final teamId = _picks['MATCH_${slot.matchNumber}_WINNER'] as String?;
       return teamId == null ? null : teamsById[teamId];
     }
+    if (slot is MatchLoser) {
+      // The loser is whichever side of the referenced match the user did
+      // NOT pick as winner. Needs that match's winner set AND both of its
+      // sides resolvable.
+      final winnerId = _picks['MATCH_${slot.matchNumber}_WINNER'] as String?;
+      if (winnerId == null) return null;
+      final m = wc2026MatchesByNumber[slot.matchNumber];
+      if (m == null) return null;
+      final left = _resolveSlot(m.left, teamsById);
+      final right = _resolveSlot(m.right, teamsById);
+      if (left != null && left.id != winnerId) return left;
+      if (right != null && right.id != winnerId) return right;
+      return null;
+    }
     if (slot is BestThird) {
       // First of the user's best-thirds that's in this slot's eligible group
       // set. FIFA's actual assignment is matrix-based — we approximate by
@@ -112,6 +128,181 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     return null;
   }
 
+  /// Resolve the user's picks into the full prediction poster model —
+  /// every group's 1–4 order, the 8 best-thirds, and every knockout
+  /// head-to-head with its predicted winner. Unresolved slots stay null
+  /// (the card shows "TBD"), so this works for partial brackets too;
+  /// we only surface the share prompt once a champion is set.
+  FullBracketPrediction _buildPrediction(Map<String, WcTeamRef> teamsById) {
+    // Groups — predicted finishing order 1..4 per letter.
+    final groups = <GroupPrediction>[
+      for (final l in wcGroupLetters)
+        GroupPrediction(
+          letter: l,
+          ordered: [
+            for (var pos = 1; pos <= 4; pos++)
+              if (_picks['GROUP_${l}_$pos'] is String &&
+                  teamsById[_picks['GROUP_${l}_$pos']] != null)
+                teamsById[_picks['GROUP_${l}_$pos']]!,
+          ],
+        ),
+    ];
+
+    // Best-thirds — the 8 selected group letters' 3rd-placed teams.
+    final bestThirds = <WcTeamRef>[
+      for (final l in _bestThirds)
+        if (_picks['GROUP_${l}_3'] is String &&
+            teamsById[_picks['GROUP_${l}_3']] != null)
+          teamsById[_picks['GROUP_${l}_3']]!,
+    ];
+
+    // One TiePrediction per knockout match, resolving both sides through
+    // the cascade and reading the stored winner.
+    TiePrediction tieFor(BracketMatch m) => TiePrediction(
+          number: m.number,
+          left: _resolveSlot(m.left, teamsById),
+          right: _resolveSlot(m.right, teamsById),
+          winnerId: _picks['MATCH_${m.number}_WINNER'] as String?,
+        );
+    List<TiePrediction> tiesIn(BracketRound round) => [
+          for (final m in wc2026Matches)
+            if (m.round == round) tieFor(m),
+        ];
+
+    final championId = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
+    final finalMatch = wc2026MatchesByNumber[wc2026ChampionMatchNumber];
+    BracketMatch? bronzeMatch;
+    for (final m in wc2026Matches) {
+      if (m.round == BracketRound.bronze) {
+        bronzeMatch = m;
+        break;
+      }
+    }
+    return FullBracketPrediction(
+      groups: groups,
+      bestThirds: bestThirds,
+      r32: tiesIn(BracketRound.r32),
+      r16: tiesIn(BracketRound.r16),
+      qf: tiesIn(BracketRound.qf),
+      sf: tiesIn(BracketRound.sf),
+      bronzeTie: bronzeMatch == null ? null : tieFor(bronzeMatch),
+      finalTie: finalMatch == null ? null : tieFor(finalMatch),
+      champion: championId == null ? null : teamsById[championId],
+    );
+  }
+
+  /// A "complete" prediction has a champion picked — that can only happen
+  /// once the entire knockout chain resolves, so it's the signal we use
+  /// to offer the share-your-prediction prompt after saving.
+  bool _isComplete() =>
+      _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] is String;
+
+  /// Render the full-bracket prediction poster to a PNG and return its
+  /// path (null on failure / groups not loaded). Shared by the share and
+  /// save-to-gallery flows.
+  Future<String?> _renderPredictionImage(List<WcGroup>? groups) async {
+    if (groups == null) return null;
+    final teamsById = <String, WcTeamRef>{
+      for (final g in groups)
+        for (final s in g.standings) s.team.id: s.team,
+    };
+    // Off-screen capture happens in ~2 frames — far too quick for crests
+    // to download. Precache every team crest into the image cache FIRST so
+    // the poster renders them all on the first painted frame (the card
+    // also disables the fade-in). Without this, only already-cached crests
+    // would appear and the rest would be blank.
+    await _precacheCrests(teamsById.values);
+    final prediction = _buildPrediction(teamsById);
+    try {
+      // Tall poster: fixed 1080 width, intrinsic height (the full bracket
+      // can run several thousand px). Captured at pixelRatio 2.
+      return await ShareService.instance.renderTallArtifactToFile(
+        context: context,
+        width: 1080,
+        filename: 'pitch_prediction.png',
+        builder: (_) => BracketPredictionCard(prediction: prediction),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Warm the image cache for every crest URL so the off-screen poster
+  /// render finds them in memory. Each precache is guarded so a single
+  /// 404 / bad URL can't fail the whole batch, and the batch is bounded
+  /// by a timeout so a slow CDN can't hang the share.
+  Future<void> _precacheCrests(Iterable<WcTeamRef> teams) async {
+    final urls = <String>{
+      for (final t in teams)
+        if (t.crestUrl != null && t.crestUrl!.isNotEmpty) t.crestUrl!,
+    };
+    if (urls.isEmpty || !mounted) return;
+    await Future.wait(
+      urls.map((u) => precacheImage(CachedNetworkImageProvider(u), context)
+          .catchError((_) {})),
+    ).timeout(const Duration(seconds: 6), onTimeout: () => const []);
+  }
+
+  WcTeamRef? _championOf(List<WcGroup>? groups) {
+    final id = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
+    if (id == null || groups == null) return null;
+    for (final g in groups) {
+      for (final s in g.standings) {
+        if (s.team.id == id) return s.team;
+      }
+    }
+    return null;
+  }
+
+  /// Render the prediction graphic and hand it (plus a ChottuLink deep
+  /// link) to the share sheet. Falls back to a link-only share if the
+  /// groups haven't loaded or the PNG render fails.
+  Future<void> _sharePrediction(List<WcGroup>? groups) async {
+    final imagePath = await _renderPredictionImage(groups);
+    final champion = _championOf(groups);
+    final pts = ref
+        .read(myBracketProvider(widget.competitionId))
+        .valueOrNull
+        ?.pointsAwarded ??
+        0;
+    await ChottuLinkService.instance.shareBracket(
+      championName: champion?.name,
+      championCrestUrl: champion?.crestUrl,
+      pointsAwarded: pts,
+      imagePath: imagePath,
+    );
+  }
+
+  /// Render the prediction poster and save it to the device gallery.
+  Future<void> _savePredictionToGallery(List<WcGroup>? groups) async {
+    if (groups == null) {
+      _toast('Bracket still loading — try again in a moment.');
+      return;
+    }
+    final imagePath = await _renderPredictionImage(groups);
+    if (imagePath == null) {
+      if (mounted) _toast('Could not generate the image. Try again.');
+      return;
+    }
+    try {
+      await Gal.putImage(imagePath, album: 'FootballMojo');
+      if (mounted) _toast('Saved to your gallery 📸');
+    } on GalException catch (e) {
+      if (!mounted) return;
+      _toast(e.type == GalExceptionType.accessDenied
+          ? 'Allow photo access to save the image.'
+          : 'Could not save to gallery.');
+    } catch (_) {
+      if (mounted) _toast('Could not save to gallery.');
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupsAsync = ref.watch(wcGroupsProvider(widget.competitionId));
@@ -125,56 +316,18 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       appBar: AppBar(
         title: const Text('My bracket'),
         actions: [
+          // Save-to-gallery — only meaningful once the bracket is complete
+          // (a champion is picked), so it's shown then.
+          if (_isComplete())
+            IconButton(
+              tooltip: 'Save to gallery',
+              icon: const Icon(Icons.download_rounded),
+              onPressed: () => _savePredictionToGallery(groupsAsync.valueOrNull),
+            ),
           IconButton(
             tooltip: 'Share',
             icon: const Icon(Icons.ios_share_rounded),
-            onPressed: () async {
-              final groups = groupsAsync.valueOrNull;
-              // Groups still loading — share with a plain deep link
-              // anyway (no PNG yet) so the button is never a dead end.
-              if (groups == null) {
-                await ChottuLinkService.instance.shareBracket();
-                return;
-              }
-              final teamsById = {
-                for (final g in groups)
-                  for (final s in g.standings) s.team.id: s.team,
-              };
-              final championId = _picks['MATCH_104_WINNER'] as String?;
-              final champion = championId == null ? null : teamsById[championId];
-              // Share card expects String→String for group/champion picks.
-              final shareMap = <String, String>{
-                for (final e in _picks.entries)
-                  if (e.value is String && (e.key.startsWith('GROUP_') && e.key.endsWith('_1')))
-                    'GROUP_${e.key.substring(6, 7)}_1': e.value as String,
-                if (championId != null) 'CHAMPION': championId,
-              };
-              // Render the share card PNG first, then hand both PNG +
-              // ChottuLink deep link to the share sheet so previews look
-              // good and the link opens the bracket screen on tap.
-              String? imagePath;
-              try {
-                imagePath = await ShareService.instance.renderArtifactToFile(
-                  context: context,
-                  logicalSize: const Size(1080, 1350),
-                  filename: 'pitch_bracket.png',
-                  builder: (_) => BracketShareCard(
-                    groups: groups,
-                    picks: shareMap,
-                    championTeam: champion,
-                  ),
-                );
-              } catch (_) {
-                imagePath = null;
-              }
-              final pts = mineAsync.valueOrNull?.pointsAwarded ?? 0;
-              await ChottuLinkService.instance.shareBracket(
-                championName: champion?.name,
-                championCrestUrl: champion?.crestUrl,
-                pointsAwarded: pts,
-                imagePath: imagePath,
-              );
-            },
+            onPressed: () => _sharePrediction(groupsAsync.valueOrNull),
           ),
           IconButton(
             tooltip: 'Leaderboard',
@@ -299,11 +452,14 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   }
 
   /// Clear downstream match winners that depended on the just-unset match.
+  /// Covers both MatchWinner references (the next round) and MatchLoser
+  /// references (the bronze final hangs off the semi-final results).
   void _invalidateDownstream(int matchNumber) {
+    bool refs(BracketSlotSource s) =>
+        (s is MatchWinner && s.matchNumber == matchNumber) ||
+        (s is MatchLoser && s.matchNumber == matchNumber);
     final downstream = wc2026Matches
-        .where((m) =>
-            (m.left is MatchWinner && (m.left as MatchWinner).matchNumber == matchNumber) ||
-            (m.right is MatchWinner && (m.right as MatchWinner).matchNumber == matchNumber))
+        .where((m) => refs(m.left) || refs(m.right))
         .map((m) => m.number);
     for (final n in downstream) {
       final key = 'MATCH_${n}_WINNER';
@@ -332,6 +488,12 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(saved.isLocked ? 'Bracket locked — saved' : 'Bracket saved')),
       );
+      // Complete bracket (champion picked) → invite them to share the
+      // prediction graphic. Not gated on lock state — sharing a complete
+      // bracket is worthwhile whether or not kickoff has begun.
+      if (_isComplete()) {
+        await _promptShare();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -346,6 +508,115 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     if (raw.contains('bracket_locked')) return 'Bracket is locked — kickoff has begun.';
     if (raw.contains('401') || raw.contains('unauthorized')) return 'Sign in to save your bracket.';
     return 'Could not save bracket. Try again.';
+  }
+
+  /// Bottom sheet shown after a complete bracket is saved, offering to
+  /// share the prediction graphic OR save it to the gallery. "Maybe later"
+  /// just dismisses.
+  Future<void> _promptShare() async {
+    final groups = ref.read(wcGroupsProvider(widget.competitionId)).valueOrNull;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF161310),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const Center(
+                child: Icon(Icons.emoji_events_rounded,
+                    color: Color(0xFFEBD9A8), size: 40),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Your bracket is complete!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Share your road-to-the-trophy prediction or save the '
+                'graphic to your gallery — then challenge your friends to '
+                'make theirs on FootballMojo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFD9B65A),
+                  foregroundColor: const Color(0xFF1E1810),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.ios_share_rounded, size: 18),
+                label: const Text(
+                  'Share my prediction',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                onPressed: () => Navigator.of(sheetCtx).pop('share'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEBD9A8),
+                  side: const BorderSide(color: Color(0x66D9B65A)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text(
+                  'Save to gallery',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                onPressed: () => Navigator.of(sheetCtx).pop('save'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(sheetCtx).pop(),
+                child: const Text(
+                  'Maybe later',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'share') {
+      await _sharePrediction(groups);
+    } else if (action == 'save') {
+      await _savePredictionToGallery(groups);
+    }
   }
 }
 
@@ -439,6 +710,7 @@ class _BracketBody extends StatelessWidget {
               BracketRound.r16,
               BracketRound.qf,
               BracketRound.sf,
+              BracketRound.bronze,
               BracketRound.finalRound,
             ])
               _RoundSection(
