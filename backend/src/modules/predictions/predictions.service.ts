@@ -133,28 +133,67 @@ export class PredictionsService {
   // ───────────────────────────────────────────────────────────────────────────
   // BRACKET PREDICTOR
   // ───────────────────────────────────────────────────────────────────────────
-  // Picks structure (flat map; one row per slot):
-  //   GROUP_<letter>_1  → team id the user thinks finishes 1st  (3 pts if correct)
-  //   GROUP_<letter>_2  → team id the user thinks finishes 2nd  (1 pt if correct)
-  //   CHAMPION          → team id the user thinks lifts the cup (50 pts if correct)
-  // Locks at the first knockout kickoff. Scoring is rerun each time a result
-  // changes — totals are derived, not accumulated, so it stays idempotent.
-
-  // Per-correct-pick point values. Knockout-stage picks are "did this
-  // team reach round X" — set-based, not position-based (no need to
-  // model winner-of-R32-1-plays-winner-of-R32-2 brackets). Each correct
-  // membership pick scores once per stage.
+  // Picks shape (mixed-value map stored in Bracket.picks JSON):
+  //
+  //   GROUP_<letter>_<pos>  → teamId       (pos 1..4 — full ordering per group)
+  //   BEST_THIRDS           → string[]     (up to 8 group letters)
+  //   MATCH_<n>_WINNER      → teamId       (one per knockout match 73..104)
+  //
+  // Scoring tiers per correct pick:
+  //   Group pos 1 / 2 / 3 / 4          → 5 / 3 / 1 / 0
+  //   Best-thirds letter qualified     → 5
+  //   Match winners by round:
+  //     R32 (73-88) → 10
+  //     R16 (89-96) → 25
+  //     QF (97-100) → 50
+  //     SF (101-102) → 100
+  //     Bronze (103) → 75
+  //     Final (104) → 500    (= champion)
+  //
+  // Locks at the first knockout kickoff. Scoring rerun on every group-
+  // standings refresh and every finished knockout. Idempotent because
+  // totals are derived from current state, not accumulated.
   private static readonly BRACKET_POINTS = {
-    GROUP_WINNER: 3,
-    GROUP_RUNNER_UP: 1,
-    REACH_R16: 5,
-    REACH_QF: 10,
-    REACH_SF: 20,
-    REACH_FINAL: 50,
-    CHAMPION: 250,
+    GROUP_POS_1: 5,
+    GROUP_POS_2: 3,
+    GROUP_POS_3: 1,
+    GROUP_POS_4: 0,
+    BEST_THIRD: 5,
+    R32_WINNER: 10,
+    R16_WINNER: 25,
+    QF_WINNER:  50,
+    SF_WINNER:  100,
+    BRONZE_WINNER: 75,
+    FINAL_WINNER: 500,
   };
 
-  async submitBracket(userId: string, competitionId: string, picks: Record<string, string>) {
+  /// Map bracket-match numbers to their knockout round + stage tag.
+  /// FIFA's WC2026 fixture list: 73-88 R32, 89-96 R16, 97-100 QF, 101-102 SF,
+  /// 103 bronze final, 104 grand final.
+  private static readonly MATCH_NUMBER_STAGE: Record<number, {
+    round: 'R32' | 'R16' | 'QF' | 'SF' | 'BRONZE' | 'FINAL';
+    stage: string;  // matches Match.stage values written by the scores poller
+    indexInStage: number;
+  }> = (() => {
+    const out: Record<number, { round: any; stage: string; indexInStage: number }> = {};
+    const ranges: Array<[string, string, number, number]> = [
+      ['R32', 'ROUND_OF_32', 73, 88],
+      ['R16', 'ROUND_OF_16', 89, 96],
+      ['QF',  'QUARTER',    97, 100],
+      ['SF',  'SEMI',       101, 102],
+      ['BRONZE', 'BRONZE',  103, 103],
+      ['FINAL', 'FINAL',    104, 104],
+    ];
+    for (const [round, stage, start, end] of ranges) {
+      for (let n = start as number; n <= (end as number); n++) {
+        out[n] = { round, stage, indexInStage: n - (start as number) };
+      }
+    }
+    return out;
+  })();
+
+  /// Picks is now a mixed shape — Record<string, string | string[]>.
+  async submitBracket(userId: string, competitionId: string, picks: Record<string, any>) {
     const lock = await this.bracketLockTime(competitionId);
     if (lock && lock.getTime() <= Date.now())
       throw new BadRequestException('bracket_locked');
@@ -176,7 +215,7 @@ export class PredictionsService {
     return {
       id: row.id,
       competitionId: row.competitionId,
-      picks: row.picks as Record<string, string>,
+      picks: (row.picks ?? {}) as Record<string, any>,
       pointsAwarded: row.pointsAwarded,
       lockedAt: lock,
       isLocked: !!(lock && lock.getTime() <= Date.now()),
@@ -203,131 +242,153 @@ export class PredictionsService {
     }));
   }
 
-  // Rerun scoring for every bracket in a competition. Idempotent — call this
-  // from a cron after group standings refresh, and again when the final ends.
+  /// Idempotent re-score over every bracket in the competition. Safe to
+  /// call from the cron after group standings refresh + after every
+  /// knockout result.
+  ///
+  /// Scoring runs in three layers:
+  ///   1. Per-group position scoring (5/3/1/0) — needs all group matches
+  ///      played (3 per team).
+  ///   2. Best-thirds picks (5 each) — checks which 3rd-placed teams
+  ///      actually appear in R32 fixtures.
+  ///   3. Knockout match winners (10/25/50/100/75/500 by round) — looks
+  ///      up the actual DB match by stage + chronological order, decides
+  ///      winner from score/penalties.
   async scoreBracket(competitionId: string) {
+    const points = PredictionsService.BRACKET_POINTS;
+
+    // ── (1) Resolve final group standings per letter ────────────────────
+    const groupResults = new Map<string, string[]>(); // letter → [pos1, pos2, pos3, pos4] teamIds
     const groups = await this.prisma.group.findMany({
       where: { competitionId },
       include: {
         standings: { orderBy: { position: 'asc' }, include: { team: true } },
       },
     });
-    const winners = new Map<string, string>();      // GROUP_A_1 → teamId
-    const runnersUp = new Map<string, string>();    // GROUP_A_2 → teamId
     for (const g of groups) {
       const letter = g.name.replace(/^Group\s+/i, '').trim() || g.name;
-      const positionLocked = (s: typeof g.standings[number]) =>
-        s.played > 0 && s.played === (g.standings[0]?.played ?? 0);
-      // Only count standings once every team has played the same number of games.
-      const allEqual = g.standings.every(positionLocked);
-      if (!allEqual) continue;
-      const final = g.standings.length >= 2
-        && g.standings[0]!.played > 0
-        && g.standings.every((s) => s.played >= 3);
-      if (!final) continue;
-      winners.set(`GROUP_${letter}_1`, g.standings[0]!.team.id);
-      runnersUp.set(`GROUP_${letter}_2`, g.standings[1]!.team.id);
+      // All teams must have played 3 games for positions to settle.
+      const allPlayed = g.standings.length === 4 && g.standings.every((s) => s.played >= 3);
+      if (!allPlayed) continue;
+      const sorted = [...g.standings].sort((a, b) => a.position - b.position);
+      groupResults.set(letter, sorted.map((s) => s.team.id));
     }
 
-    // Champion = winner of the final match in the competition, if FINISHED.
-    const finalMatch = await this.prisma.match.findFirst({
-      where: { competitionId, stage: 'FINAL', status: 'FINISHED' },
+    // ── (2) Set of group letters whose 3rd-place team actually advanced ─
+    const r32Matches = await this.prisma.match.findMany({
+      where: { competitionId, stage: 'ROUND_OF_32' },
+      select: { homeTeamId: true, awayTeamId: true },
     });
-    let champion: string | null = null;
-    if (finalMatch) {
-      if (finalMatch.homeScore !== finalMatch.awayScore) {
-        champion = finalMatch.homeScore > finalMatch.awayScore
-          ? finalMatch.homeTeamId : finalMatch.awayTeamId;
-      } else if (finalMatch.homePenalties != null && finalMatch.awayPenalties != null) {
-        champion = finalMatch.homePenalties > finalMatch.awayPenalties
-          ? finalMatch.homeTeamId : finalMatch.awayTeamId;
+    const teamsInR32 = new Set<string>();
+    for (const m of r32Matches) {
+      teamsInR32.add(m.homeTeamId);
+      teamsInR32.add(m.awayTeamId);
+    }
+    const advancingThirdLetters = new Set<string>();
+    for (const [letter, ordered] of groupResults) {
+      const thirdId = ordered[2];
+      if (thirdId && teamsInR32.has(thirdId)) {
+        advancingThirdLetters.add(letter);
       }
     }
 
-    // Build the set of teams that actually reached each knockout stage.
-    // A team "reached" stage X if it appears as home or away in any match
-    // with that stage. Derived from Match.stage which is set by the
-    // scores poller as the tournament progresses.
-    const reached = {
-      R16:   new Set<string>(),
-      QF:    new Set<string>(),
-      SF:    new Set<string>(),
-      FINAL: new Set<string>(),
-    };
-    const stageMatches = await this.prisma.match.findMany({
+    // ── (3) Bracket-match-number → actual winner ─────────────────────────
+    const knockout = await this.prisma.match.findMany({
       where: {
         competitionId,
-        stage: { in: ['ROUND_OF_16', 'QUARTER', 'SEMI', 'FINAL'] },
+        status: 'FINISHED',
+        stage: { in: ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER', 'SEMI', 'BRONZE', 'FINAL'] },
       },
-      select: { stage: true, homeTeamId: true, awayTeamId: true },
+      orderBy: { kickoffAt: 'asc' },
     });
-    for (const m of stageMatches) {
-      const bucket =
-        m.stage === 'ROUND_OF_16' ? reached.R16 :
-        m.stage === 'QUARTER'     ? reached.QF  :
-        m.stage === 'SEMI'        ? reached.SF  :
-        m.stage === 'FINAL'       ? reached.FINAL : null;
-      if (!bucket) continue;
-      bucket.add(m.homeTeamId);
-      bucket.add(m.awayTeamId);
+    const byStage = new Map<string, typeof knockout>();
+    for (const m of knockout) {
+      if (!m.stage) continue;
+      const list = byStage.get(m.stage) ?? [];
+      list.push(m);
+      byStage.set(m.stage, list);
+    }
+    const actualWinnerByMatch = new Map<number, string>();
+    for (const [num, info] of Object.entries(PredictionsService.MATCH_NUMBER_STAGE)) {
+      const dbMatch = byStage.get(info.stage)?.[info.indexInStage];
+      if (!dbMatch) continue;
+      const winner = this.matchWinner(dbMatch);
+      if (winner) actualWinnerByMatch.set(Number(num), winner);
     }
 
+    // ── Score every bracket ─────────────────────────────────────────────
     const brackets = await this.prisma.bracket.findMany({ where: { competitionId } });
     let updated = 0;
     for (const b of brackets) {
-      const picks = (b.picks ?? {}) as Record<string, string | string[]>;
+      const picks = (b.picks ?? {}) as Record<string, any>;
       let pts = 0;
 
-      // ── Group stage ────────────────────────────────────────────────
-      for (const [slot, teamId] of winners.entries()) {
-        if (picks[slot] === teamId) {
-          pts += PredictionsService.BRACKET_POINTS.GROUP_WINNER;
-          await this.gems.creditBracket(b.userId, b.id, slot, 'group_winner');
+      // Group positions (5/3/1/0 for pos 1/2/3/4).
+      for (const [letter, ordered] of groupResults) {
+        for (let pos = 1; pos <= 4; pos++) {
+          const userTeam = picks[`GROUP_${letter}_${pos}`];
+          const actualTeam = ordered[pos - 1];
+          if (typeof userTeam !== 'string' || userTeam !== actualTeam) continue;
+          if (pos === 1) {
+            pts += points.GROUP_POS_1;
+            await this.gems.creditBracket(b.userId, b.id, `GROUP_${letter}_1`, 'group_winner');
+          } else if (pos === 2) {
+            pts += points.GROUP_POS_2;
+            await this.gems.creditBracket(b.userId, b.id, `GROUP_${letter}_2`, 'runner_up');
+          } else if (pos === 3) {
+            pts += points.GROUP_POS_3;
+            // No gem reward for 3rd-place position alone — qualifying
+            // happens via the separate BEST_THIRDS pick.
+          }
+          // pos 4: 0 pts (just a bonus completeness signal, no reward).
         }
       }
-      for (const [slot, teamId] of runnersUp.entries()) {
-        if (picks[slot] === teamId) {
-          pts += PredictionsService.BRACKET_POINTS.GROUP_RUNNER_UP;
-          await this.gems.creditBracket(b.userId, b.id, slot, 'runner_up');
+
+      // Best-thirds: per letter the user picked, did their 3rd actually advance.
+      if (advancingThirdLetters.size > 0) {
+        const userThirds = picks['BEST_THIRDS'];
+        if (Array.isArray(userThirds)) {
+          for (const letter of userThirds) {
+            if (typeof letter !== 'string') continue;
+            if (!advancingThirdLetters.has(letter)) continue;
+            pts += points.BEST_THIRD;
+            // Reuse r16_reach gem kind — same semantic: "your pick made it
+            // into the bracket". Dedupe ref keeps each letter unique.
+            await this.gems.creditBracket(
+              b.userId, b.id, `BEST_THIRD:${letter}`, 'r16_reach',
+            );
+          }
         }
       }
 
-      // ── Knockout reach picks ──────────────────────────────────────
-      // Set-membership scoring: each team the user picked to reach
-      // round X that actually got there = 1 correct pick.
-      const scoreReach = async (
-        slotKey: 'REACH_R16' | 'REACH_QF' | 'REACH_SF' | 'REACH_FINAL',
-        actual: Set<string>,
-        pointsEach: number,
-        gemKind: 'r16_reach' | 'qf_reach' | 'sf_reach' | 'finalist',
-      ) => {
-        if (actual.size === 0) return;     // stage hasn't played out yet
-        const userPicks = picks[slotKey];
-        if (!Array.isArray(userPicks)) return;
-        for (const teamId of userPicks) {
-          if (typeof teamId !== 'string' || !actual.has(teamId)) continue;
-          pts += pointsEach;
-          // Dedupe ref includes the team id so each correct pick credits
-          // exactly one gem reward, idempotent across re-scores.
-          await this.gems.creditBracket(
-            b.userId, b.id, `${slotKey}:${teamId}`, gemKind,
-          );
-        }
-      };
+      // Match winners — iterate every match where we know the actual winner.
+      for (const [matchNum, actualWinner] of actualWinnerByMatch) {
+        const userPick = picks[`MATCH_${matchNum}_WINNER`];
+        if (typeof userPick !== 'string' || userPick !== actualWinner) continue;
+        const info = PredictionsService.MATCH_NUMBER_STAGE[matchNum];
+        if (!info) continue;
 
-      await scoreReach('REACH_R16',   reached.R16,
-        PredictionsService.BRACKET_POINTS.REACH_R16,   'r16_reach');
-      await scoreReach('REACH_QF',    reached.QF,
-        PredictionsService.BRACKET_POINTS.REACH_QF,    'qf_reach');
-      await scoreReach('REACH_SF',    reached.SF,
-        PredictionsService.BRACKET_POINTS.REACH_SF,    'sf_reach');
-      await scoreReach('REACH_FINAL', reached.FINAL,
-        PredictionsService.BRACKET_POINTS.REACH_FINAL, 'finalist');
+        const pointsForRound =
+          info.round === 'R32'    ? points.R32_WINNER :
+          info.round === 'R16'    ? points.R16_WINNER :
+          info.round === 'QF'     ? points.QF_WINNER  :
+          info.round === 'SF'     ? points.SF_WINNER  :
+          info.round === 'BRONZE' ? points.BRONZE_WINNER :
+          info.round === 'FINAL'  ? points.FINAL_WINNER  : 0;
+        pts += pointsForRound;
 
-      // ── Champion ──────────────────────────────────────────────────
-      if (champion && picks['CHAMPION'] === champion) {
-        pts += PredictionsService.BRACKET_POINTS.CHAMPION;
-        await this.gems.creditBracket(b.userId, b.id, 'CHAMPION', 'champion');
+        // Gem kind by round — reuse existing kinds where semantically
+        // similar. The dedupe key includes the match number so each
+        // correct pick credits exactly once.
+        const kind =
+          info.round === 'R32'    ? 'r16_reach' :
+          info.round === 'R16'    ? 'qf_reach'  :
+          info.round === 'QF'     ? 'sf_reach'  :
+          info.round === 'SF'     ? 'finalist'  :
+          info.round === 'BRONZE' ? 'finalist'  :
+          /* FINAL */               'champion'   as
+          ('r16_reach' | 'qf_reach' | 'sf_reach' | 'finalist' | 'champion');
+        await this.gems.creditBracket(b.userId, b.id, `MATCH_${matchNum}`, kind);
       }
 
       if (pts !== b.pointsAwarded) {
@@ -339,6 +400,22 @@ export class PredictionsService {
       }
     }
     return { scored: brackets.length, updated };
+  }
+
+  /// Determine the winner of a finished match. Returns null on draws with
+  /// no penalty data (rare — knockout matches always resolve, but defensive).
+  private matchWinner(m: {
+    homeTeamId: string; awayTeamId: string;
+    homeScore: number; awayScore: number;
+    homePenalties: number | null; awayPenalties: number | null;
+  }): string | null {
+    if (m.homeScore > m.awayScore) return m.homeTeamId;
+    if (m.awayScore > m.homeScore) return m.awayTeamId;
+    if (m.homePenalties != null && m.awayPenalties != null) {
+      if (m.homePenalties > m.awayPenalties) return m.homeTeamId;
+      if (m.awayPenalties > m.homePenalties) return m.awayTeamId;
+    }
+    return null;
   }
 
   // First knockout kickoff = lock for the bracket. Falls back to first match

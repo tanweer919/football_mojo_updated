@@ -13,9 +13,18 @@ export class NewsController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
     @Query('teamId') teamId?: string,
+    // Comma-separated list of team IDs for the "Following" tab.
+    // Articles matching ANY of them are returned.
+    @Query('teamIds') teamIds?: string,
     @Query('source') source?: string,
   ) {
-    return this.news.list({ limit: limit ? +limit : undefined, cursor, teamId, source });
+    return this.news.list({
+      limit: limit ? +limit : undefined,
+      cursor,
+      teamId,
+      teamIds: teamIds ? teamIds.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      source,
+    });
   }
 
   @Get(':id')
