@@ -55,13 +55,14 @@ class ChottuLinkService {
 
   /// Turns a deep-link URL into a GoRouter path.
   ///
-  /// Supported schemes:
-  ///   /news?id=<id>         → /news/<id>
-  ///   /player?id=<id>       → /players/<id>
-  ///   /match?id=<id>        → /matches/<id>
-  ///   /fantasy?slug=<slug>  → /fantasy/<slug>
+  /// Supported schemes (must match the routes in RoutePaths/app_router):
+  ///   /news?id=<id>         → /news/<id>          (newsReader)
+  ///   /player?id=<id>       → /players/<id>       (playerProfile)
+  ///   /match?id=<id>        → /matches/<id>       (matchDetail)
+  ///   /fantasy?slug=<slug>  → /fantasy/<slug>     (fantasyTournament)
   ///   /league?id=<id>&slug=<slug> → /fantasy/<slug>/leagues
-  ///   /card?id=<id>         → /cards/<id>
+  ///   /card?id=<id>         → /album/<id>         (cardDetail)
+  ///   /bracket              → /tournament/bracket
   ///
   /// Returns `null` if the URL can't be parsed → caller should just
   /// navigate to home.
@@ -92,9 +93,13 @@ class ChottuLinkService {
           final slug = q['slug'] ?? 'global-cup-2026';
           return '/fantasy/$slug/leagues';
         case '/card':
+          // Owned-card detail lives at /album/:id (there is no /cards route).
           final id = q['id'];
-          if (id != null) return '/cards/$id';
-          return '/market';
+          if (id != null) return '/album/$id';
+          return '/album';
+        case '/bracket':
+          // Matches shareBracket()'s deep link → the WC bracket screen.
+          return '/tournament/bracket';
         default:
           return null;
       }
