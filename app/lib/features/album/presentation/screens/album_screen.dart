@@ -14,6 +14,7 @@ import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
 import '../../data/models/card_models.dart';
 import '../../data/repositories/album_repository.dart';
+import '../widgets/free_card_cta.dart';
 
 /// Collection screen — exact port of `design-specs/android/collection.html`.
 class AlbumScreen extends ConsumerStatefulWidget {
@@ -99,6 +100,13 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
                     iconic: tierCounts[CardRarity.ICONIC] ?? 0,
                     avgRating: _avgRating(ownedEntries),
                   ),
+                ),
+                const SizedBox(height: 16),
+                // Watch-ad-for-card — earn a new card straight into the
+                // collection. Hides itself when ads are off or the user is Pro.
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: FreeCardCta(),
                 ),
                 const SizedBox(height: 22),
                 const Padding(

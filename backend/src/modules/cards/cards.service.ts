@@ -289,14 +289,17 @@ export class CardsService {
     }
 
     // Walk the reward tiers from second-lowest up. Within the first tier
-    // that still has giftable templates the user is MISSING, pick one at
-    // random. Falling back up the ladder keeps the reward flowing even once
-    // the user has completed the lower tiers, without ever dipping to COMMON
-    // or jumping to the premium tiers.
+    // that still has a REAL player card (non-empty artUrl) the user is
+    // MISSING, pick one at random. We require artUrl so the reward is never
+    // a blank placeholder template, and we DON'T require giftableOnly —
+    // those are only the ICONIC premium templates; the regular player
+    // cards (which carry the art) are the right reward pool.
     for (const rarity of CardsService.REWARDED_AD_TIERS) {
       const missing = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         SELECT t.id FROM "CardTemplate" t
-        WHERE t.rarity = ${rarity}::"CardRarity" AND t."giftableOnly" = true
+        WHERE t.rarity = ${rarity}::"CardRarity"
+          AND t."artUrl" <> ''
+          AND t."mintedCount" < t."totalSupply"
           AND NOT EXISTS (
             SELECT 1 FROM "OwnedCard" o
             WHERE o."templateId" = t.id AND o."ownerId" = ${userId}
