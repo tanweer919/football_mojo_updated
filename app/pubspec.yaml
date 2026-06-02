@@ -110,18 +110,17 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  # iOS + legacy (pre-Android-8) launcher icon: the full square art.
-  image_path: "assets/images/app_icon7.png"
-  # Adaptive icon layers (Android 8+). The launcher masks the outer ~1/3
-  # of the canvas (only the centre 66.7% is guaranteed visible), so the
-  # foreground is app_icon6 scaled so the ball lands at ~64% of the canvas
-  # on a black canvas (app_icon6's corners are pure black, so it's
-  # seamless against the matching black background — the ball never clips).
-  adaptive_icon_foreground: "assets/images/app_icon7_foreground.png"
-  adaptive_icon_background: "#000000"
-  # The foreground is ALREADY padded into the safe zone, so suppress the
-  # package's default 16% inset (which would double-pad and shrink the
-  # ball too far).
+  # iOS + legacy (pre-Android-8) launcher icon: white wireframe football on
+  # the dark brand field (#0F0E0D), flattened to a full square.
+  image_path: "assets/images/app_icon8_full.png"
+  # Adaptive icon layers (Android 8+). Foreground is the white wireframe
+  # ball (from assets/images/app.png, inverted to white) on transparency,
+  # scaled to ~66% of the canvas — inside the 66.7% safe zone so no mask
+  # clips it — over the matching dark background layer.
+  adaptive_icon_foreground: "assets/images/app_icon8_foreground.png"
+  adaptive_icon_background: "#0F0E0D"
+  # Foreground is ALREADY padded into the safe zone, so suppress the
+  # package's default 16% inset (it would double-pad and shrink the ball).
   adaptive_icon_foreground_inset: 0
   min_sdk_android: 21
   remove_alpha_ios: true
