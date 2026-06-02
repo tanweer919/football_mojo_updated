@@ -71,7 +71,11 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // Use real keystore when key.properties exists, otherwise fall back
+            // to debug signing (allows local APK testing without a keystore).
+            signingConfig = keystorePropertiesFile.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
             // Real production AdMob App ID — swapped in only for release builds.
             // Debug uses the test ID from defaultConfig above.
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3528263454526689~2685435320"

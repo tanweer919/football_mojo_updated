@@ -8,7 +8,7 @@
          FlutterApplication and put your custom class here. -->
     <application
         android:label="Football Mojo"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/ic_launcher">
         <!-- Flutter 3.41: Impeller is opt-in on Android (default on iOS).
              Reduces first-frame jank from shader compilation and smooths
              complex animations (lineup pitch paint, card flip, score roll). -->

@@ -106,10 +106,16 @@ dev_dependencies:
   custom_lint: ^0.7.3
   riverpod_lint: ^2.6.5
 
-flutter_icons:
-  android: "launcher_icon"
+flutter_launcher_icons:
+  android: true
   ios: true
-  image_path: "assets/images/app_icon2.png"
+  image_path: "assets/images/app_icon_foreground.png"
+  # Adaptive icon layers (Android 8+) — this is what makes the icon
+  # render full-size with your branded dark background instead of
+  # being shrunk inside a white circle.
+  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"
+  adaptive_icon_background: "#0F0E0D"
+  min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
