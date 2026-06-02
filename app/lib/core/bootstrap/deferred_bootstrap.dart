@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ads/admob_service.dart';
 import '../analytics/clarity_service.dart';
+import '../config/remote_app_config.dart';
 import '../deeplink/chottu_link_service.dart';
 import '../network/dio_provider.dart';
 import '../notifications/fcm_service.dart';
@@ -42,7 +43,13 @@ class _DeferredBootstrap {
     if (_done) return;
     _done = true;
 
-    Future.microtask(AdmobService.initialise);
+    // Only spin up AdMob when the remote kill-switch allows it. A slow or
+    // failed config fetch defaults to ads-on, so this never silently
+    // disables ads on a flaky network.
+    Future.microtask(() async {
+      final cfg = await ref.read(remoteAppConfigProvider.future);
+      if (cfg.adsEnabled) await AdmobService.initialise();
+    });
     Future.microtask(FcmBootstrap.initialise);
     // Wire push-tap deeplinks to the active GoRouter. Reads the provider
     // lazily inside the closure so the call site can fire before the

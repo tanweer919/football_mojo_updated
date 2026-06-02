@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AcquisitionSource, Prisma } from '@prisma/client';
+import { AcquisitionSource, CardRarity, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { GemsService } from '../gems/gems.service';
 import { MintingService } from './minting.service';
@@ -268,22 +268,47 @@ export class CardsService {
     return this.minting.award({ userId, templateId: tpl.id, source: 'DAILY_LOGIN' });
   }
 
-  // Rewarded-ad mint: user watches a 30s ad, server validates the ad SSV callback
-  // (signed token verified upstream of this method) and mints a specific common card.
+  // Rewarded-ad mint: user watches a ~30s ad, server validates the ad SSV
+  // callback (signed token verified upstream) and mints a RANDOM card from
+  // the "reward tier" — second-lowest rarity and up, never the bottom-most
+  // COMMON tier (so the reward feels worthwhile) and never the premium
+  // ICONIC/LEGENDARY tiers (those stay paid/earned). Capped per UTC day to
+  // stop ad-farming.
+  static readonly REWARDED_AD_TIERS: CardRarity[] = ['UNCOMMON', 'RARE', 'EPIC'];
+  static readonly REWARDED_AD_DAILY_CAP = 5;
+
   async claimRewardedAd(userId: string) {
-    // Pick the next common card the user is MISSING from their album. Fully deterministic.
-    const missing = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT t.id FROM "CardTemplate" t
-      WHERE t.rarity = 'COMMON' AND t."giftableOnly" = true
-        AND NOT EXISTS (
-          SELECT 1 FROM "OwnedCard" o
-          WHERE o."templateId" = t.id AND o."ownerId" = ${userId}
-        )
-      ORDER BY t.id ASC
-      LIMIT 1;
-    `);
-    if (!missing.length) throw new BadRequestException('album_complete_for_commons');
-    return this.minting.award({ userId, templateId: missing[0]!.id, source: 'REWARDED_AD' });
+    // Per-day cap: count REWARDED_AD cards minted to this user since UTC midnight.
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const claimedToday = await this.prisma.ownedCard.count({
+      where: { ownerId: userId, acquiredVia: 'REWARDED_AD', mintedAt: { gte: dayStart } },
+    });
+    if (claimedToday >= CardsService.REWARDED_AD_DAILY_CAP) {
+      throw new BadRequestException('rewarded_ad_daily_cap_reached');
+    }
+
+    // Walk the reward tiers from second-lowest up. Within the first tier
+    // that still has giftable templates the user is MISSING, pick one at
+    // random. Falling back up the ladder keeps the reward flowing even once
+    // the user has completed the lower tiers, without ever dipping to COMMON
+    // or jumping to the premium tiers.
+    for (const rarity of CardsService.REWARDED_AD_TIERS) {
+      const missing = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT t.id FROM "CardTemplate" t
+        WHERE t.rarity = ${rarity}::"CardRarity" AND t."giftableOnly" = true
+          AND NOT EXISTS (
+            SELECT 1 FROM "OwnedCard" o
+            WHERE o."templateId" = t.id AND o."ownerId" = ${userId}
+          )
+        ORDER BY RANDOM()
+        LIMIT 1;
+      `);
+      if (missing.length) {
+        return this.minting.award({ userId, templateId: missing[0]!.id, source: 'REWARDED_AD' });
+      }
+    }
+    throw new BadRequestException('reward_tier_album_complete');
   }
 
   // ─── Direct purchase (halal IAP) ──────────────────────────────────────────

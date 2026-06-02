@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/ads/admob_service.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/router/route_paths.dart';
@@ -17,7 +18,9 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
+import '../../../album/data/repositories/album_repository.dart';
 import '../../../competitions/data/competitions_repository.dart';
+import '../../../iap/data/iap_service.dart';
 import '../../../fantasy/data/models/fantasy_models.dart';
 import '../../../fantasy/presentation/providers/fantasy_providers.dart';
 import '../../../insights/data/standings_repository.dart';
@@ -131,6 +134,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: _BracketCard(),
             ),
 
+            // Free-card CTA — watch a rewarded ad for a free card. Hides
+            // itself when ads are off or the user is Pro.
+            const _SectionGap(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _FreeCardCta(),
+            ),
+
             // Your teams — followed-team digest (crests + news + their
             // own fixture digest inside the card). No separate "Following
             // matches" section — this one already covers it.
@@ -236,6 +247,8 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          const _GemChip(),
+          const SizedBox(width: 8),
           const NotificationBell(),
           const SizedBox(width: 4),
           GestureDetector(
@@ -245,6 +258,225 @@ class _Appbar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Compact gem-balance pill in the app bar. Taps through to the wallet.
+/// Shows nothing until the profile (and thus the balance) has loaded so
+/// it never flashes a "0".
+class _GemChip extends ConsumerWidget {
+  const _GemChip();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gems = ref.watch(myProfileProvider).maybeWhen(
+          data: (p) => p?.gems,
+          orElse: () => null,
+        );
+    if (gems == null) return const SizedBox.shrink();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push(RoutePaths.wallet),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.gold.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: AppColors.goldHairline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.diamond, size: 13, color: AppColors.gold),
+            const SizedBox(width: 5),
+            Text(
+              _compact(gems),
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.gold,
+                letterSpacing: -0.2,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 1234 → "1.2k" so the pill never grows wide.
+  static String _compact(int n) {
+    if (n < 1000) return '$n';
+    if (n < 1000000) {
+      final k = n / 1000;
+      return '${k.toStringAsFixed(k >= 100 ? 0 : 1)}k';
+    }
+    return '${(n / 1000000).toStringAsFixed(1)}M';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FREE-CARD CTA — watch a rewarded ad, get a card
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// "Watch a short ad → free card" entry point. Opt-in, so it's the most
+/// user-friendly ad format and a strong revenue driver. Hidden entirely
+/// when ads are remotely disabled or the user has PITCH Pro.
+class _FreeCardCta extends ConsumerStatefulWidget {
+  const _FreeCardCta();
+  @override
+  ConsumerState<_FreeCardCta> createState() => _FreeCardCtaState();
+}
+
+class _FreeCardCtaState extends ConsumerState<_FreeCardCta> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final adsEnabled = ref.watch(adsEnabledProvider);
+    final isPro = ref.watch(isProActiveProvider);
+    if (!adsEnabled || isPro) return const SizedBox.shrink();
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _busy ? null : _watchForCard,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.goldHairline),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF221C14), Color(0xFF12100D)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.gold.withValues(alpha: 0.16),
+                border: Border.all(color: AppColors.goldHairline),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.card_giftcard, color: AppColors.gold, size: 20),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Free card',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Watch a short ad to add a card to your album',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: AppColors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            if (_busy)
+              const SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF1E1810)),
+                    SizedBox(width: 2),
+                    Text(
+                      'Watch',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E1810),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _watchForCard() {
+    setState(() => _busy = true);
+    var earned = false;
+    AdmobService.instance.showRewarded(
+      onReward: (_) {
+        earned = true;
+        _claimCard();
+      },
+      onNotReady: () {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        _toast('Ad not ready yet — try again in a moment.');
+      },
+      onDismissed: () {
+        // Reward already handled in onReward (which fires first). If the
+        // user closed early without earning, just release the button.
+        if (!mounted) return;
+        if (!earned) setState(() => _busy = false);
+      },
+    );
+  }
+
+  Future<void> _claimCard() async {
+    try {
+      // ssvToken is the AdMob server-side-verification callback; the client
+      // doesn't have it here, so we pass empty and the server grants
+      // (SSV validation is enforced server-side only when ADMOB_SSV_ENABLED).
+      final card = await ref.read(albumRepositoryProvider).claimRewardedAd('');
+      ref.invalidate(albumProvider);
+      ref.invalidate(myProfileProvider);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      context.push('/album/${card.id}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final msg = '$e';
+      if (msg.contains('daily_cap')) {
+        _toast("That's all the free cards for today — come back tomorrow!");
+      } else if (msg.contains('album_complete')) {
+        _toast('You already own every card in this tier — nice!');
+      } else {
+        _toast('Could not grant your card. Please try again.');
+      }
+    }
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 }
 
