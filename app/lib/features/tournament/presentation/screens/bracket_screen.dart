@@ -112,31 +112,57 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     return null;
   }
 
-  /// Resolve the user's MATCH_<n>_WINNER picks into one team list per
-  /// knockout round, for the shareable prediction graphic. Missing picks
-  /// are simply skipped (the card hides empty rounds), so this works for
-  /// partial brackets too — though we only surface the share prompt once
-  /// a champion is set (see [_isComplete]).
-  BracketPrediction _buildPrediction(Map<String, WcTeamRef> teamsById) {
-    List<WcTeamRef> winners(Iterable<int> matchNumbers) => [
-          for (final n in matchNumbers)
-            if (_picks['MATCH_${n}_WINNER'] is String &&
-                teamsById[_picks['MATCH_${n}_WINNER']] != null)
-              teamsById[_picks['MATCH_${n}_WINNER']]!,
-        ];
-    final groupWinners = <WcTeamRef>[
+  /// Resolve the user's picks into the full prediction poster model —
+  /// every group's 1–4 order, the 8 best-thirds, and every knockout
+  /// head-to-head with its predicted winner. Unresolved slots stay null
+  /// (the card shows "TBD"), so this works for partial brackets too;
+  /// we only surface the share prompt once a champion is set.
+  FullBracketPrediction _buildPrediction(Map<String, WcTeamRef> teamsById) {
+    // Groups — predicted finishing order 1..4 per letter.
+    final groups = <GroupPrediction>[
       for (final l in wcGroupLetters)
-        if (_picks['GROUP_${l}_1'] is String &&
-            teamsById[_picks['GROUP_${l}_1']] != null)
-          teamsById[_picks['GROUP_${l}_1']]!,
+        GroupPrediction(
+          letter: l,
+          ordered: [
+            for (var pos = 1; pos <= 4; pos++)
+              if (_picks['GROUP_${l}_$pos'] is String &&
+                  teamsById[_picks['GROUP_${l}_$pos']] != null)
+                teamsById[_picks['GROUP_${l}_$pos']]!,
+          ],
+        ),
     ];
+
+    // Best-thirds — the 8 selected group letters' 3rd-placed teams.
+    final bestThirds = <WcTeamRef>[
+      for (final l in _bestThirds)
+        if (_picks['GROUP_${l}_3'] is String &&
+            teamsById[_picks['GROUP_${l}_3']] != null)
+          teamsById[_picks['GROUP_${l}_3']]!,
+    ];
+
+    // One TiePrediction per knockout match, resolving both sides through
+    // the cascade and reading the stored winner.
+    TiePrediction tieFor(BracketMatch m) => TiePrediction(
+          number: m.number,
+          left: _resolveSlot(m.left, teamsById),
+          right: _resolveSlot(m.right, teamsById),
+          winnerId: _picks['MATCH_${m.number}_WINNER'] as String?,
+        );
+    List<TiePrediction> tiesIn(BracketRound round) => [
+          for (final m in wc2026Matches)
+            if (m.round == round) tieFor(m),
+        ];
+
     final championId = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
-    return BracketPrediction(
-      groupWinners: groupWinners,
-      lastSixteen: winners([for (var n = 73; n <= 88; n++) n]),
-      quarterFinalists: winners([for (var n = 89; n <= 96; n++) n]),
-      semiFinalists: winners([for (var n = 97; n <= 100; n++) n]),
-      finalists: winners(const [101, 102]),
+    final finalMatch = wc2026MatchesByNumber[wc2026ChampionMatchNumber];
+    return FullBracketPrediction(
+      groups: groups,
+      bestThirds: bestThirds,
+      r32: tiesIn(BracketRound.r32),
+      r16: tiesIn(BracketRound.r16),
+      qf: tiesIn(BracketRound.qf),
+      sf: tiesIn(BracketRound.sf),
+      finalTie: finalMatch == null ? null : tieFor(finalMatch),
       champion: championId == null ? null : teamsById[championId],
     );
   }
@@ -163,9 +189,11 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     final prediction = _buildPrediction(teamsById);
     String? imagePath;
     try {
-      imagePath = await ShareService.instance.renderArtifactToFile(
+      // Tall poster: fixed 1080 width, intrinsic height (the full bracket
+      // can run several thousand px). Captured at pixelRatio 2.
+      imagePath = await ShareService.instance.renderTallArtifactToFile(
         context: context,
-        logicalSize: const Size(1080, 1350),
+        width: 1080,
         filename: 'pitch_prediction.png',
         builder: (_) => BracketPredictionCard(prediction: prediction),
       );

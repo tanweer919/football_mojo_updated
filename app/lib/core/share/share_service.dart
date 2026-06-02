@@ -75,41 +75,86 @@ class ShareService {
     }
   }
 
-  /// Hidden-overlay PNG capture. Used by both [shareArtifact] and
-  /// [renderArtifactToFile]. Returns null on failure.
+  /// Renders [builder] at a FIXED WIDTH with intrinsic (content-driven)
+  /// height and writes the PNG to a temp file. Use for tall "poster"
+  /// graphics whose height can't be known up front — e.g. a full bracket
+  /// prediction. Returns null on failure.
+  ///
+  /// [maxHeight] is a safety ceiling so an unbounded layout can't blow up
+  /// memory; content taller than this is clipped (set generously).
+  Future<String?> renderTallArtifactToFile({
+    required BuildContext context,
+    required Widget Function(BuildContext) builder,
+    required double width,
+    String filename = 'pitch_poster.png',
+    double pixelRatio = 2.0,
+    double maxHeight = 8000,
+  }) async {
+    final bytes = await _capture(
+      context: context,
+      builder: builder,
+      // A null logicalSize signals width-only layout to _capture.
+      logicalSize: null,
+      width: width,
+      maxHeight: maxHeight,
+      pixelRatio: pixelRatio,
+    );
+    if (bytes == null) return null;
+    try {
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/$filename');
+      await file.writeAsBytes(bytes, flush: true);
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Hidden-overlay PNG capture. Used by [shareArtifact],
+  /// [renderArtifactToFile] (fixed [logicalSize]) and
+  /// [renderTallArtifactToFile] (width-only, intrinsic height). Returns
+  /// null on failure.
   Future<Uint8List?> _capture({
     required BuildContext context,
     required Widget Function(BuildContext) builder,
-    required Size logicalSize,
+    Size? logicalSize,
+    double? width,
+    double maxHeight = 8000,
     required double pixelRatio,
   }) async {
     final overlay = Overlay.of(context, rootOverlay: true);
     final boundaryKey = GlobalKey();
+    // Width-only mode lays the child out at a tight width and loose
+    // height so a Column(mainAxisSize.min) sizes to its content; the
+    // RepaintBoundary then captures that intrinsic size.
+    final mqSize = logicalSize ?? Size(width ?? 1080, maxHeight);
 
     final entry = OverlayEntry(
       builder: (ctx) {
-        // Hidden but laid out so RepaintBoundary captures a real frame.
-        // Offstage on its own won't paint; Opacity 0 keeps the paint cycle
-        // running while staying invisible to the user.
+        final framed = MediaQuery(
+          data: MediaQuery.of(ctx).copyWith(size: mqSize),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Builder(builder: builder),
+          ),
+        );
+        final sized = logicalSize != null
+            ? SizedBox.fromSize(size: logicalSize, child: framed)
+            : ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: width!,
+                  maxWidth: width,
+                  maxHeight: maxHeight,
+                ),
+                child: framed,
+              );
         return Positioned(
-          left: -10_000, // off-screen but still in the paint tree
-          top: -10_000,
+          left: -20_000, // off-screen but still in the paint tree
+          top: -20_000,
           child: IgnorePointer(
             child: Opacity(
               opacity: 0,
-              child: RepaintBoundary(
-                key: boundaryKey,
-                child: SizedBox.fromSize(
-                  size: logicalSize,
-                  child: MediaQuery(
-                    data: MediaQuery.of(ctx).copyWith(size: logicalSize),
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Builder(builder: builder),
-                    ),
-                  ),
-                ),
-              ),
+              child: RepaintBoundary(key: boundaryKey, child: sized),
             ),
           ),
         );
