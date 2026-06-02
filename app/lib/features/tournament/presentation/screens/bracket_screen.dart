@@ -13,9 +13,13 @@ import '../widgets/bracket_share_card.dart';
 /// Bracket predictor for a tournament. WC 2026 default.
 ///
 /// Picks model (matches the backend's flat `Bracket.picks` JSON):
-///   GROUP_<letter>_1  → user's pick for 1st place           (3 pts each)
-///   GROUP_<letter>_2  → user's pick for 2nd place           (1 pt each)
-///   CHAMPION          → user's pick for the eventual winner (50 pts)
+///   GROUP_<letter>_1   → user's pick for 1st place              (3 pts each)
+///   GROUP_<letter>_2   → user's pick for 2nd place              (1 pt each)
+///   REACH_R16          → List<teamId> the user expects in R16   (5 pts each)
+///   REACH_QF           → List<teamId> expected in QF            (10 pts each)
+///   REACH_SF           → List<teamId> expected in SF            (20 pts each)
+///   REACH_FINAL        → List<teamId> expected in the final     (50 pts each)
+///   CHAMPION           → teamId expected to lift the trophy     (250 pts)
 class BracketScreen extends ConsumerStatefulWidget {
   const BracketScreen({super.key, this.competitionId = 'WC2026'});
   final String competitionId;
@@ -23,8 +27,19 @@ class BracketScreen extends ConsumerStatefulWidget {
   ConsumerState<BracketScreen> createState() => _BracketScreenState();
 }
 
+/// Total picks across every section. Drives the progress bar + Save chip.
+class _BracketSlots {
+  static const groups = 24;       // 12 groups × 2 (winner + runner-up)
+  static const r16    = 16;
+  static const qf     = 8;
+  static const sf     = 4;
+  static const finals = 2;
+  static const champion = 1;
+  static const total = groups + r16 + qf + sf + finals + champion;
+}
+
 class _BracketScreenState extends ConsumerState<BracketScreen> {
-  final Map<String, String> _picks = {};
+  final Map<String, dynamic> _picks = {};
   bool _hydrated = false;
   bool _saving = false;
 
@@ -32,6 +47,33 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     if (_hydrated) return;
     _picks.addAll(bracket.picks);
     _hydrated = true;
+  }
+
+  // ── Pick helpers ─────────────────────────────────────────────────────────
+  List<String> _reachList(String key) {
+    final v = _picks[key];
+    if (v is List) return v.whereType<String>().toList();
+    return <String>[];
+  }
+
+  int _capFor(String key) => switch (key) {
+        'REACH_R16'   => _BracketSlots.r16,
+        'REACH_QF'    => _BracketSlots.qf,
+        'REACH_SF'    => _BracketSlots.sf,
+        'REACH_FINAL' => _BracketSlots.finals,
+        _ => 0,
+      };
+
+  int _filled() {
+    var n = 0;
+    for (final k in _picks.keys) {
+      if (k.startsWith('GROUP_') && _picks[k] is String) n++;
+    }
+    for (final k in const ['REACH_R16', 'REACH_QF', 'REACH_SF', 'REACH_FINAL']) {
+      n += _reachList(k).length;
+    }
+    if (_picks['CHAMPION'] is String) n++;
+    return n;
   }
 
   @override
@@ -50,11 +92,8 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
           IconButton(
             tooltip: 'Share bracket',
             icon: const Icon(Icons.ios_share_rounded),
-            // Always tappable — the empty-state snackbar is clearer than a
-            // silently-disabled icon (which renders at low opacity and is
-            // easy to miss).
             onPressed: () async {
-              if (_picks.isEmpty) {
+              if (_filled() == 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Make some picks first, then share your bracket.'),
@@ -64,8 +103,16 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
               }
               final groups = groupsAsync.valueOrNull;
               if (groups == null) return;
+              // Share card only knows group + champion picks today. Build
+              // a String-only view for it — knockout share variant TBD.
+              final groupAndChampion = <String, String>{
+                for (final e in _picks.entries)
+                  if (e.value is String &&
+                      (e.key.startsWith('GROUP_') || e.key == 'CHAMPION'))
+                    e.key: e.value as String,
+              };
               WcTeamRef? champion;
-              final championId = _picks['CHAMPION'];
+              final championId = _picks['CHAMPION'] as String?;
               if (championId != null) {
                 for (final g in groups) {
                   for (final s in g.standings) {
@@ -83,7 +130,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
                 filename: 'pitch_bracket.png',
                 builder: (_) => BracketShareCard(
                   groups: groups,
-                  picks: _picks,
+                  picks: groupAndChampion,
                   championTeam: champion,
                 ),
               );
@@ -115,36 +162,67 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
           return _BracketBody(
             groups: groups,
             picks: _picks,
+            filled: _filled(),
             locked: locked,
             lockAt: lockAt,
             pointsAwarded: pointsAwarded,
             saving: _saving,
-            onPick: (key, teamId) {
+            onGroupPick: (key, teamId) {
               if (locked) return;
               setState(() {
-                // Toggle off when the same slot is tapped twice.
                 if (_picks[key] == teamId) {
                   _picks.remove(key);
                   return;
                 }
-
-                // One team = one role inside the group stage. Picking a team
-                // for slot X auto-clears it from any OTHER group slot.
-                // Champion is allowed to be the same team as a 1st-place
-                // pick (you'd typically pick the same team for both).
+                // One team = one role inside the group stage. Auto-clear
+                // the same team from any OTHER group slot. Champion can
+                // overlap with a group winner (common case).
                 if (key.startsWith('GROUP_')) {
-                  // Strip the trailing `_1` / `_2` to get the group key, then
-                  // sweep both slots of that group + every other group's two
-                  // slots, removing this teamId wherever it appears.
                   for (final existing in [..._picks.keys]) {
                     if (!existing.startsWith('GROUP_')) continue;
                     if (existing == key) continue;
-                    if (_picks[existing] == teamId) {
-                      _picks.remove(existing);
-                    }
+                    if (_picks[existing] == teamId) _picks.remove(existing);
                   }
                 }
                 _picks[key] = teamId;
+              });
+            },
+            onChampionPick: (teamId) {
+              if (locked) return;
+              setState(() {
+                if (_picks['CHAMPION'] == teamId) {
+                  _picks.remove('CHAMPION');
+                } else {
+                  _picks['CHAMPION'] = teamId;
+                }
+              });
+            },
+            onReachToggle: (key, teamId) {
+              if (locked) return;
+              setState(() {
+                final current = _reachList(key);
+                if (current.contains(teamId)) {
+                  current.remove(teamId);
+                } else {
+                  if (current.length >= _capFor(key)) {
+                    // At cap — nudge instead of silently failing.
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        duration: const Duration(seconds: 2),
+                        content: Text(
+                          'Cap reached (${_capFor(key)} teams). Tap a selected team to swap.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  current.add(teamId);
+                }
+                if (current.isEmpty) {
+                  _picks.remove(key);
+                } else {
+                  _picks[key] = current;
+                }
               });
             },
             onSave: _save,
@@ -155,7 +233,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   }
 
   Future<void> _save() async {
-    if (_picks.isEmpty) {
+    if (_filled() == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pick at least one team before saving.')),
       );
@@ -166,7 +244,6 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       final saved = await ref
           .read(predictionsRepositoryProvider)
           .submitBracket(widget.competitionId, _picks);
-      // Refresh providers so locked/points reflect server state.
       ref.invalidate(myBracketProvider(widget.competitionId));
       ref.invalidate(bracketLeaderboardProvider(widget.competitionId));
       if (!mounted) return;
@@ -202,25 +279,28 @@ class _BracketBody extends StatelessWidget {
   const _BracketBody({
     required this.groups,
     required this.picks,
+    required this.filled,
     required this.locked,
     required this.lockAt,
     required this.pointsAwarded,
     required this.saving,
-    required this.onPick,
+    required this.onGroupPick,
+    required this.onChampionPick,
+    required this.onReachToggle,
     required this.onSave,
   });
 
   final List<WcGroup> groups;
-  final Map<String, String> picks;
+  final Map<String, dynamic> picks;
+  final int filled;
   final bool locked;
   final DateTime? lockAt;
   final int pointsAwarded;
   final bool saving;
-  final void Function(String key, String teamId) onPick;
+  final void Function(String key, String teamId) onGroupPick;
+  final void Function(String teamId) onChampionPick;
+  final void Function(String key, String teamId) onReachToggle;
   final VoidCallback onSave;
-
-  int get _filled => picks.length;
-  int get _slots => groups.length * 2 + 1; // 2 per group + champion
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +308,6 @@ class _BracketBody extends StatelessWidget {
     final allTeams = <WcTeamRef>[
       for (final g in groups) ...g.standings.map((s) => s.team),
     ];
-    // Stable, alphabetical team list for the champion picker.
     final sortedTeams = [...allTeams]..sort((a, b) => a.name.compareTo(b.name));
 
     return Stack(
@@ -237,57 +316,96 @@ class _BracketBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
             _ProgressHeader(
-              filled: _filled,
-              slots: _slots,
+              filled: filled,
+              slots: _BracketSlots.total,
               locked: locked,
               lockAt: lockAt,
               points: pointsAwarded,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Group stage',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            const SizedBox(height: 18),
+
+            // ── Group stage ─────────────────────────────────────────────
+            _SectionHeading(
+              title: 'Group stage',
+              caption: 'Top two from each group. 3 pts per winner, 1 pt per runner-up.',
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Pick the top two finishers in each group. 3 pts per group winner, 1 pt per runner-up.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
             for (var i = 0; i < groups.length; i++)
               _GroupPicker(
                 group: groups[i],
                 picks: picks,
                 locked: locked,
-                onPick: onPick,
+                onPick: onGroupPick,
               ).animate().fade(duration: 220.ms, delay: (40 * i).ms).slideY(begin: 0.04, end: 0),
-            const SizedBox(height: 24),
-            Text(
-              'Champion',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+
+            // ── Knockout reach sections ────────────────────────────────
+            const SizedBox(height: 20),
+            _ReachSection(
+              title: 'Round of 16',
+              caption: 'Pick the 16 teams you think reach the R16. 5 pts each.',
+              slotKey: 'REACH_R16',
+              cap: _BracketSlots.r16,
+              teams: sortedTeams,
+              picks: picks,
+              locked: locked,
+              onToggle: onReachToggle,
+              accentLabel: '5 pts',
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Who lifts the trophy? Worth 50 pts.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            const SizedBox(height: 16),
+            _ReachSection(
+              title: 'Quarter-finals',
+              caption: 'Pick the 8 teams that reach the QF. 10 pts each.',
+              slotKey: 'REACH_QF',
+              cap: _BracketSlots.qf,
+              teams: sortedTeams,
+              picks: picks,
+              locked: locked,
+              onToggle: onReachToggle,
+              accentLabel: '10 pts',
+            ),
+            const SizedBox(height: 16),
+            _ReachSection(
+              title: 'Semi-finals',
+              caption: 'Pick the 4 teams that reach the SF. 20 pts each.',
+              slotKey: 'REACH_SF',
+              cap: _BracketSlots.sf,
+              teams: sortedTeams,
+              picks: picks,
+              locked: locked,
+              onToggle: onReachToggle,
+              accentLabel: '20 pts',
+            ),
+            const SizedBox(height: 16),
+            _ReachSection(
+              title: 'Final',
+              caption: 'Pick the 2 finalists. 50 pts each.',
+              slotKey: 'REACH_FINAL',
+              cap: _BracketSlots.finals,
+              teams: sortedTeams,
+              picks: picks,
+              locked: locked,
+              onToggle: onReachToggle,
+              accentLabel: '50 pts',
+            ),
+
+            // ── Champion ───────────────────────────────────────────────
+            const SizedBox(height: 24),
+            _SectionHeading(
+              title: 'Champion',
+              caption: 'Who lifts the trophy? Worth 250 pts.',
             ),
             const SizedBox(height: 12),
             _ChampionPicker(
               teams: sortedTeams,
-              selectedTeamId: picks['CHAMPION'],
+              selectedTeamId: picks['CHAMPION'] is String ? picks['CHAMPION'] as String : null,
               locked: locked,
-              onPick: (teamId) => onPick('CHAMPION', teamId),
+              onPick: onChampionPick,
             ),
           ],
         ),
+
+        // Sticky save button at the bottom.
         Positioned(
-          left: 16,
-          right: 16,
-          bottom: 16,
+          left: 16, right: 16, bottom: 16,
           child: SafeArea(
             top: false,
             child: SizedBox(
@@ -300,7 +418,7 @@ class _BracketBody extends StatelessWidget {
                 label: Text(
                   locked
                       ? 'Bracket locked'
-                      : (saving ? 'Saving…' : 'Save bracket  ·  $_filled / $_slots picks'),
+                      : (saving ? 'Saving…' : 'Save bracket  ·  $filled / ${_BracketSlots.total} picks'),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 onPressed: locked || saving ? null : onSave,
@@ -310,11 +428,42 @@ class _BracketBody extends StatelessWidget {
         ),
       ],
     );
+
+    // unused theme reference — silence analyzer if needed
+    // ignore: dead_code
+    theme.toString();
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.caption});
+  final String title;
+  final String caption;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            caption,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group picker
+// Group picker (unchanged behaviour)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _GroupPicker extends StatelessWidget {
@@ -325,7 +474,7 @@ class _GroupPicker extends StatelessWidget {
     required this.onPick,
   });
   final WcGroup group;
-  final Map<String, String> picks;
+  final Map<String, dynamic> picks;
   final bool locked;
   final void Function(String key, String teamId) onPick;
 
@@ -334,8 +483,8 @@ class _GroupPicker extends StatelessWidget {
     final theme = Theme.of(context);
     final winnerKey = 'GROUP_${group.letter}_1';
     final runnerKey = 'GROUP_${group.letter}_2';
-    final winnerId = picks[winnerKey];
-    final runnerId = picks[runnerKey];
+    final winnerId = picks[winnerKey] is String ? picks[winnerKey] as String : null;
+    final runnerId = picks[runnerKey] is String ? picks[runnerKey] as String : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -473,7 +622,220 @@ class _SlotChip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Champion picker
+// Knockout-reach section — multi-select chip cloud, capped per round
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ReachSection extends StatefulWidget {
+  const _ReachSection({
+    required this.title,
+    required this.caption,
+    required this.slotKey,
+    required this.cap,
+    required this.teams,
+    required this.picks,
+    required this.locked,
+    required this.onToggle,
+    required this.accentLabel,
+  });
+  final String title;
+  final String caption;
+  final String slotKey;
+  final int cap;
+  final List<WcTeamRef> teams;
+  final Map<String, dynamic> picks;
+  final bool locked;
+  final void Function(String key, String teamId) onToggle;
+  final String accentLabel;
+
+  @override
+  State<_ReachSection> createState() => _ReachSectionState();
+}
+
+class _ReachSectionState extends State<_ReachSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final raw = widget.picks[widget.slotKey];
+    final selected = raw is List ? raw.whereType<String>().toSet() : <String>{};
+    final atCap = selected.length >= widget.cap;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            widget.title,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              widget.accentLabel,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.caption,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${selected.length}/${widget.cap}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: atCap ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                IconButton(
+                  tooltip: _expanded ? 'Collapse' : 'Expand',
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                ),
+              ],
+            ),
+            // Always render selected pills (compact summary). Full list
+            // only when expanded — keeps the screen scrollable.
+            if (selected.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final tid in selected)
+                      _ReachChip(
+                        team: widget.teams.firstWhere(
+                          (t) => t.id == tid,
+                          orElse: () => WcTeamRef(
+                            id: tid,
+                            name: tid,
+                            shortName: tid,
+                          ),
+                        ),
+                        selected: true,
+                        locked: widget.locked,
+                        onTap: () => widget.onToggle(widget.slotKey, tid),
+                      ),
+                  ],
+                ),
+              ),
+            if (_expanded) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final t in widget.teams)
+                    _ReachChip(
+                      team: t,
+                      selected: selected.contains(t.id),
+                      locked: widget.locked,
+                      onTap: () => widget.onToggle(widget.slotKey, t.id),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReachChip extends StatelessWidget {
+  const _ReachChip({
+    required this.team,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
+  });
+  final WcTeamRef team;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bg = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.surfaceContainerHigh;
+    final fg = selected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: locked ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (team.crestUrl != null)
+                ClipOval(
+                  child: Image.network(
+                    team.crestUrl!,
+                    width: 16, height: 16,
+                    errorBuilder: (_, __, ___) =>
+                        const SizedBox(width: 16, height: 16),
+                  ),
+                ),
+              if (team.crestUrl != null) const SizedBox(width: 6),
+              Text(
+                team.shortName,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.close_rounded, size: 12, color: fg.withValues(alpha: 0.75)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Champion picker (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ChampionPicker extends StatelessWidget {

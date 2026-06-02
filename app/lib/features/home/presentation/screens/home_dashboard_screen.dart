@@ -25,6 +25,9 @@ import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
 import '../../../news/presentation/providers/home_news_provider.dart';
+import '../../../predictions/data/predictions_repository.dart';
+import '../../../world_cup/data/world_cup_models.dart';
+import '../../../world_cup/data/world_cup_repository.dart';
 import '../../../news/presentation/providers/news_feed_provider.dart';
 import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
@@ -100,6 +103,15 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             _Greeting(dateLabel: dateLabel),
             const SizedBox(height: 12),
             _WcHero(remaining: _wcCountdown),
+
+            // Bracket card — surfaces the user's current bracket directly
+            // on home so it's visible (not buried behind a CTA button).
+            // Shows champion + progress when in-flight, points when scored,
+            // CTA when not started.
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _BracketCard(),
+            ),
 
             // Your teams — either the followed-team digest or a prompt
             // to pick teams. Sits directly under the WC hero because
@@ -2739,6 +2751,271 @@ class _HostRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BRACKET CARD — surfaces the user's WC bracket on home
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Three render states:
+//   1. No bracket yet  → gold CTA: "Predict the bracket · earn up to 250 gems"
+//   2. In progress     → champion crest + progress bar + "X / 55 picks"
+//   3. Locked + scored → champion + points so far + leaderboard rank hint
+//
+// Tap routes to /tournament/bracket. Listens to myBracketProvider + the
+// groups provider (needed to resolve the champion teamId → team object
+// so we can show the crest + name).
+class _BracketCard extends ConsumerWidget {
+  const _BracketCard();
+  static const _competitionId = 'WC2026';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mine = ref.watch(myBracketProvider(_competitionId));
+    final groups = ref.watch(wcGroupsProvider(_competitionId));
+    return mine.when(
+      loading: () => const SkeletonBlock(height: 92, radius: AppRadii.r4),
+      // Unauthed or unreachable — fall back to the CTA state so the
+      // surface still funnels users into the bracket.
+      error: (_, __) => const _BracketCta(),
+      data: (b) {
+        if (b == null) return const _BracketCta();
+        WcTeamRef? champion;
+        final championId = b.championId;
+        if (championId != null) {
+          for (final g in groups.valueOrNull ?? const <WcGroup>[]) {
+            for (final s in g.standings) {
+              if (s.team.id == championId) {
+                champion = s.team;
+                break;
+              }
+            }
+            if (champion != null) break;
+          }
+        }
+        return _BracketStatus(bracket: b, champion: champion);
+      },
+    );
+  }
+}
+
+class _BracketCta extends StatelessWidget {
+  const _BracketCta();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        onTap: () => context.push(RoutePaths.bracket),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1F1814), Color(0xFF110C09)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            border: Border.all(color: AppColors.goldHairline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.gold.withValues(alpha: 0.16),
+                  border: Border.all(color: AppColors.goldHairline),
+                ),
+                child: const Icon(Icons.account_tree_outlined,
+                    size: 20, color: AppColors.gold),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Eyebrow('WORLD CUP BRACKET', gold: true, size: 10),
+                    SizedBox(height: 2),
+                    Text(
+                      'Predict who wins the trophy',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: AppColors.fg,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Group stage → final. Earn gems for every correct pick — 500 for the champion.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: AppColors.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: AppColors.gold),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BracketStatus extends StatelessWidget {
+  const _BracketStatus({required this.bracket, required this.champion});
+  final BracketDto bracket;
+  final WcTeamRef? champion;
+
+  /// 24 groups + 16 R16 + 8 QF + 4 SF + 2 Final + 1 champion = 55.
+  static const _totalSlots = 55;
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = bracket.totalPickCount;
+    final pct = (filled / _totalSlots).clamp(0.0, 1.0);
+    final scored = bracket.pointsAwarded > 0;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        onTap: () => context.push(RoutePaths.bracket),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            border: Border.all(color: AppColors.goldHairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Champion crest or trophy fallback.
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.gold.withValues(alpha: 0.16),
+                      border: Border.all(color: AppColors.goldHairline),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: champion?.crestUrl != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: PremiumImage(
+                              url: champion!.crestUrl,
+                              fit: BoxFit.contain,
+                            ),
+                          )
+                        : const Icon(Icons.emoji_events_rounded,
+                            size: 20, color: AppColors.gold),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Eyebrow('YOUR BRACKET', gold: true, size: 10),
+                        const SizedBox(height: 2),
+                        Text(
+                          champion != null
+                              ? 'Champion: ${champion!.shortName}'
+                              : 'Pick your champion',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: AppColors.fg,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (scored)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        '${bracket.pointsAwarded} pts',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.gold,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  backgroundColor: AppColors.surface3,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    bracket.isLocked
+                        ? 'Locked  ·  $filled / $_totalSlots picks'
+                        : '$filled / $_totalSlots picks',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const Spacer(),
+                  if (!bracket.isLocked && filled < _totalSlots)
+                    const Text(
+                      'Tap to continue →',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -140,10 +140,18 @@ export class PredictionsService {
   // Locks at the first knockout kickoff. Scoring is rerun each time a result
   // changes — totals are derived, not accumulated, so it stays idempotent.
 
+  // Per-correct-pick point values. Knockout-stage picks are "did this
+  // team reach round X" — set-based, not position-based (no need to
+  // model winner-of-R32-1-plays-winner-of-R32-2 brackets). Each correct
+  // membership pick scores once per stage.
   private static readonly BRACKET_POINTS = {
     GROUP_WINNER: 3,
     GROUP_RUNNER_UP: 1,
-    CHAMPION: 50,
+    REACH_R16: 5,
+    REACH_QF: 10,
+    REACH_SF: 20,
+    REACH_FINAL: 50,
+    CHAMPION: 250,
   };
 
   async submitBracket(userId: string, competitionId: string, picks: Record<string, string>) {
@@ -236,15 +244,44 @@ export class PredictionsService {
       }
     }
 
+    // Build the set of teams that actually reached each knockout stage.
+    // A team "reached" stage X if it appears as home or away in any match
+    // with that stage. Derived from Match.stage which is set by the
+    // scores poller as the tournament progresses.
+    const reached = {
+      R16:   new Set<string>(),
+      QF:    new Set<string>(),
+      SF:    new Set<string>(),
+      FINAL: new Set<string>(),
+    };
+    const stageMatches = await this.prisma.match.findMany({
+      where: {
+        competitionId,
+        stage: { in: ['ROUND_OF_16', 'QUARTER', 'SEMI', 'FINAL'] },
+      },
+      select: { stage: true, homeTeamId: true, awayTeamId: true },
+    });
+    for (const m of stageMatches) {
+      const bucket =
+        m.stage === 'ROUND_OF_16' ? reached.R16 :
+        m.stage === 'QUARTER'     ? reached.QF  :
+        m.stage === 'SEMI'        ? reached.SF  :
+        m.stage === 'FINAL'       ? reached.FINAL : null;
+      if (!bucket) continue;
+      bucket.add(m.homeTeamId);
+      bucket.add(m.awayTeamId);
+    }
+
     const brackets = await this.prisma.bracket.findMany({ where: { competitionId } });
     let updated = 0;
     for (const b of brackets) {
-      const picks = (b.picks ?? {}) as Record<string, string>;
+      const picks = (b.picks ?? {}) as Record<string, string | string[]>;
       let pts = 0;
+
+      // ── Group stage ────────────────────────────────────────────────
       for (const [slot, teamId] of winners.entries()) {
         if (picks[slot] === teamId) {
           pts += PredictionsService.BRACKET_POINTS.GROUP_WINNER;
-          // Gems credit is idempotent via the (userId, source, bracket:slot) key.
           await this.gems.creditBracket(b.userId, b.id, slot, 'group_winner');
         }
       }
@@ -254,6 +291,40 @@ export class PredictionsService {
           await this.gems.creditBracket(b.userId, b.id, slot, 'runner_up');
         }
       }
+
+      // ── Knockout reach picks ──────────────────────────────────────
+      // Set-membership scoring: each team the user picked to reach
+      // round X that actually got there = 1 correct pick.
+      const scoreReach = async (
+        slotKey: 'REACH_R16' | 'REACH_QF' | 'REACH_SF' | 'REACH_FINAL',
+        actual: Set<string>,
+        pointsEach: number,
+        gemKind: 'r16_reach' | 'qf_reach' | 'sf_reach' | 'finalist',
+      ) => {
+        if (actual.size === 0) return;     // stage hasn't played out yet
+        const userPicks = picks[slotKey];
+        if (!Array.isArray(userPicks)) return;
+        for (const teamId of userPicks) {
+          if (typeof teamId !== 'string' || !actual.has(teamId)) continue;
+          pts += pointsEach;
+          // Dedupe ref includes the team id so each correct pick credits
+          // exactly one gem reward, idempotent across re-scores.
+          await this.gems.creditBracket(
+            b.userId, b.id, `${slotKey}:${teamId}`, gemKind,
+          );
+        }
+      };
+
+      await scoreReach('REACH_R16',   reached.R16,
+        PredictionsService.BRACKET_POINTS.REACH_R16,   'r16_reach');
+      await scoreReach('REACH_QF',    reached.QF,
+        PredictionsService.BRACKET_POINTS.REACH_QF,    'qf_reach');
+      await scoreReach('REACH_SF',    reached.SF,
+        PredictionsService.BRACKET_POINTS.REACH_SF,    'sf_reach');
+      await scoreReach('REACH_FINAL', reached.FINAL,
+        PredictionsService.BRACKET_POINTS.REACH_FINAL, 'finalist');
+
+      // ── Champion ──────────────────────────────────────────────────
       if (champion && picks['CHAMPION'] === champion) {
         pts += PredictionsService.BRACKET_POINTS.CHAMPION;
         await this.gems.creditBracket(b.userId, b.id, 'CHAMPION', 'champion');
