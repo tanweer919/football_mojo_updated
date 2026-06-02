@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/router/route_paths.dart';
 
@@ -33,10 +32,6 @@ class ProfileScreen extends ConsumerWidget {
       // Always show the back affordance — `context.canPop()` returns false
       // inside the ShellRoute branch even when the Navigator can pop.
       onBack: () => context.canPop() ? context.pop() : context.go('/home'),
-      trailing: CircleIconButton(
-        icon: Icons.settings_outlined,
-        onPressed: () => context.push('/settings'),
-      ),
       child: profile.when(
         loading: () => const Padding(
           padding: EdgeInsets.all(16),
@@ -138,19 +133,6 @@ class _SignedOutAccount extends ConsumerWidget {
   }
 }
 
-/// Open an external URL via the system browser. Falls back to a snackbar
-/// when the URL can't be launched (no installed browser, malformed, etc).
-Future<void> _open(String url, BuildContext context) async {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return;
-  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-  if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Couldn't open $url")),
-    );
-  }
-}
-
 class _ProfileBody extends ConsumerWidget {
   const _ProfileBody({required this.profile});
   final Profile profile;
@@ -219,29 +201,14 @@ class _ProfileBody extends ConsumerWidget {
                     label: 'Member since',
                     value: DateFormat.yMMMd().format(p.memberSince.toLocal()),
                   ),
-                  _SettingRow(
-                    icon: Icons.workspace_premium_outlined,
-                    label: 'PITCH Pro',
-                    value: p.proExpiresAt == null
-                        ? 'Free tier'
-                        : 'Until ${DateFormat.yMMMd().format(p.proExpiresAt!.toLocal())}',
-                    // Always tappable — Pro paywall is the upgrade surface
-                    // when free, and the manage-subscription view when paid.
-                    onTap: () => context.push(RoutePaths.proPaywall),
-                  ),
+                  // (PITCH Pro row hidden — the tier isn't shipping yet.)
                 ]),
               ),
               const SectionHead(title: 'Wallet'),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SettingsGroup(rows: [
-                  _SettingRow(
-                    icon: Icons.toll,
-                    label: 'Coins',
-                    value: '${p.coins}',
-                    gold: true,
-                    onTap: () => context.push(RoutePaths.wallet),
-                  ),
+                  // Coins removed — current build only spends/earns gems.
                   _SettingRow(
                     icon: Icons.diamond,
                     label: 'Gems',
@@ -287,17 +254,17 @@ class _ProfileBody extends ConsumerWidget {
                   _SettingRow(
                     icon: Icons.help_outline,
                     label: 'Help centre',
-                    onTap: () => _open('https://pitch.app/help', context),
+                    onTap: () => context.push(RoutePaths.helpCentre),
                   ),
                   _SettingRow(
                     icon: Icons.privacy_tip_outlined,
-                    label: 'Privacy',
-                    onTap: () => _open('https://pitch.app/privacy', context),
+                    label: 'Privacy policy',
+                    onTap: () => context.push(RoutePaths.privacyPolicy),
                   ),
                   _SettingRow(
                     icon: Icons.gavel_outlined,
-                    label: 'Terms',
-                    onTap: () => _open('https://pitch.app/terms', context),
+                    label: 'Terms of service',
+                    onTap: () => context.push(RoutePaths.termsOfService),
                   ),
                 ]),
               ),
@@ -380,20 +347,7 @@ class _Hero extends StatelessWidget {
                       letterSpacing: profile.userTag != null ? -0.2 : 0,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: AppColors.goldHairline),
-                    ),
-                    child: Eyebrow(
-                      profile.proExpiresAt == null ? 'Free Manager' : 'PITCH Pro',
-                      gold: true,
-                      size: 9,
-                    ),
-                  ),
+                  // (Pro / Free pip hidden — Pro tier isn't shipping yet.)
                 ],
               ),
             ),

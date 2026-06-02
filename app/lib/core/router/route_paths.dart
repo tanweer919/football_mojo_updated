@@ -58,4 +58,9 @@ class RoutePaths {
 
   // Award pick'em
   static const awardPicks         = '/tournament/awards';
+
+  // Static legal / support pages
+  static const privacyPolicy      = '/legal/privacy';
+  static const termsOfService     = '/legal/terms';
+  static const helpCentre         = '/help';
 }

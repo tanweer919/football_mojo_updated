@@ -73,9 +73,15 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
           orElse: () => 0,
         );
 
+    // scrollable: false — the page body owns its own scroll (TabBarView →
+    // tab-local ListView per tab). Wrapping the Column-with-Expanded
+    // inside PitchScreen's default SingleChildScrollView triggers an
+    // unbounded-height assertion because Expanded needs a bounded
+    // parent.
     return PitchScreen(
       title: 'News',
       onBack: context.canPop() ? () => context.pop() : null,
+      scrollable: false,
       trailing: CircleIconButton(
         icon: Icons.ios_share_rounded,
         onPressed: () => ChottuLinkService.instance.shareApp(),

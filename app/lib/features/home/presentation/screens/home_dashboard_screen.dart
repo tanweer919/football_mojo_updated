@@ -503,22 +503,20 @@ class _SectionHead extends StatelessWidget {
 
 /// Combined live + next-match strip.
 ///
-/// Behaviour:
-///   - When there ARE live matches: show up to [_maxVisible] in a
-///     compact vertical list, sorted so followed-teams' games come first.
-///   - When there are NO live matches: show the next 1-2 upcoming
-///     fixtures instead, again preferring followed teams. Section title
-///     in the parent reads "Matches" (renamed from "Live now") so this
-///     dual-purpose strip matches the section name.
+/// Always renders both "now" and "next" so the user sees their
+/// followed-team fixtures even on a quiet day:
+///   - Live matches first (followed teams pulled to the top).
+///   - Then upcoming fixtures — prioritising followed teams — fill any
+///     remaining slots up to [_maxVisible]. If no followed-team game is
+///     upcoming, the closest fixture wins.
+///   - With nothing live and nothing upcoming we fall back to
+///     [_NoLiveNowTile] so the section is never silently empty.
 class _LiveStrip extends ConsumerWidget {
   const _LiveStrip();
 
   /// Cap visible rows so the section stays glanceable. The full list is
   /// one tap away via the "All matches →" action in the section head.
   static const _maxVisible = 4;
-  /// When there are no live games, surface this many upcoming matches
-  /// so the strip still has something time-relevant.
-  static const _maxUpcoming = 2;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -534,44 +532,84 @@ class _LiveStrip extends ConsumerWidget {
         );
     return live.when(
       loading: () => const _LiveSkeleton(),
-      error: (e, _) => const _StripEmpty(
-        title: 'Live scores paused',
-        subtitle: 'Couldn’t reach the score feed. Pull to refresh.',
-        glyph: EmptyGlyph.football,
-      ),
-      data: (matches) {
-        if (matches.isNotEmpty) {
-          final sorted = _prioritise(matches, followedIds);
-          final visible = sorted.take(_maxVisible).toList();
-          return _LiveCard(
-            children: [
-              for (var i = 0; i < visible.length; i++) ...[
-                _LiveRowItem(match: visible[i]),
-                if (i < visible.length - 1) const _LiveDivider(),
-              ],
-            ],
-          );
-        }
-        // No live → show the next upcoming matches (followed teams first).
+      error: (e, _) => _buildFromUpcomingOnly(fixtures, followedIds),
+      data: (liveMatches) {
+        final liveSorted = _prioritise(liveMatches, followedIds)
+            .take(_maxVisible)
+            .toList();
         return fixtures.when(
-          loading: () => const _LiveSkeleton(),
-          error: (_, __) => const _NoLiveNowTile(),
+          loading: () {
+            if (liveSorted.isEmpty) return const _LiveSkeleton();
+            return _LiveCard(children: _rowsFor(liveSorted, upcoming: const []));
+          },
+          error: (_, __) {
+            if (liveSorted.isEmpty) return const _NoLiveNowTile();
+            return _LiveCard(children: _rowsFor(liveSorted, upcoming: const []));
+          },
           data: (f) {
-            if (f.upcoming.isEmpty) return const _NoLiveNowTile();
-            final sortedUpcoming = _prioritise(f.upcoming, followedIds);
-            final visible = sortedUpcoming.take(_maxUpcoming).toList();
+            // Pick upcoming entries to slot in after live. Filter out
+            // anything already shown live so a kicking-off match doesn't
+            // appear twice.
+            final liveIds = liveSorted.map((m) => m.id).toSet();
+            final upcomingPool = f.upcoming
+                .where((m) => !liveIds.contains(m.id))
+                .toList();
+            final upcoming = _prioritise(upcomingPool, followedIds)
+                .take(_maxVisible - liveSorted.length)
+                .toList();
+            if (liveSorted.isEmpty && upcoming.isEmpty) {
+              return const _NoLiveNowTile();
+            }
             return _LiveCard(
-              children: [
-                for (var i = 0; i < visible.length; i++) ...[
-                  _UpcomingRowItem(match: visible[i]),
-                  if (i < visible.length - 1) const _LiveDivider(),
-                ],
-              ],
+              children: _rowsFor(liveSorted, upcoming: upcoming),
             );
           },
         );
       },
     );
+  }
+
+  Widget _buildFromUpcomingOnly(
+    AsyncValue<HomeFixtures> fixtures,
+    Set<String> followedIds,
+  ) {
+    return fixtures.when(
+      loading: () => const _LiveSkeleton(),
+      error: (_, __) => const _StripEmpty(
+        title: 'Matches unavailable',
+        subtitle: 'Couldn’t reach the fixtures feed. Pull to refresh.',
+        glyph: EmptyGlyph.football,
+      ),
+      data: (f) {
+        if (f.upcoming.isEmpty) return const _NoLiveNowTile();
+        final upcoming = _prioritise(f.upcoming, followedIds)
+            .take(_maxVisible)
+            .toList();
+        return _LiveCard(children: _rowsFor(const [], upcoming: upcoming));
+      },
+    );
+  }
+
+  /// Build the interleaved rows: live block first, then upcoming. The
+  /// two halves are separated by a slightly heavier divider so the
+  /// "what's now" / "what's next" boundary reads at a glance.
+  List<Widget> _rowsFor(
+    List<MatchDto> live, {
+    required List<MatchDto> upcoming,
+  }) {
+    final rows = <Widget>[];
+    for (var i = 0; i < live.length; i++) {
+      rows.add(_LiveRowItem(match: live[i]));
+      if (i < live.length - 1) rows.add(const _LiveDivider());
+    }
+    if (live.isNotEmpty && upcoming.isNotEmpty) {
+      rows.add(const _LiveSectionDivider());
+    }
+    for (var i = 0; i < upcoming.length; i++) {
+      rows.add(_UpcomingRowItem(match: upcoming[i]));
+      if (i < upcoming.length - 1) rows.add(const _LiveDivider());
+    }
+    return rows;
   }
 
   /// Stable sort that pulls any match involving a followed team to the
@@ -591,6 +629,36 @@ class _LiveStrip extends ConsumerWidget {
 
   static bool _isFollowed(MatchDto m, Set<String> followed) =>
       followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id);
+}
+
+/// Slightly heavier divider used to mark the live → upcoming boundary
+/// in the matches strip so the two halves don't visually run together.
+class _LiveSectionDivider extends StatelessWidget {
+  const _LiveSectionDivider();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
+          const SizedBox(width: 8),
+          const Text(
+            'UP NEXT',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
+        ],
+      ),
+    );
+  }
 }
 
 class _LiveCard extends StatelessWidget {

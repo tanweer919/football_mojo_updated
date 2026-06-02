@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:chottu_link/chottu_link.dart';
 import 'package:chottu_link/dynamic_link/cl_dynamic_link_behaviour.dart';
@@ -247,7 +249,7 @@ class ChottuLinkService {
 
   // ── Internal ─────────────────────────────────────────────────────────
 
-  void _createAndShare({
+  Future<void> _createAndShare({
     required String deepLink,
     required String utmCampaign,
     required String linkName,
@@ -256,7 +258,7 @@ class ChottuLinkService {
     String? socialImageUrl,
     required String shareText,
     String? imagePath,
-  }) {
+  }) async {
     final files = imagePath != null ? [XFile(imagePath)] : <XFile>[];
     final parameters = CLDynamicLinkParameters(
       link: Uri.parse(deepLink),
@@ -272,21 +274,48 @@ class ChottuLinkService {
       socialImageUrl: socialImageUrl,
     );
 
-    ChottuLink.createDynamicLink(
-      parameters: parameters,
-      onSuccess: (link) {
-        debugPrint('✅ ChottuLink created: $link');
-        SharePlus.instance.share(
-          ShareParams(text: '$shareText$link', files: files),
-        );
-      },
-      onError: (error) {
-        debugPrint('❌ ChottuLink error: ${error.description}');
-        // Fallback: share PNG (if any) + text without a deep link.
-        SharePlus.instance.share(
-          ShareParams(text: shareText, files: files),
-        );
-      },
-    );
+    // The ChottuLink SDK is callback-based; if its native side hangs (auth
+    // failure, network drop, init never completed) neither callback ever
+    // fires and the share button does nothing. We bridge into a Future
+    // with a 5s timeout: success → share with dynamic link; timeout or
+    // error → fall back to sharing the raw deep link so the UX never
+    // dead-ends.
+    final completer = Completer<String?>();
+    try {
+      ChottuLink.createDynamicLink(
+        parameters: parameters,
+        onSuccess: (link) {
+          debugPrint('✅ ChottuLink created: $link');
+          if (!completer.isCompleted) completer.complete(link);
+        },
+        onError: (error) {
+          debugPrint('❌ ChottuLink error: ${error.description}');
+          if (!completer.isCompleted) completer.complete(null);
+        },
+      );
+    } catch (e) {
+      debugPrint('❌ ChottuLink threw synchronously: $e');
+      if (!completer.isCompleted) completer.complete(null);
+    }
+
+    String? dynamicLink;
+    try {
+      dynamicLink = await completer.future
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        debugPrint('❌ ChottuLink timed out — falling back to raw deep link');
+        return null;
+      });
+    } catch (_) {
+      dynamicLink = null;
+    }
+
+    final urlToShare = dynamicLink ?? deepLink;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(text: '$shareText$urlToShare', files: files),
+      );
+    } catch (e) {
+      debugPrint('❌ SharePlus failed: $e');
+    }
   }
 }

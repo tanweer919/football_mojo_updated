@@ -129,14 +129,13 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
             tooltip: 'Share',
             icon: const Icon(Icons.ios_share_rounded),
             onPressed: () async {
-              if (_filled() == 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Make some picks first, then share.')),
-                );
+              final groups = groupsAsync.valueOrNull;
+              // Groups still loading — share with a plain deep link
+              // anyway (no PNG yet) so the button is never a dead end.
+              if (groups == null) {
+                await ChottuLinkService.instance.shareBracket();
                 return;
               }
-              final groups = groupsAsync.valueOrNull;
-              if (groups == null) return;
               final teamsById = {
                 for (final g in groups)
                   for (final s in g.standings) s.team.id: s.team,
@@ -153,16 +152,21 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
               // Render the share card PNG first, then hand both PNG +
               // ChottuLink deep link to the share sheet so previews look
               // good and the link opens the bracket screen on tap.
-              final imagePath = await ShareService.instance.renderArtifactToFile(
-                context: context,
-                logicalSize: const Size(1080, 1350),
-                filename: 'pitch_bracket.png',
-                builder: (_) => BracketShareCard(
-                  groups: groups,
-                  picks: shareMap,
-                  championTeam: champion,
-                ),
-              );
+              String? imagePath;
+              try {
+                imagePath = await ShareService.instance.renderArtifactToFile(
+                  context: context,
+                  logicalSize: const Size(1080, 1350),
+                  filename: 'pitch_bracket.png',
+                  builder: (_) => BracketShareCard(
+                    groups: groups,
+                    picks: shareMap,
+                    championTeam: champion,
+                  ),
+                );
+              } catch (_) {
+                imagePath = null;
+              }
               final pts = mineAsync.valueOrNull?.pointsAwarded ?? 0;
               await ChottuLinkService.instance.shareBracket(
                 championName: champion?.name,
