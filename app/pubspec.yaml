@@ -84,6 +84,7 @@ dependencies:
   connectivity_plus: ^6.1.4
   share_plus: ^11.0.0
   chottu_link: ^1.1.0
+  gal: ^2.3.0                        # save share graphics to the device gallery
 
   # App updates
   in_app_update: ^4.2.3              # Android Play Store in-app updates (Android-only)

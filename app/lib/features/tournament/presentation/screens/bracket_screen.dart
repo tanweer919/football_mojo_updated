@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/deeplink/chottu_link_service.dart';
@@ -95,6 +96,20 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       final teamId = _picks['MATCH_${slot.matchNumber}_WINNER'] as String?;
       return teamId == null ? null : teamsById[teamId];
     }
+    if (slot is MatchLoser) {
+      // The loser is whichever side of the referenced match the user did
+      // NOT pick as winner. Needs that match's winner set AND both of its
+      // sides resolvable.
+      final winnerId = _picks['MATCH_${slot.matchNumber}_WINNER'] as String?;
+      if (winnerId == null) return null;
+      final m = wc2026MatchesByNumber[slot.matchNumber];
+      if (m == null) return null;
+      final left = _resolveSlot(m.left, teamsById);
+      final right = _resolveSlot(m.right, teamsById);
+      if (left != null && left.id != winnerId) return left;
+      if (right != null && right.id != winnerId) return right;
+      return null;
+    }
     if (slot is BestThird) {
       // First of the user's best-thirds that's in this slot's eligible group
       // set. FIFA's actual assignment is matrix-based — we approximate by
@@ -155,6 +170,13 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
 
     final championId = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
     final finalMatch = wc2026MatchesByNumber[wc2026ChampionMatchNumber];
+    BracketMatch? bronzeMatch;
+    for (final m in wc2026Matches) {
+      if (m.round == BracketRound.bronze) {
+        bronzeMatch = m;
+        break;
+      }
+    }
     return FullBracketPrediction(
       groups: groups,
       bestThirds: bestThirds,
@@ -162,6 +184,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       r16: tiesIn(BracketRound.r16),
       qf: tiesIn(BracketRound.qf),
       sf: tiesIn(BracketRound.sf),
+      bronzeTie: bronzeMatch == null ? null : tieFor(bronzeMatch),
       finalTie: finalMatch == null ? null : tieFor(finalMatch),
       champion: championId == null ? null : teamsById[championId],
     );
@@ -173,43 +196,87 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   bool _isComplete() =>
       _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] is String;
 
-  /// Render the prediction graphic to a PNG and hand it (plus a ChottuLink
-  /// deep link) to the share sheet. Used by the app-bar share button and
-  /// the post-save prompt. Falls back to a link-only share if the groups
-  /// haven't loaded or the PNG render fails.
-  Future<void> _sharePrediction(List<WcGroup>? groups) async {
-    if (groups == null) {
-      await ChottuLinkService.instance.shareBracket();
-      return;
-    }
+  /// Render the full-bracket prediction poster to a PNG and return its
+  /// path (null on failure / groups not loaded). Shared by the share and
+  /// save-to-gallery flows.
+  Future<String?> _renderPredictionImage(List<WcGroup>? groups) async {
+    if (groups == null) return null;
     final teamsById = <String, WcTeamRef>{
       for (final g in groups)
         for (final s in g.standings) s.team.id: s.team,
     };
     final prediction = _buildPrediction(teamsById);
-    String? imagePath;
     try {
       // Tall poster: fixed 1080 width, intrinsic height (the full bracket
       // can run several thousand px). Captured at pixelRatio 2.
-      imagePath = await ShareService.instance.renderTallArtifactToFile(
+      return await ShareService.instance.renderTallArtifactToFile(
         context: context,
         width: 1080,
         filename: 'pitch_prediction.png',
         builder: (_) => BracketPredictionCard(prediction: prediction),
       );
     } catch (_) {
-      imagePath = null;
+      return null;
     }
+  }
+
+  WcTeamRef? _championOf(List<WcGroup>? groups) {
+    final id = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
+    if (id == null || groups == null) return null;
+    for (final g in groups) {
+      for (final s in g.standings) {
+        if (s.team.id == id) return s.team;
+      }
+    }
+    return null;
+  }
+
+  /// Render the prediction graphic and hand it (plus a ChottuLink deep
+  /// link) to the share sheet. Falls back to a link-only share if the
+  /// groups haven't loaded or the PNG render fails.
+  Future<void> _sharePrediction(List<WcGroup>? groups) async {
+    final imagePath = await _renderPredictionImage(groups);
+    final champion = _championOf(groups);
     final pts = ref
         .read(myBracketProvider(widget.competitionId))
         .valueOrNull
         ?.pointsAwarded ??
         0;
     await ChottuLinkService.instance.shareBracket(
-      championName: prediction.champion?.name,
-      championCrestUrl: prediction.champion?.crestUrl,
+      championName: champion?.name,
+      championCrestUrl: champion?.crestUrl,
       pointsAwarded: pts,
       imagePath: imagePath,
+    );
+  }
+
+  /// Render the prediction poster and save it to the device gallery.
+  Future<void> _savePredictionToGallery(List<WcGroup>? groups) async {
+    if (groups == null) {
+      _toast('Bracket still loading — try again in a moment.');
+      return;
+    }
+    final imagePath = await _renderPredictionImage(groups);
+    if (imagePath == null) {
+      if (mounted) _toast('Could not generate the image. Try again.');
+      return;
+    }
+    try {
+      await Gal.putImage(imagePath, album: 'FootballMojo');
+      if (mounted) _toast('Saved to your gallery 📸');
+    } on GalException catch (e) {
+      if (!mounted) return;
+      _toast(e.type == GalExceptionType.accessDenied
+          ? 'Allow photo access to save the image.'
+          : 'Could not save to gallery.');
+    } catch (_) {
+      if (mounted) _toast('Could not save to gallery.');
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -226,6 +293,14 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       appBar: AppBar(
         title: const Text('My bracket'),
         actions: [
+          // Save-to-gallery — only meaningful once the bracket is complete
+          // (a champion is picked), so it's shown then.
+          if (_isComplete())
+            IconButton(
+              tooltip: 'Save to gallery',
+              icon: const Icon(Icons.download_rounded),
+              onPressed: () => _savePredictionToGallery(groupsAsync.valueOrNull),
+            ),
           IconButton(
             tooltip: 'Share',
             icon: const Icon(Icons.ios_share_rounded),
@@ -354,11 +429,14 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   }
 
   /// Clear downstream match winners that depended on the just-unset match.
+  /// Covers both MatchWinner references (the next round) and MatchLoser
+  /// references (the bronze final hangs off the semi-final results).
   void _invalidateDownstream(int matchNumber) {
+    bool refs(BracketSlotSource s) =>
+        (s is MatchWinner && s.matchNumber == matchNumber) ||
+        (s is MatchLoser && s.matchNumber == matchNumber);
     final downstream = wc2026Matches
-        .where((m) =>
-            (m.left is MatchWinner && (m.left as MatchWinner).matchNumber == matchNumber) ||
-            (m.right is MatchWinner && (m.right as MatchWinner).matchNumber == matchNumber))
+        .where((m) => refs(m.left) || refs(m.right))
         .map((m) => m.number);
     for (final n in downstream) {
       final key = 'MATCH_${n}_WINNER';
@@ -409,11 +487,12 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     return 'Could not save bracket. Try again.';
   }
 
-  /// Bottom sheet shown after a complete bracket is saved, inviting the
-  /// user to share the prediction graphic. "Maybe later" just dismisses.
+  /// Bottom sheet shown after a complete bracket is saved, offering to
+  /// share the prediction graphic OR save it to the gallery. "Maybe later"
+  /// just dismisses.
   Future<void> _promptShare() async {
     final groups = ref.read(wcGroupsProvider(widget.competitionId)).valueOrNull;
-    final share = await showModalBottomSheet<bool>(
+    final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF161310),
       shape: const RoundedRectangleBorder(
@@ -452,8 +531,9 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Share your road-to-the-trophy prediction and challenge your '
-                'friends to make theirs on FootballMojo.',
+                'Share your road-to-the-trophy prediction or save the '
+                'graphic to your gallery — then challenge your friends to '
+                'make theirs on FootballMojo.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white70,
@@ -476,11 +556,28 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
                   'Share my prediction',
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                 ),
-                onPressed: () => Navigator.of(sheetCtx).pop(true),
+                onPressed: () => Navigator.of(sheetCtx).pop('share'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEBD9A8),
+                  side: const BorderSide(color: Color(0x66D9B65A)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text(
+                  'Save to gallery',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                onPressed: () => Navigator.of(sheetCtx).pop('save'),
               ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => Navigator.of(sheetCtx).pop(false),
+                onPressed: () => Navigator.of(sheetCtx).pop(),
                 child: const Text(
                   'Maybe later',
                   style: TextStyle(color: Colors.white54, fontSize: 13),
@@ -491,8 +588,11 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
         ),
       ),
     );
-    if (share == true && mounted) {
+    if (!mounted) return;
+    if (action == 'share') {
       await _sharePrediction(groups);
+    } else if (action == 'save') {
+      await _savePredictionToGallery(groups);
     }
   }
 }
@@ -587,6 +687,7 @@ class _BracketBody extends StatelessWidget {
               BracketRound.r16,
               BracketRound.qf,
               BracketRound.sf,
+              BracketRound.bronze,
               BracketRound.finalRound,
             ])
               _RoundSection(

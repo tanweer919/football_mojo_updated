@@ -48,6 +48,7 @@ class FullBracketPrediction {
     required this.r16,
     required this.qf,
     required this.sf,
+    required this.bronzeTie,
     required this.finalTie,
     required this.champion,
   });
@@ -57,6 +58,7 @@ class FullBracketPrediction {
   final List<TiePrediction> r16; // 8
   final List<TiePrediction> qf;  // 4
   final List<TiePrediction> sf;  // 2
+  final TiePrediction? bronzeTie;
   final TiePrediction? finalTie;
   final WcTeamRef? champion;
 }
@@ -155,6 +157,12 @@ class BracketPredictionCard extends StatelessWidget {
             _sectionLabel('SEMI-FINALS'),
             const SizedBox(height: 12),
             _TieColumns(ties: prediction.sf, perRow: 2),
+          ],
+          if (prediction.bronzeTie != null) ...[
+            const SizedBox(height: 22),
+            _sectionLabel('THIRD-PLACE PLAY-OFF'),
+            const SizedBox(height: 12),
+            _TieCard(tie: prediction.bronzeTie!),
           ],
           if (prediction.finalTie != null) ...[
             const SizedBox(height: 22),
@@ -522,18 +530,23 @@ class _TieColumns extends StatelessWidget {
       final slice = ties.sublist(i, (i + perRow).clamp(0, ties.length));
       rows.add(Padding(
         padding: EdgeInsets.only(bottom: i + perRow < ties.length ? 8 : 0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var c = 0; c < perRow; c++) ...[
-              if (c > 0) const SizedBox(width: 8),
-              Expanded(
-                child: c < slice.length
-                    ? _TieCard(tie: slice[c])
-                    : const SizedBox.shrink(),
-              ),
+        // IntrinsicHeight bounds the row's cross axis to its tallest child
+        // so CrossAxisAlignment.stretch is valid even when the whole poster
+        // is laid out with an unbounded (intrinsic) height for capture.
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var c = 0; c < perRow; c++) ...[
+                if (c > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: c < slice.length
+                      ? _TieCard(tie: slice[c])
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ));
     }

@@ -138,24 +138,24 @@ class ShareService {
             child: Builder(builder: builder),
           ),
         );
+        // A positioned (left/top only) overlay child receives UNBOUNDED
+        // constraints. A SizedBox pins a finite size regardless:
+        //   - fixed-size mode → both dimensions tight
+        //   - width-only mode → width tight, height loose (0..inf) so the
+        //     poster's Column(mainAxisSize.min) wraps to its content.
         final sized = logicalSize != null
             ? SizedBox.fromSize(size: logicalSize, child: framed)
-            : ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: width!,
-                  maxWidth: width,
-                  maxHeight: maxHeight,
-                ),
-                child: framed,
-              );
+            : SizedBox(width: width, child: framed);
+        // NOTE: no Opacity here. RenderOpacity with opacity 0 skips
+        // painting its subtree, which leaves the RepaintBoundary unpainted
+        // and makes toImage throw (!debugNeedsPaint). The content is
+        // already invisible because it's positioned far off-screen, so the
+        // opacity wrapper is unnecessary as well as harmful.
         return Positioned(
           left: -20_000, // off-screen but still in the paint tree
           top: -20_000,
           child: IgnorePointer(
-            child: Opacity(
-              opacity: 0,
-              child: RepaintBoundary(key: boundaryKey, child: sized),
-            ),
+            child: RepaintBoundary(key: boundaryKey, child: sized),
           ),
         );
       },
@@ -169,12 +169,20 @@ class ShareService {
     try {
       final boundary = boundaryKey.currentContext!.findRenderObject()
           as RenderRepaintBoundary;
+      // Wait until the boundary has actually painted (large posters can
+      // need an extra frame); avoids a "needs paint" toImage failure.
+      var tries = 0;
+      while (boundary.debugNeedsPaint && tries < 8) {
+        await WidgetsBinding.instance.endOfFrame;
+        tries++;
+      }
       final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       if (byteData == null) return null;
       return byteData.buffer.asUint8List();
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('ShareService capture failed: $e\n$st');
       return null;
     } finally {
       entry.remove();

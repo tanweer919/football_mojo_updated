@@ -87,4 +87,10 @@
     </application>
     <uses-permission
         android:name="android.permission.INTERNET"/>
+    <!-- gal: saving share graphics to the gallery. On API 29+ scoped
+         storage means no runtime permission is needed; this is only for
+         API ≤ 28, hence maxSdkVersion. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
 </manifest>

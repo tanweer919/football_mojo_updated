@@ -41,6 +41,16 @@ class MatchWinner extends BracketSlotSource {
   String get label => 'Winner of M$matchNumber';
 }
 
+/// The LOSER of an earlier match — used for the bronze final, which pits
+/// the two semi-final losers. Resolved by the screen as "the side of
+/// match N that the user did NOT pick as winner".
+class MatchLoser extends BracketSlotSource {
+  const MatchLoser(this.matchNumber);
+  final int matchNumber;
+  @override
+  String get label => 'Loser of M$matchNumber';
+}
+
 class BestThird extends BracketSlotSource {
   const BestThird(this.eligibleGroups);
   /// Group letters the FIFA table allows for this slot — the actual third
@@ -198,13 +208,11 @@ const wc2026Matches = <BracketMatch>[
   BracketMatch(number: 102, round: BracketRound.sf, left: MatchWinner(99), right: MatchWinner(100)),
 
   // ── BRONZE + FINAL ──────────────────────────────────────────────────────
-  // Bronze pits the SF losers — represented as MatchLoser. For simplicity
-  // we mark it with MatchWinner of the SF and resolve the loser side at
-  // render time (the bracket-resolver helper does this).
+  // Bronze pits the two semi-final losers.
   BracketMatch(
     number: 103, round: BracketRound.bronze,
-    left:  MatchWinner(101),   // marker — resolver treats as "loser of 101"
-    right: MatchWinner(102),   // marker — resolver treats as "loser of 102"
+    left:  MatchLoser(101),
+    right: MatchLoser(102),
   ),
   BracketMatch(
     number: 104, round: BracketRound.finalRound,
