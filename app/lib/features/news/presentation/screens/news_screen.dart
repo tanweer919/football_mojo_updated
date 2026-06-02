@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/ads/ad_widgets.dart';
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/eyebrow.dart';
@@ -75,7 +76,10 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
     return PitchScreen(
       title: 'News',
       onBack: context.canPop() ? () => context.pop() : null,
-      trailing: CircleIconButton(icon: Icons.search, onPressed: () {}),
+      trailing: CircleIconButton(
+        icon: Icons.ios_share_rounded,
+        onPressed: () => ChottuLinkService.instance.shareApp(),
+      ),
       child: Column(
         children: [
           _TabBar(

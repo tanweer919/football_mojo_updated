@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/share/share_service.dart';
 import '../../../predictions/data/predictions_repository.dart';
@@ -149,16 +150,25 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
                     'GROUP_${e.key.substring(6, 7)}_1': e.value as String,
                 if (championId != null) 'CHAMPION': championId,
               };
-              await ShareService.instance.shareArtifact(
+              // Render the share card PNG first, then hand both PNG +
+              // ChottuLink deep link to the share sheet so previews look
+              // good and the link opens the bracket screen on tap.
+              final imagePath = await ShareService.instance.renderArtifactToFile(
                 context: context,
                 logicalSize: const Size(1080, 1350),
-                text: 'My WC 2026 bracket on PITCH ⚽',
                 filename: 'pitch_bracket.png',
                 builder: (_) => BracketShareCard(
                   groups: groups,
                   picks: shareMap,
                   championTeam: champion,
                 ),
+              );
+              final pts = mineAsync.valueOrNull?.pointsAwarded ?? 0;
+              await ChottuLinkService.instance.shareBracket(
+                championName: champion?.name,
+                championCrestUrl: champion?.crestUrl,
+                pointsAwarded: pts,
+                imagePath: imagePath,
               );
             },
           ),

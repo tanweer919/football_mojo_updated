@@ -178,6 +178,61 @@ class ChottuLinkService {
     );
   }
 
+  /// Share the user's WC2026 bracket. Optionally attaches a pre-rendered
+  /// PNG (see `ShareService.renderArtifactToFile`).
+  Future<void> shareBracket({
+    String? championName,
+    String? championCrestUrl,
+    int? pointsAwarded,
+    String? imagePath,
+  }) async {
+    final hasChampion = championName != null && championName.isNotEmpty;
+    final title = hasChampion
+        ? 'My WC 2026 bracket — $championName for the cup'
+        : 'My WC 2026 bracket on FootballMojo';
+    final description = pointsAwarded != null && pointsAwarded > 0
+        ? '$pointsAwarded pts so far. Build yours and beat me.'
+        : 'Build yours and see if you can beat me.';
+    final shareText = hasChampion
+        ? "I've got $championName lifting the cup 🏆 Make your bracket:\n\n"
+        : "My WC 2026 bracket is in. Make yours:\n\n";
+    _createAndShare(
+      deepLink: '$_baseUrl/bracket',
+      utmCampaign: 'bracket_share',
+      linkName: 'bracket_share',
+      socialTitle: title,
+      socialDescription: description,
+      socialImageUrl: championCrestUrl,
+      shareText: shareText,
+      imagePath: imagePath,
+    );
+  }
+
+  /// Share the user's fantasy lineup for a specific gameweek.
+  Future<void> shareFantasyLineup({
+    required String slug,
+    String? tournamentName,
+    String? gameweekName,
+    double? totalPoints,
+    String? imagePath,
+  }) async {
+    final pts = totalPoints != null ? totalPoints.toStringAsFixed(1) : null;
+    final title = pts != null
+        ? '$pts pts — ${gameweekName ?? "my lineup"} on FootballMojo'
+        : 'My ${tournamentName ?? "fantasy"} lineup on FootballMojo';
+    _createAndShare(
+      deepLink: '$_baseUrl/fantasy?slug=$slug',
+      utmCampaign: 'fantasy_share',
+      linkName: 'fantasy_${slug}_lineup',
+      socialTitle: title,
+      socialDescription: 'Pick your XI and compete in the Global Cup.',
+      shareText: pts != null
+          ? 'My PITCH lineup — $pts pts. Pick yours:\n\n'
+          : 'My PITCH lineup is set. Pick yours:\n\n',
+      imagePath: imagePath,
+    );
+  }
+
   /// Share the app itself.
   Future<void> shareApp() async {
     _createAndShare(
@@ -200,7 +255,9 @@ class ChottuLinkService {
     required String socialDescription,
     String? socialImageUrl,
     required String shareText,
+    String? imagePath,
   }) {
+    final files = imagePath != null ? [XFile(imagePath)] : <XFile>[];
     final parameters = CLDynamicLinkParameters(
       link: Uri.parse(deepLink),
       domain: _domain,
@@ -219,12 +276,16 @@ class ChottuLinkService {
       parameters: parameters,
       onSuccess: (link) {
         debugPrint('✅ ChottuLink created: $link');
-        SharePlus.instance.share(ShareParams(text: '$shareText$link'));
+        SharePlus.instance.share(
+          ShareParams(text: '$shareText$link', files: files),
+        );
       },
       onError: (error) {
         debugPrint('❌ ChottuLink error: ${error.description}');
-        // Fallback: share without deep link
-        SharePlus.instance.share(ShareParams(text: shareText));
+        // Fallback: share PNG (if any) + text without a deep link.
+        SharePlus.instance.share(
+          ShareParams(text: shareText, files: files),
+        );
       },
     );
   }

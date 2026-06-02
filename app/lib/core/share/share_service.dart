@@ -16,6 +16,34 @@ class ShareService {
   ShareService._();
   static final instance = ShareService._();
 
+  /// Renders [builder] at [logicalSize], writes the PNG to a temp file,
+  /// and returns the file path. Use this when the caller wants to attach
+  /// the PNG to a ChottuLink-generated deep link share rather than
+  /// firing the plain share sheet.
+  Future<String?> renderArtifactToFile({
+    required BuildContext context,
+    required Widget Function(BuildContext) builder,
+    required Size logicalSize,
+    String filename = 'pitch_share.png',
+    double pixelRatio = 3.0,
+  }) async {
+    final bytes = await _capture(
+      context: context,
+      builder: builder,
+      logicalSize: logicalSize,
+      pixelRatio: pixelRatio,
+    );
+    if (bytes == null) return null;
+    try {
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/$filename');
+      await file.writeAsBytes(bytes, flush: true);
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Renders [builder]'s widget at [logicalSize], captures it as PNG, then
   /// shares it with [text] as the message body. Auto-removes the hidden
   /// overlay after capture.
@@ -27,9 +55,36 @@ class ShareService {
     String filename = 'pitch_share.png',
     double pixelRatio = 3.0,
   }) async {
+    final bytes = await _capture(
+      context: context,
+      builder: builder,
+      logicalSize: logicalSize,
+      pixelRatio: pixelRatio,
+    );
+    if (bytes == null) return false;
+    try {
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/$filename');
+      await file.writeAsBytes(bytes, flush: true);
+      await SharePlus.instance.share(
+        ShareParams(text: text, files: [XFile(file.path)]),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Hidden-overlay PNG capture. Used by both [shareArtifact] and
+  /// [renderArtifactToFile]. Returns null on failure.
+  Future<Uint8List?> _capture({
+    required BuildContext context,
+    required Widget Function(BuildContext) builder,
+    required Size logicalSize,
+    required double pixelRatio,
+  }) async {
     final overlay = Overlay.of(context, rootOverlay: true);
     final boundaryKey = GlobalKey();
-    final completer = Completer<Uint8List>();
 
     final entry = OverlayEntry(
       builder: (ctx) {
@@ -62,9 +117,7 @@ class ShareService {
     );
     overlay.insert(entry);
 
-    // Wait two frames so any image/network widgets get a chance to lay out
-    // before we capture. Three frames is paranoid-safe; one tends to miss
-    // cached images that resolve on the next microtask.
+    // Two frames so any image/network widgets resolve before capture.
     await WidgetsBinding.instance.endOfFrame;
     await WidgetsBinding.instance.endOfFrame;
 
@@ -74,25 +127,12 @@ class ShareService {
       final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
-      if (byteData == null) throw StateError('encode_failed');
-      completer.complete(byteData.buffer.asUint8List());
-    } catch (e) {
-      completer.completeError(e);
+      if (byteData == null) return null;
+      return byteData.buffer.asUint8List();
+    } catch (_) {
+      return null;
     } finally {
       entry.remove();
-    }
-
-    try {
-      final bytes = await completer.future;
-      final tmp = await getTemporaryDirectory();
-      final file = File('${tmp.path}/$filename');
-      await file.writeAsBytes(bytes, flush: true);
-      await SharePlus.instance.share(
-        ShareParams(text: text, files: [XFile(file.path)]),
-      );
-      return true;
-    } catch (_) {
-      return false;
     }
   }
 }
