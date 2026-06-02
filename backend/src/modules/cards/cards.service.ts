@@ -210,6 +210,24 @@ export class CardsService {
 
     return {
       ...card,
+      // Flatten the template the same way getAlbum/store do, so the client's
+      // CardTemplateDto sees playerName/teamName/artUrl at the top level
+      // (otherwise the detail screen shows "Player" and no art).
+      template: {
+        id: card.template.id,
+        edition: card.template.edition,
+        rarity: card.template.rarity,
+        totalSupply: card.template.totalSupply,
+        mintedCount: card.template.mintedCount,
+        artUrl: card.template.artUrl,
+        frameStyle: card.template.frameStyle,
+        playerName: card.template.player?.name ?? null,
+        teamName: card.template.player?.team?.name ?? null,
+        teamCrestUrl: card.template.player?.team?.crestUrl ?? null,
+        dropOpensAt: card.template.dropOpensAt ?? null,
+        dropClosesAt: card.template.dropClosesAt ?? null,
+        maxPerUser: card.template.maxPerUser ?? null,
+      },
       // Spread the level out from XP at render — keeps the DB column
       // honest as the source-of-truth XP value.
       level: levelFromXp(card.xp),
@@ -265,7 +283,11 @@ export class CardsService {
     const idx = Math.floor(Date.now() / 86_400_000) % rotation.length;
     const tpl = rotation[idx]!;
 
-    return this.minting.award({ userId, templateId: tpl.id, source: 'DAILY_LOGIN' });
+    const card = await this.minting.award({ userId, templateId: tpl.id, source: 'DAILY_LOGIN' });
+    // Return the enriched card (with flattened template) so the client can
+    // parse + render it — minting.award returns a bare OwnedCard with no
+    // template, which fails OwnedCardDto.fromJson.
+    return this.getOwnedCard(userId, card.id);
   }
 
   // Rewarded-ad mint: user watches a ~30s ad, server validates the ad SSV
@@ -308,7 +330,10 @@ export class CardsService {
         LIMIT 1;
       `);
       if (missing.length) {
-        return this.minting.award({ userId, templateId: missing[0]!.id, source: 'REWARDED_AD' });
+        const card = await this.minting.award({ userId, templateId: missing[0]!.id, source: 'REWARDED_AD' });
+        // Enriched card (flattened template) so the client parses + renders
+        // it; the bare OwnedCard from minting.award has no template.
+        return this.getOwnedCard(userId, card.id);
       }
     }
     throw new BadRequestException('reward_tier_album_complete');
