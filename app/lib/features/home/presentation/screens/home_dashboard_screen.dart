@@ -128,14 +128,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: _BracketCard(),
             ),
 
-            // Your teams — followed-team digest or prompt to pick teams.
+            // Your teams — followed-team digest (crests + news + their
+            // own fixture digest inside the card). No separate "Following
+            // matches" section — this one already covers it.
             const _SectionGap(),
             const _YourTeamsSection(),
-
-            // Followed-team fixtures — live + upcoming matches involving
-            // any team the user follows. Rendered only when the user
-            // actually follows teams; the widget short-circuits otherwise.
-            const _FollowedMatchesSection(),
 
             // European leagues — hidden during WC mode since all domestic
             // seasons are over and the section is empty.
@@ -506,14 +503,11 @@ class _SectionHead extends StatelessWidget {
 // MATCH HERO — one big card showing the next/current match
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Single-match feature card. Picks the most relevant match right now:
-///   1. Any live match (first one — the live feed is already
-///      newest-first / by-priority server-side).
-///   2. Otherwise the next upcoming kickoff (followed teams preferred,
-///      then chronological).
-/// Rendered larger than the legacy strip with competition badge, both
-/// crests, score or kickoff time, and a live pulse / kickoff countdown
-/// status line. All times formatted in the user's local timezone.
+/// Single-match feature card. Picks the most relevant match right now
+/// — completely team-agnostic (any followed-team filter would conflict
+/// with what the user sees in the Your teams section just below):
+///   1. The first live match in the feed.
+///   2. Otherwise the next upcoming kickoff in chronological order.
 class _NextMatchHero extends ConsumerWidget {
   const _NextMatchHero();
 
@@ -521,57 +515,26 @@ class _NextMatchHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final live = ref.watch(liveMatchesProvider);
     final fixtures = ref.watch(homeFixturesProvider);
-    final followedIds = ref
-        .watch(myProfileProvider)
-        .maybeWhen(
-          data: (p) => (p?.followedTeams ?? const <ProfileTeam>[])
-              .map((t) => t.id)
-              .toSet(),
-          orElse: () => <String>{},
-        );
 
-    final liveList = live.valueOrNull;
-    final fixtureBundle = fixtures.valueOrNull;
-
-    // Loading-priority order: if both are still loading show the skeleton.
     if (live.isLoading && fixtures.isLoading) {
       return const _HeroSkeleton();
     }
 
-    // Pick the match: live (followed first) → upcoming (followed first).
-    MatchDto? selected;
-    if (liveList != null && liveList.isNotEmpty) {
-      selected = _firstPreferringFollowed(liveList, followedIds);
-    }
-    if (selected == null &&
-        fixtureBundle != null &&
-        fixtureBundle.upcoming.isNotEmpty) {
-      selected = _firstPreferringFollowed(fixtureBundle.upcoming, followedIds);
-    }
+    final liveList = live.valueOrNull;
+    final fixtureBundle = fixtures.valueOrNull;
+    final MatchDto? selected = liveList != null && liveList.isNotEmpty
+        ? liveList.first
+        : (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty
+            ? fixtureBundle.upcoming.first
+            : null);
 
     if (selected == null) {
-      // Nothing live, nothing upcoming in the window — render the
-      // standing "no matches" fallback so the section is never empty.
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
         child: _NoLiveNowTile(),
       );
     }
     return _MatchFeatureCard(match: selected);
-  }
-
-  static MatchDto _firstPreferringFollowed(
-    List<MatchDto> matches,
-    Set<String> followed,
-  ) {
-    if (followed.isEmpty) return matches.first;
-    for (final m in matches) {
-      if (followed.contains(m.homeTeam.id) ||
-          followed.contains(m.awayTeam.id)) {
-        return m;
-      }
-    }
-    return matches.first;
   }
 }
 
@@ -875,411 +838,6 @@ class _MatchHeroStatus extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FOLLOWED MATCHES SECTION — strip-style list of followed-team fixtures
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Section that lists matches involving any team the user follows.
-/// Renders only when the profile has at least one followed team; in
-/// the empty-state case it shrinks to nothing so the page doesn't show
-/// an empty header. Live matches come first, then chronological
-/// upcoming. Up to 4 rows on home — full list one tap away.
-class _FollowedMatchesSection extends ConsumerWidget {
-  const _FollowedMatchesSection();
-  static const _maxVisible = 4;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(myProfileProvider);
-    final followedIds = profileAsync.maybeWhen(
-      data: (p) => (p?.followedTeams ?? const <ProfileTeam>[])
-          .map((t) => t.id)
-          .toSet(),
-      orElse: () => <String>{},
-    );
-    if (followedIds.isEmpty) return const SizedBox.shrink();
-
-    final live = ref.watch(liveMatchesProvider);
-    final fixtures = ref.watch(homeFixturesProvider);
-
-    final liveMatches = (live.valueOrNull ?? const <MatchDto>[])
-        .where((m) => _isFollowed(m, followedIds))
-        .toList();
-    final upcomingMatches = (fixtures.valueOrNull?.upcoming ?? const <MatchDto>[])
-        .where((m) =>
-            _isFollowed(m, followedIds) &&
-            !liveMatches.any((lm) => lm.id == m.id))
-        .toList();
-
-    final rows = <Widget>[];
-    final maxLive = (_maxVisible).clamp(0, liveMatches.length);
-    for (var i = 0; i < maxLive; i++) {
-      rows.add(_LiveRowItem(match: liveMatches[i]));
-      if (i < maxLive - 1) rows.add(const _LiveDivider());
-    }
-    final remaining = _maxVisible - maxLive;
-    final pickUpcoming = upcomingMatches.take(remaining).toList();
-    if (rows.isNotEmpty && pickUpcoming.isNotEmpty) {
-      rows.add(const _UpNextDivider());
-    }
-    for (var i = 0; i < pickUpcoming.length; i++) {
-      rows.add(_UpcomingRowItem(match: pickUpcoming[i]));
-      if (i < pickUpcoming.length - 1) rows.add(const _LiveDivider());
-    }
-
-    if (rows.isEmpty) {
-      // Followed teams have no live + no fixtures in the window — show
-      // a small placeholder rather than a giant empty card.
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SectionHead(
-            title: 'Following matches',
-            action: 'All matches →',
-            onAction: () => context.push(RoutePaths.matches),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'No upcoming matches yet for ${profileAsync.valueOrNull?.followedTeams.length ?? 0} '
-              'followed team${(profileAsync.valueOrNull?.followedTeams.length ?? 0) == 1 ? "" : "s"}.',
-              style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.4),
-            ),
-          ),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionHead(
-          title: 'Following matches',
-          action: 'All matches →',
-          onAction: () => context.push(RoutePaths.matches),
-        ),
-        _LiveCard(children: rows),
-      ],
-    );
-  }
-
-  static bool _isFollowed(MatchDto m, Set<String> followed) =>
-      followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id);
-}
-
-class _UpNextDivider extends StatelessWidget {
-  const _UpNextDivider();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
-          const SizedBox(width: 8),
-          const Text(
-            'UP NEXT',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: AppColors.gold,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveCard extends StatelessWidget {
-  const _LiveCard({required this.children});
-  final List<Widget> children;
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.surface2, AppColors.surface],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Column(children: children),
-      ),
-    );
-  }
-}
-
-class _LiveDivider extends StatelessWidget {
-  const _LiveDivider();
-  @override
-  Widget build(BuildContext context) => const Divider(
-        height: 1,
-        thickness: 1,
-        color: AppColors.borderSoft,
-        indent: 12,
-        endIndent: 12,
-      );
-}
-
-
-/// Compact single-line live match row — both crests, names, score and
-/// minute marker all visible at a glance.
-class _LiveRowItem extends StatelessWidget {
-  const _LiveRowItem({required this.match});
-  final MatchDto match;
-
-  @override
-  Widget build(BuildContext context) {
-    final homeWinning = match.homeScore > match.awayScore;
-    final awayWinning = match.awayScore > match.homeScore;
-    return InkWell(
-      onTap: () => context.push('/matches/${match.id}'),
-      borderRadius: BorderRadius.circular(AppRadii.r3),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: _LiveSideName(
-                team: match.homeTeam,
-                alignEnd: true,
-                winning: homeWinning,
-              ),
-            ),
-            const SizedBox(width: 10),
-            _LiveScoreChip(
-              home: match.homeScore,
-              away: match.awayScore,
-              minute: match.minute,
-              isLive: match.isLive,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _LiveSideName(
-                team: match.awayTeam,
-                alignEnd: false,
-                winning: awayWinning,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Upcoming-match version of [_LiveRowItem]. Same layout but the centre
-/// chip shows the kickoff time + relative-day label ("Today", "Sat")
-/// instead of a live score.
-class _UpcomingRowItem extends StatelessWidget {
-  const _UpcomingRowItem({required this.match});
-  final MatchDto match;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push('/matches/${match.id}'),
-      borderRadius: BorderRadius.circular(AppRadii.r3),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: _LiveSideName(
-                team: match.homeTeam,
-                alignEnd: true,
-                winning: false,
-              ),
-            ),
-            const SizedBox(width: 10),
-            _UpcomingTimeChip(kickoff: match.kickoffAt),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _LiveSideName(
-                team: match.awayTeam,
-                alignEnd: false,
-                winning: false,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _UpcomingTimeChip extends StatelessWidget {
-  const _UpcomingTimeChip({required this.kickoff});
-  final DateTime kickoff;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final local = kickoff.toLocal();
-    final isToday = local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
-    final daysAhead = DateTime(local.year, local.month, local.day)
-        .difference(DateTime(now.year, now.month, now.day))
-        .inDays;
-    final dayLabel = isToday
-        ? 'Today'
-        : daysAhead == 1
-            ? 'Tomorrow'
-            : DateFormat('EEE d MMM').format(local);
-    final timeLabel = DateFormat('HH:mm').format(local);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0x8C0F0E0D),
-            borderRadius: BorderRadius.circular(AppRadii.r2),
-            border: Border.all(color: AppColors.borderSoft),
-          ),
-          child: Text(
-            timeLabel,
-            style: const TextStyle(
-              fontFamily: 'JetBrainsMono',
-              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: AppColors.fg,
-              letterSpacing: -0.2,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          dayLabel.toUpperCase(),
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 8.5,
-            fontWeight: FontWeight.w800,
-            color: AppColors.gold,
-            letterSpacing: 0.8,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LiveSideName extends StatelessWidget {
-  const _LiveSideName({
-    required this.team,
-    required this.alignEnd,
-    required this.winning,
-  });
-  final TeamDto team;
-  final bool alignEnd;
-  final bool winning;
-
-  @override
-  Widget build(BuildContext context) {
-    final crest = SizedBox(
-      width: 20,
-      height: 20,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-      ),
-    );
-    final name = Flexible(
-      child: Text(
-        team.shortName ?? team.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-        style: TextStyle(
-          fontFamily: 'Inter',
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          color: winning ? AppColors.gold : AppColors.fg,
-        ),
-      ),
-    );
-    return Row(
-      mainAxisAlignment:
-          alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
-      children: alignEnd
-          ? [name, const SizedBox(width: 8), crest]
-          : [crest, const SizedBox(width: 8), name],
-    );
-  }
-}
-
-class _LiveScoreChip extends StatelessWidget {
-  const _LiveScoreChip({
-    required this.home,
-    required this.away,
-    required this.minute,
-    required this.isLive,
-  });
-  final int home;
-  final int away;
-  final int? minute;
-  final bool isLive;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0x8C0F0E0D),
-            borderRadius: BorderRadius.circular(AppRadii.r2),
-            border: Border.all(color: AppColors.borderSoft),
-          ),
-          child: Text(
-            '$home–$away',
-            style: const TextStyle(
-              fontFamily: 'JetBrainsMono',
-              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppColors.fg,
-              letterSpacing: -0.3,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-        const SizedBox(height: 3),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isLive) ...[
-              const LiveDot(),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              "${minute ?? 0}'",
-              style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: AppColors.pitch,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
 
 class _StripEmpty extends StatelessWidget {
   const _StripEmpty({

@@ -28,16 +28,36 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
       DateTime(now.year, now.month, now.day + i),
   ];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
-  // Backend's per-day query slots a match into its UTC date; that means
-  // a 22:00-local-time kickoff falls into "today" and "tomorrow" buckets
-  // in different timezones, so the same match can come back twice across
-  // adjacent day queries. Dedupe by match id before slotting into recent/
-  // upcoming so we never render the same fixture twice on home.
-  final dedup = <String, MatchDto>{};
-  for (final m in results.expand((e) => e)) {
-    dedup.putIfAbsent(m.id, () => m);
+  // Two layers of dedupe:
+  //   1. Same match id appearing in adjacent-day queries (UTC bucket
+  //      bleed for late-night kickoffs).
+  //   2. Same real-world fixture with DIFFERENT ids — the WC seed
+  //      uses synthetic ids like `WC2026-GF-portugal-dr-congo`, while
+  //      api-football inserts the same match again with a numeric
+  //      id once the fixture publishes. We dedupe on the natural
+  //      key (homeId|awayId|kickoff-hour) so the same Portugal vs
+  //      DR Congo doesn't show twice. Prefer the row that has live
+  //      data (status != SCHEDULED) when collapsing duplicates so
+  //      the live row wins over the seed placeholder.
+  final byKey = <String, MatchDto>{};
+  String keyOf(MatchDto m) {
+    final t = m.kickoffAt.toUtc();
+    final hour = '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}T${t.hour.toString().padLeft(2, '0')}';
+    return '${m.homeTeam.id}|${m.awayTeam.id}|$hour';
   }
-  final all = dedup.values.toList();
+  for (final m in results.expand((e) => e)) {
+    final k = keyOf(m);
+    final existing = byKey[k];
+    if (existing == null) {
+      byKey[k] = m;
+    } else {
+      // Prefer the row that's live/finished over a SCHEDULED twin.
+      final existingIsScheduled = existing.status == MatchStatus.SCHEDULED;
+      final candidateBetter = existingIsScheduled && m.status != MatchStatus.SCHEDULED;
+      if (candidateBetter) byKey[k] = m;
+    }
+  }
+  final all = byKey.values.toList();
 
   final upcoming = all
       .where((m) =>
