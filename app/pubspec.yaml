@@ -110,15 +110,14 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  # iOS + legacy (pre-Android-8) launcher icon: white wireframe football on
-  # black, flattened to a full square.
-  image_path: "assets/images/app_icon8_full.png"
-  # Adaptive icon layers (Android 8+). Foreground is the white wireframe
-  # ball (assets/images/app.png as-is — white linework, black panels) on
-  # transparency, scaled to ~66% (inside the 66.7% safe zone so no mask
-  # clips it). The black panels merge into the black background layer,
-  # leaving the white wireframe on black.
-  adaptive_icon_foreground: "assets/images/app_icon8_foreground.png"
+  # iOS + legacy (pre-Android-8) launcher icon: gold wireframe ball
+  # (app_icon5) on black, flattened to a full square.
+  image_path: "assets/images/app_icon5_full.png"
+  # Adaptive icon layers (Android 8+). Foreground is the gold wireframe
+  # ball (from assets/images/app_icon5.png) on transparency, scaled to
+  # ~55% of the canvas — inside the 66.7% safe zone with a framed black
+  # margin — over the black background layer.
+  adaptive_icon_foreground: "assets/images/app_icon5_foreground.png"
   adaptive_icon_background: "#000000"
   # Foreground is ALREADY padded into the safe zone, so suppress the
   # package's default 16% inset (it would double-pad and shrink the ball).
