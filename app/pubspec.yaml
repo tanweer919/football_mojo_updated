@@ -110,13 +110,21 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/app_icon_foreground.png"
-  # Adaptive icon layers (Android 8+) — this is what makes the icon
-  # render full-size with your branded dark background instead of
-  # being shrunk inside a white circle.
-  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"
-  adaptive_icon_background: "#0F0E0D"
+  # iOS + legacy (pre-Android-8) launcher icon: the full square art.
+  image_path: "assets/images/app_icon5.png"
+  # Adaptive icon layers (Android 8+). The launcher masks the outer ~1/3
+  # of the canvas (only the centre 66.7% is guaranteed visible), so the
+  # foreground is app_icon5 scaled into that safe zone on a black canvas
+  # (app_icon5's own corners are pure black, so it's seamless against the
+  # matching black background layer — the gold ball never gets clipped).
+  adaptive_icon_foreground: "assets/images/app_icon5_foreground.png"
+  adaptive_icon_background: "#000000"
+  # The foreground is ALREADY padded into the safe zone, so suppress the
+  # package's default 16% inset (which would double-pad and shrink the
+  # ball too far).
+  adaptive_icon_foreground_inset: 0
   min_sdk_android: 21
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
