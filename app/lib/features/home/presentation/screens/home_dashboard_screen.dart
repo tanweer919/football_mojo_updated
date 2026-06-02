@@ -12,7 +12,6 @@ import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
-import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../../core/widgets/pcard.dart';
@@ -341,94 +340,88 @@ class _WcHero extends StatelessWidget {
     final secs = remaining.inSeconds % 60;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF211D17), Color(0xFF110F0D)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
-          borderRadius: BorderRadius.circular(AppRadii.r5),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
           border: Border.all(color: AppColors.goldHairline),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.7),
-              blurRadius: 60,
-              offset: const Offset(0, 32),
-              spreadRadius: -28,
-            ),
-          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              children: const [
-                Text('★ ', style: TextStyle(color: AppColors.goldDeep, fontSize: 11, height: 1)),
-                Eyebrow('FIFA WORLD CUP 2026', gold: true, size: 11),
-              ],
-            ),
-            const SizedBox(height: 18),
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.2,
-                  color: AppColors.fg,
-                  height: 1.0,
-                ),
+            // Title block — eyebrow + small CTA
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const TextSpan(text: 'The world\nplays in '),
-                  TextSpan(
-                    text: '${days.clamp(0, 999)} days',
-                    style: const TextStyle(
-                      fontFamily: 'IowanOldStyle',
-                      fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.gold,
-                      fontSize: 30,
+                  Row(
+                    children: const [
+                      Text('★ ',
+                          style: TextStyle(color: AppColors.goldDeep, fontSize: 10, height: 1)),
+                      Flexible(
+                        child: Eyebrow('WORLD CUP 2026', gold: true, size: 10),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Kicks off 11 Jun',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.3,
+                      height: 1.1,
                     ),
                   ),
-                  const TextSpan(text: '.'),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => context.push(RoutePaths.bracket),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Make bracket',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.gold,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.arrow_forward,
+                            color: AppColors.gold, size: 12),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            const Eyebrow('United States · Canada · Mexico · 16 cities'),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: _CountdownCell(n: days,  l: 'Days')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: hours, l: 'Hours')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: mins,  l: 'Min')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: secs,  l: 'Sec')),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: GoldButton(
-                    label: 'Make your bracket',
-                    onPressed: () => context.push(RoutePaths.bracket),
-                    expand: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GhostButton(
-                  label: 'Global Cup',
-                  onPressed: () => context.push(RoutePaths.fantasyHome),
-                  small: true,
-                ),
-              ],
+            // Compact countdown cells — half the previous height
+            Expanded(
+              flex: 7,
+              child: Row(
+                children: [
+                  Expanded(child: _CountdownCell(n: days,  l: 'D')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: hours, l: 'H')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: mins,  l: 'M')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: secs,  l: 'S')),
+                ],
+              ),
             ),
           ],
         ),
@@ -444,28 +437,39 @@ class _CountdownCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       decoration: BoxDecoration(
         color: const Color(0x8C0F0E0D),
         borderRadius: BorderRadius.circular(AppRadii.r2),
         border: Border.all(color: AppColors.borderSoft),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             n.toString().padLeft(2, '0'),
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 26,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
-              letterSpacing: -1.04,
+              letterSpacing: -0.6,
               color: AppColors.gold,
               height: 1.0,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 6),
-          Eyebrow(l, size: 9),
+          const SizedBox(height: 2),
+          Text(
+            l,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: AppColors.muted,
+              letterSpacing: 0.8,
+              height: 1.0,
+            ),
+          ),
         ],
       ),
     );
@@ -524,18 +528,25 @@ class _SectionHead extends StatelessWidget {
 
 class _LiveStrip extends ConsumerWidget {
   const _LiveStrip();
+
+  /// Cap visible rows so the section stays glanceable. The full list is
+  /// one tap away via the "All matches →" action in the section head.
+  static const _maxVisible = 4;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final live = ref.watch(liveMatchesProvider);
     return live.when(
-      loading: () => SizedBox(
-        height: 168,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: 3,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => const SizedBox(width: 240, child: MatchCardSkeleton()),
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: List.generate(
+            3,
+            (_) => const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Skeleton(height: 40, radius: 10),
+            ),
+          ),
         ),
       ),
       error: (e, _) => const _StripEmpty(
@@ -544,25 +555,190 @@ class _LiveStrip extends ConsumerWidget {
         glyph: EmptyGlyph.football,
       ),
       data: (matches) {
-        if (matches.isEmpty) {
-          // No live matches in this very moment. Don't editorialise about
-          // the season — there are usually matches kicking off in a few
-          // hours regardless of the time of year. The European leagues
-          // section below has results + fixtures so home isn't dry.
-          return const _NoLiveNowTile();
-        }
-        return SizedBox(
-          height: 168,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            physics: const BouncingScrollPhysics(),
-            itemCount: matches.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => _LiveCard(match: matches[i]),
+        if (matches.isEmpty) return const _NoLiveNowTile();
+        final visible = matches.take(_maxVisible).toList();
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.surface2, AppColors.surface],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < visible.length; i++) ...[
+                  _LiveRowItem(match: visible[i]),
+                  if (i < visible.length - 1)
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: AppColors.borderSoft,
+                      indent: 12,
+                      endIndent: 12,
+                    ),
+                ],
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Compact single-line live match row — both crests, names, score and
+/// minute marker all visible at a glance.
+class _LiveRowItem extends StatelessWidget {
+  const _LiveRowItem({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    final homeWinning = match.homeScore > match.awayScore;
+    final awayWinning = match.awayScore > match.homeScore;
+    return InkWell(
+      onTap: () => context.push('/matches/${match.id}'),
+      borderRadius: BorderRadius.circular(AppRadii.r3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _LiveSideName(
+                team: match.homeTeam,
+                alignEnd: true,
+                winning: homeWinning,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _LiveScoreChip(
+              home: match.homeScore,
+              away: match.awayScore,
+              minute: match.minute,
+              isLive: match.isLive,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _LiveSideName(
+                team: match.awayTeam,
+                alignEnd: false,
+                winning: awayWinning,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveSideName extends StatelessWidget {
+  const _LiveSideName({
+    required this.team,
+    required this.alignEnd,
+    required this.winning,
+  });
+  final TeamDto team;
+  final bool alignEnd;
+  final bool winning;
+
+  @override
+  Widget build(BuildContext context) {
+    final crest = SizedBox(
+      width: 20,
+      height: 20,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+      ),
+    );
+    final name = Flexible(
+      child: Text(
+        team.shortName ?? team.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          color: winning ? AppColors.gold : AppColors.fg,
+        ),
+      ),
+    );
+    return Row(
+      mainAxisAlignment:
+          alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: alignEnd
+          ? [name, const SizedBox(width: 8), crest]
+          : [crest, const SizedBox(width: 8), name],
+    );
+  }
+}
+
+class _LiveScoreChip extends StatelessWidget {
+  const _LiveScoreChip({
+    required this.home,
+    required this.away,
+    required this.minute,
+    required this.isLive,
+  });
+  final int home;
+  final int away;
+  final int? minute;
+  final bool isLive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0x8C0F0E0D),
+            borderRadius: BorderRadius.circular(AppRadii.r2),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            '$home–$away',
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.fg,
+              letterSpacing: -0.3,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLive) ...[
+              const LiveDot(),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              "${minute ?? 0}'",
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: AppColors.pitch,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -595,102 +771,6 @@ class _StripEmpty extends StatelessWidget {
   }
 }
 
-class _LiveCard extends StatelessWidget {
-  const _LiveCard({required this.match});
-  final MatchDto match;
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/matches/${match.id}'),
-      child: Container(
-        width: 240,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.surface2, AppColors.surface],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(child: Eyebrow('LIVE', size: 9)),
-                if (match.isLive) const LiveDot(),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _LiveRow(team: match.homeTeam, score: match.homeScore, winning: match.homeScore > match.awayScore),
-            const SizedBox(height: 6),
-            _LiveRow(team: match.awayTeam, score: match.awayScore, winning: match.awayScore > match.homeScore),
-            const Spacer(),
-            Text(
-              "${match.minute ?? 0}'",
-              style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-                color: AppColors.pitch,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveRow extends StatelessWidget {
-  const _LiveRow({required this.team, required this.score, required this.winning});
-  final TeamDto team;
-  final int score;
-  final bool winning;
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 22, height: 16,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            team.shortName ?? team.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: AppColors.fg,
-            ),
-          ),
-        ),
-        Text(
-          score.toString(),
-          style: TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: winning ? AppColors.gold : AppColors.fg,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FANTASY CARD — wired to currentGameweek + myLineup
