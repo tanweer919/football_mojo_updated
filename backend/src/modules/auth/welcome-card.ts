@@ -30,14 +30,19 @@ export async function mintWelcomeCard(
   const order = shuffle([...WELCOME_RARITIES]);
 
   for (const rarity of order) {
-    const total = await prisma.cardTemplate.count({
-      where: { rarity, mintedCount: { lt: prisma.cardTemplate.fields.totalSupply } },
-    });
+    // Only real player cards (non-empty artUrl) so the signup gift is never
+    // a blank placeholder template.
+    const where = {
+      rarity,
+      artUrl: { not: '' },
+      mintedCount: { lt: prisma.cardTemplate.fields.totalSupply },
+    };
+    const total = await prisma.cardTemplate.count({ where });
     if (total === 0) continue;
 
     const skip = Math.floor(Math.random() * total);
     const tmpl = await prisma.cardTemplate.findFirst({
-      where: { rarity, mintedCount: { lt: prisma.cardTemplate.fields.totalSupply } },
+      where,
       skip,
       select: { id: true, mintedCount: true },
     });

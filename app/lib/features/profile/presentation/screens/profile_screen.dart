@@ -194,6 +194,12 @@ class _ProfileBody extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SettingsGroup(rows: [
+                  _SettingRow(
+                    icon: Icons.style_outlined,
+                    label: 'My collection',
+                    value: '${p.stats.ownedCards} cards',
+                    onTap: () => context.push(RoutePaths.album),
+                  ),
                   // Account-info rows are read-only — no chevron, no tap.
                   _SettingRow(icon: Icons.email_outlined, label: 'Email', value: p.email ?? '—'),
                   _SettingRow(
@@ -373,13 +379,26 @@ class _StatsRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: _Stat(label: 'Cards', value: stats.ownedCards.toString())),
+          // Cards + Iconic tap through to the collection.
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push(RoutePaths.album),
+              child: _Stat(label: 'Cards', value: stats.ownedCards.toString()),
+            ),
+          ),
           _Divider(),
           Expanded(child: _Stat(label: 'Total pts', value: stats.totalFantasyPoints.toStringAsFixed(0), gold: true)),
           _Divider(),
           Expanded(child: _Stat(label: '1v1 wins', value: stats.h2hWins.toString())),
           _Divider(),
-          Expanded(child: _Stat(label: 'Iconic', value: (stats.rarityCount['ICONIC'] ?? 0).toString())),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push(RoutePaths.album),
+              child: _Stat(label: 'Iconic', value: (stats.rarityCount['ICONIC'] ?? 0).toString()),
+            ),
+          ),
         ],
       ),
     );

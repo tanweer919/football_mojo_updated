@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design/rarity_theme.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../album/data/repositories/album_repository.dart';
+import '../../../album/presentation/widgets/free_card_cta.dart';
 import '../../data/gems_repository.dart';
 
 /// Gem wallet — balance, daily claim, earn rules, spend catalog, history.
@@ -60,6 +61,9 @@ class WalletScreen extends ConsumerWidget {
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
+            // Watch-ad-for-card — earn a free card. Hides when ads off / Pro.
+            const FreeCardCta(),
+            const SizedBox(height: 10),
             _EarnRules(catalog: catalog),
             const SizedBox(height: 18),
             Text('Store',

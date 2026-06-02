@@ -228,8 +228,31 @@ class _Front extends StatelessWidget {
                       if (card.template.artUrl.isNotEmpty)
                         PremiumImage(url: card.template.artUrl, fit: BoxFit.contain)
                       else
-                        Icon(Icons.person,
-                            size: 140, color: theme.frame.withValues(alpha: 0.4)),
+                        // No player art on this template — show a clear
+                        // crest-style placeholder instead of a blank panel.
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.sports_soccer,
+                                  size: 96, color: theme.accent.withValues(alpha: 0.8)),
+                              const SizedBox(height: 10),
+                              Text(
+                                (card.template.playerName ?? card.template.edition)
+                                    .toUpperCase(),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.frame,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
