@@ -112,16 +112,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: _BracketCard(),
             ),
 
-            // Your teams — either the followed-team digest or a prompt
-            // to pick teams. Sits directly under the WC hero because
-            // following is the single biggest signal we have for what
-            // content the user cares about.
-            const _YourTeamsSection(),
-
-            // (Removed: the "Get ready" hype strip felt like promo noise
-            // once the followed-teams section was richer. Anything that
-            // was there is one level deeper in Fantasy / Cards / Predictions.)
-
+            // Live now — moved above followed-teams: when a match is in
+            // progress the user almost always wants to see the score
+            // first, before scrolling past their followed teams.
             const SizedBox(height: 8),
             _SectionHead(
               title: 'Live now',
@@ -130,6 +123,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             const SizedBox(height: 10),
             const _LiveStrip(),
+
+            // Your teams — followed-team digest or prompt to pick teams.
+            const _YourTeamsSection(),
 
             // European leagues — hidden during WC mode since all domestic
             // seasons are over and the section is empty.
@@ -146,15 +142,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 10),
             const _GroupSpotlight(),
 
-            // WC upcoming schedule — next 4 WC matches
-            const SizedBox(height: 16),
-            _SectionHead(
-              title: 'WC schedule',
-              action: 'Full draw →',
-              onAction: () => context.push(RoutePaths.matches),
-            ),
-            const SizedBox(height: 10),
-            const _WcUpcomingMatches(),
+            // (Removed: WC upcoming schedule — moved to /world-cup screen
+            // alongside the other tournament context so the home page
+            // doesn't double-list it.)
 
             // Host venues — the 3 host nations + venue count
             const SizedBox(height: 16),
@@ -2607,92 +2597,6 @@ class _GroupTeamCell extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WC UPCOMING MATCHES — next 4 WC2026 fixtures
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Shows the next 4 WC2026 matches from the home fixtures provider.
-/// Falls back to a friendly empty state before the tournament starts.
-class _WcUpcomingMatches extends ConsumerWidget {
-  const _WcUpcomingMatches();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(homeFixturesProvider);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: async.when(
-        loading: () => const Skeleton(height: 160, radius: 16),
-        error: (_, __) => const _StripEmpty(
-          title: 'Schedule unavailable',
-          subtitle: "Couldn't reach the fixtures feed. Pull to refresh.",
-        ),
-        data: (f) {
-          final wcMatches = f.upcoming
-              .where((m) => m.competitionId == 'WC2026')
-              .take(4)
-              .toList();
-          if (wcMatches.isEmpty) {
-            return Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadii.r4),
-                border: Border.all(color: AppColors.borderSoft),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.event_note, color: AppColors.gold, size: 22),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'World Cup fixtures drop when the draw is finalised.',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: AppColors.muted,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Check back closer to June 2026.',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: AppColors.muted2,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadii.r4),
-              border: Border.all(color: AppColors.borderSoft),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final m in wcMatches) _LeagueFixtureRow(match: m),
-                const SizedBox(height: 6),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }

@@ -243,12 +243,16 @@ class _AllFeed extends ConsumerWidget {
       onRefresh: () => ref.read(newsFeedProvider.notifier).refresh(),
       child: feed.when(
         loading: () => const _LoadingList(),
-        error: (e, _) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('$e', style: const TextStyle(color: AppColors.live)),
+        error: (e, _) => _NewsErrorList(
+          error: e,
+          onRetry: () => ref.read(newsFeedProvider.notifier).refresh(),
         ),
         data: (page) {
-          if (page.items.isEmpty) return const _EmptyAll();
+          if (page.items.isEmpty) {
+            return _EmptyAll(
+              onRetry: () => ref.read(newsFeedProvider.notifier).refresh(),
+            );
+          }
           return _NewsList(page: page, scrollController: scrollController);
         },
       ),
@@ -257,34 +261,106 @@ class _AllFeed extends ConsumerWidget {
 }
 
 class _EmptyAll extends StatelessWidget {
-  const _EmptyAll();
+  const _EmptyAll({required this.onRetry});
+  final Future<void> Function() onRetry;
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Eyebrow('TODAY\'S STORIES', gold: true),
-          SizedBox(height: 12),
-          Text(
-            'No stories yet',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.fg,
-              letterSpacing: -0.4,
+    // ListView so RefreshIndicator's pull-to-refresh still works when the
+    // empty state doesn't fill the screen.
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        const SizedBox(height: 40),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Eyebrow("TODAY'S STORIES", gold: true),
+              SizedBox(height: 12),
+              Text(
+                'No stories yet',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.fg,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Sources update every 10 minutes. Pull to refresh or hit retry.',
+                style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: GoldButton(label: 'Retry', onPressed: onRetry),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Error state that's pull-to-refresh-able. Used for both All and
+/// Following tabs. Renders the dio/network message so prod users can
+/// screenshot and report it instead of seeing a silent blank screen.
+class _NewsErrorList extends StatelessWidget {
+  const _NewsErrorList({required this.error, required this.onRetry});
+  final Object error;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      children: [
+        const Eyebrow('COULDN’T LOAD NEWS', gold: true),
+        const SizedBox(height: 12),
+        const Text(
+          'Something went wrong fetching stories',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: AppColors.fg,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            '$error',
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 11.5,
+              color: AppColors.live,
+              height: 1.4,
             ),
           ),
-          SizedBox(height: 6),
-          Text(
-            'Pull to refresh — sources update every 10 minutes.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: GoldButton(label: 'Retry', onPressed: onRetry),
+        ),
+      ],
     );
   }
 }
@@ -314,9 +390,9 @@ class _FollowingFeed extends ConsumerWidget {
       onRefresh: () => ref.read(followingNewsProvider.notifier).refresh(),
       child: feed.when(
         loading: () => const _LoadingList(),
-        error: (e, _) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('$e', style: const TextStyle(color: AppColors.live)),
+        error: (e, _) => _NewsErrorList(
+          error: e,
+          onRetry: () => ref.read(followingNewsProvider.notifier).refresh(),
         ),
         data: (page) {
           if (page.items.isEmpty) return _NoMatchingArticles();
