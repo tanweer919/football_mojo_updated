@@ -68,7 +68,14 @@ class PredictionsRepository {
         .toList();
   }
 
-  Future<BracketDto> submitBracket(String competitionId, Map<String, String> picks) async {
+  /// Submit the user's bracket picks. `picks` keys map to either:
+  ///   - a single team id String   (GROUP_<letter>_1/2, CHAMPION)
+  ///   - a List<String> of team ids (REACH_R16, REACH_QF, REACH_SF, REACH_FINAL)
+  /// Backend stores the JSON verbatim; scoring inspects each key by shape.
+  Future<BracketDto> submitBracket(
+    String competitionId,
+    Map<String, dynamic> picks,
+  ) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/v1/predictions/bracket',
       data: {'competitionId': competitionId, 'picks': picks},
@@ -109,7 +116,11 @@ class BracketDto {
   });
   final String id;
   final String competitionId;
-  final Map<String, String> picks;
+  /// Mixed-shape picks map. Group + champion slots store a single teamId
+  /// string ("GROUP_A_1" → "team-arg-id"). Knockout-reach slots store a
+  /// list of teamIds ("REACH_R16" → ["team-arg-id", "team-fra-id", …]).
+  /// Untyped here; callers use the typed getters below.
+  final Map<String, dynamic> picks;
   final int pointsAwarded;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -119,12 +130,32 @@ class BracketDto {
         id: j['id'] as String,
         competitionId: j['competitionId'] as String,
         picks: ((j['picks'] as Map?) ?? const {})
-            .map((k, v) => MapEntry(k as String, v as String)),
+            .map((k, v) => MapEntry(k as String, v)),
         pointsAwarded: (j['pointsAwarded'] as num?)?.toInt() ?? 0,
         isLocked: j['isLocked'] as bool? ?? false,
         lockedAt: j['lockedAt'] == null ? null : DateTime.parse(j['lockedAt'] as String),
         updatedAt: j['updatedAt'] == null ? null : DateTime.parse(j['updatedAt'] as String),
       );
+
+  // ─── Typed read helpers ────────────────────────────────────────────────
+  String? slotPick(String key) {
+    final v = picks[key];
+    return v is String ? v : null;
+  }
+  List<String> reachPicks(String key) {
+    final v = picks[key];
+    if (v is List) return v.whereType<String>().toList(growable: false);
+    return const [];
+  }
+  String? get championId => slotPick('CHAMPION');
+  int get groupPickCount => picks.keys.where((k) => k.startsWith('GROUP_')).length;
+  int get knockoutPickCount =>
+      reachPicks('REACH_R16').length +
+      reachPicks('REACH_QF').length +
+      reachPicks('REACH_SF').length +
+      reachPicks('REACH_FINAL').length;
+  int get totalPickCount =>
+      groupPickCount + knockoutPickCount + (championId != null ? 1 : 0);
 }
 
 class BracketLeaderRow {

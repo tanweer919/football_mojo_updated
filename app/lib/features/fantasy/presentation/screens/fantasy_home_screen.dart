@@ -6,9 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/rarity_theme.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
-import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
@@ -202,9 +202,10 @@ class _PrimaryAction extends StatelessWidget {
               child: const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    colors: [Color(0x40C99A3D), Colors.transparent],
+                    colors: [Color(0x30C99A3D), Color(0x15C99A3D), Colors.transparent],
                     center: Alignment(1, -1),
-                    radius: 0.8,
+                    radius: 1.2,
+                    stops: [0.0, 0.4, 1.0],
                   ),
                 ),
               ),
@@ -493,9 +494,6 @@ class _PrizeTile extends StatelessWidget {
   final GlobalCupPrizeDto prize;
 
   CardRarity get _rarity {
-    // Map the server's enum string to the Flutter enum. Default to ICONIC
-    // — prize tiers without a rarity should still render with the most
-    // dramatic frame so they read as a flex, not a placeholder.
     if (prize.cardRarity == null) return CardRarity.ICONIC;
     return CardRarity.values.firstWhere(
       (r) => r.name == prize.cardRarity,
@@ -517,12 +515,83 @@ class _PrizeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PCard(
-      rarity: _rarity,
-      name: _rankLabel,
-      editionLabel: prize.description,
-      position: _rarity.name,
-      country: '',
+    final theme = RarityTheme.of(_rarity);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        border: Border.all(color: theme.accentTint.withValues(alpha: 0.35)),
+        gradient: LinearGradient(
+          colors: [
+            theme.accentTint.withValues(alpha: 0.18),
+            AppColors.surface2,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.accentTint.withValues(alpha: 0.10),
+            blurRadius: 12,
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Rank badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              color: theme.accentTint.withValues(alpha: 0.20),
+              border: Border.all(color: theme.accentTint.withValues(alpha: 0.30)),
+            ),
+            child: Text(
+              _rankLabel,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: theme.ratingColor,
+                letterSpacing: -0.3,
+                height: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Rarity tag
+          Text(
+            _rarity.name,
+            style: TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: theme.ratingColor.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Prize description
+          Flexible(
+            child: Text(
+              prize.description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.fgSoft,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

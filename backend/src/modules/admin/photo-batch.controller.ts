@@ -1,11 +1,26 @@
-import { Controller, Get, Patch, Body, Query } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Query, UseGuards, CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 
 /**
- * Temporary unguarded endpoints for the one-time local photo refresh script.
- * DELETE THIS FILE after the photo migration is done.
+ * Internal-only endpoints for the photo refresh script.
+ * Guarded by INTERNAL_API_KEY — set this env var in production.
  */
+@Injectable()
+class InternalApiKeyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest();
+    const key = process.env.INTERNAL_API_KEY;
+    if (!key) return true; // Allow in dev when key is not set
+    const provided = req.headers['x-api-key'];
+    if (provided !== key) {
+      throw new UnauthorizedException('Invalid or missing x-api-key');
+    }
+    return true;
+  }
+}
+
 @Controller({ path: 'internal/photos', version: '1' })
+@UseGuards(InternalApiKeyGuard)
 export class PhotoBatchController {
   constructor(private readonly prisma: PrismaService) {}
 

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import '../../../../core/deeplink/chottu_link_service.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/widgets/eyebrow.dart';
@@ -70,7 +71,12 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
   void _share() {
     final a = _article;
     if (a == null) return;
-    SharePlus.instance.share(ShareParams(text: '${a.title}\n${a.url}'));
+    ChottuLinkService.instance.shareNews(
+      articleId: a.id,
+      title: a.title,
+      imageUrl: a.imageUrl,
+      source: a.source,
+    );
   }
 }
 

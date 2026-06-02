@@ -25,11 +25,14 @@ import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
 import '../../../news/presentation/providers/home_news_provider.dart';
+import '../../../predictions/data/predictions_repository.dart';
+import '../../../world_cup/data/world_cup_models.dart';
+import '../../../world_cup/data/world_cup_repository.dart';
 import '../../../news/presentation/providers/news_feed_provider.dart';
 import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
 import '../../../profile/data/profile_repository.dart' show myProfileProvider;
-import '../../../iap/presentation/widgets/gem_chip.dart';
+
 import '../../../profile/presentation/widgets/notification_bell.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
@@ -101,6 +104,15 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 12),
             _WcHero(remaining: _wcCountdown),
 
+            // Bracket card — surfaces the user's current bracket directly
+            // on home so it's visible (not buried behind a CTA button).
+            // Shows champion + progress when in-flight, points when scored,
+            // CTA when not started.
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _BracketCard(),
+            ),
+
             // Your teams — either the followed-team digest or a prompt
             // to pick teams. Sits directly under the WC hero because
             // following is the single biggest signal we have for what
@@ -134,6 +146,22 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             const SizedBox(height: 10),
             const _GroupSpotlight(),
+
+            // WC upcoming schedule — next 4 WC matches
+            const SizedBox(height: 16),
+            _SectionHead(
+              title: 'WC schedule',
+              action: 'Full draw →',
+              onAction: () => context.push(RoutePaths.matches),
+            ),
+            const SizedBox(height: 10),
+            const _WcUpcomingMatches(),
+
+            // Host venues — the 3 host nations + venue count
+            const SizedBox(height: 16),
+            const _SectionHead(title: 'Host venues'),
+            const SizedBox(height: 10),
+            const _WcHostVenues(),
 
             // Featured Iconic / Legendary cards — pulled from the seeded
             // market catalogue (works pre-WC because cards are seeded).
@@ -217,8 +245,6 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const GemChip(),
-          const SizedBox(width: 6),
           const NotificationBell(),
           const SizedBox(width: 4),
           GestureDetector(
@@ -278,7 +304,7 @@ class _Greeting extends StatelessWidget {
             text: const TextSpan(
               style: h1Style,
               children: [
-                TextSpan(text: 'Welcome back to\n'),
+                TextSpan(text: 'Welcome back to '),
                 TextSpan(
                   text: 'PITCH.',
                   style: TextStyle(
@@ -2063,13 +2089,13 @@ class _FollowedTeamsRail extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Fixtures — results + upcoming
-            _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
-            const SizedBox(height: 6),
+            // Team news — headlines from ALL followed teams (most engaging content first)
+            for (final team in teams)
+              _FollowedTeamNews(teamId: team.id),
             Container(height: 1, color: AppColors.borderSoft),
             const SizedBox(height: 8),
-            // Team news — headlines from the first followed team
-            _FollowedTeamNews(teamId: teams.first.id),
+            // Fixtures — results + upcoming
+            _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
           ],
         ),
       ),
@@ -2501,6 +2527,495 @@ class _GroupTeamCell extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WC UPCOMING MATCHES — next 4 WC2026 fixtures
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Shows the next 4 WC2026 matches from the home fixtures provider.
+/// Falls back to a friendly empty state before the tournament starts.
+class _WcUpcomingMatches extends ConsumerWidget {
+  const _WcUpcomingMatches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(homeFixturesProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: async.when(
+        loading: () => const Skeleton(height: 160, radius: 16),
+        error: (_, __) => const _StripEmpty(
+          title: 'Schedule unavailable',
+          subtitle: "Couldn't reach the fixtures feed. Pull to refresh.",
+        ),
+        data: (f) {
+          final wcMatches = f.upcoming
+              .where((m) => m.competitionId == 'WC2026')
+              .take(4)
+              .toList();
+          if (wcMatches.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadii.r4),
+                border: Border.all(color: AppColors.borderSoft),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.event_note, color: AppColors.gold, size: 22),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'World Cup fixtures drop when the draw is finalised.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: AppColors.muted,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Check back closer to June 2026.',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: AppColors.muted2,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              border: Border.all(color: AppColors.borderSoft),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+                begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final m in wcMatches) _LeagueFixtureRow(match: m),
+                const SizedBox(height: 6),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WC HOST VENUES — 3 host countries
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Static host-cities strip — USA / Mexico / Canada with venue counts.
+class _WcHostVenues extends StatelessWidget {
+  const _WcHostVenues();
+
+  static const _hosts = [
+    _HostCountry(
+      flag: '🇺🇸',
+      name: 'United States',
+      venues: 11,
+      cities: 'New York, LA, Dallas, Miami, Seattle …',
+    ),
+    _HostCountry(
+      flag: '🇲🇽',
+      name: 'Mexico',
+      venues: 3,
+      cities: 'Mexico City, Monterrey, Guadalajara',
+    ),
+    _HostCountry(
+      flag: '🇨🇦',
+      name: 'Canada',
+      venues: 2,
+      cities: 'Toronto, Vancouver',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          children: [
+            for (var i = 0; i < _hosts.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: 8),
+                Container(height: 1, color: AppColors.borderSoft),
+                const SizedBox(height: 8),
+              ],
+              _HostRow(host: _hosts[i]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HostCountry {
+  const _HostCountry({
+    required this.flag,
+    required this.name,
+    required this.venues,
+    required this.cities,
+  });
+  final String flag;
+  final String name;
+  final int venues;
+  final String cities;
+}
+
+class _HostRow extends StatelessWidget {
+  const _HostRow({required this.host});
+  final _HostCountry host;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(host.flag, style: const TextStyle(fontSize: 26)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    host.name,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '${host.venues} ${host.venues == 1 ? 'venue' : 'venues'}',
+                      style: const TextStyle(
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                host.cities,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11.5,
+                  color: AppColors.muted,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BRACKET CARD — surfaces the user's WC bracket on home
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Three render states:
+//   1. No bracket yet  → gold CTA: "Predict the bracket · earn up to 250 gems"
+//   2. In progress     → champion crest + progress bar + "X / 55 picks"
+//   3. Locked + scored → champion + points so far + leaderboard rank hint
+//
+// Tap routes to /tournament/bracket. Listens to myBracketProvider + the
+// groups provider (needed to resolve the champion teamId → team object
+// so we can show the crest + name).
+class _BracketCard extends ConsumerWidget {
+  const _BracketCard();
+  static const _competitionId = 'WC2026';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mine = ref.watch(myBracketProvider(_competitionId));
+    final groups = ref.watch(wcGroupsProvider(_competitionId));
+    return mine.when(
+      loading: () => const SkeletonBlock(height: 92, radius: AppRadii.r4),
+      // Unauthed or unreachable — fall back to the CTA state so the
+      // surface still funnels users into the bracket.
+      error: (_, __) => const _BracketCta(),
+      data: (b) {
+        if (b == null) return const _BracketCta();
+        WcTeamRef? champion;
+        final championId = b.championId;
+        if (championId != null) {
+          for (final g in groups.valueOrNull ?? const <WcGroup>[]) {
+            for (final s in g.standings) {
+              if (s.team.id == championId) {
+                champion = s.team;
+                break;
+              }
+            }
+            if (champion != null) break;
+          }
+        }
+        return _BracketStatus(bracket: b, champion: champion);
+      },
+    );
+  }
+}
+
+class _BracketCta extends StatelessWidget {
+  const _BracketCta();
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        onTap: () => context.push(RoutePaths.bracket),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1F1814), Color(0xFF110C09)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            border: Border.all(color: AppColors.goldHairline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.gold.withValues(alpha: 0.16),
+                  border: Border.all(color: AppColors.goldHairline),
+                ),
+                child: const Icon(Icons.account_tree_outlined,
+                    size: 20, color: AppColors.gold),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Eyebrow('WORLD CUP BRACKET', gold: true, size: 10),
+                    SizedBox(height: 2),
+                    Text(
+                      'Predict who wins the trophy',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: AppColors.fg,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Group stage → final. Earn gems for every correct pick — 500 for the champion.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: AppColors.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: AppColors.gold),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BracketStatus extends StatelessWidget {
+  const _BracketStatus({required this.bracket, required this.champion});
+  final BracketDto bracket;
+  final WcTeamRef? champion;
+
+  /// 24 groups + 16 R16 + 8 QF + 4 SF + 2 Final + 1 champion = 55.
+  static const _totalSlots = 55;
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = bracket.totalPickCount;
+    final pct = (filled / _totalSlots).clamp(0.0, 1.0);
+    final scored = bracket.pointsAwarded > 0;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        onTap: () => context.push(RoutePaths.bracket),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            border: Border.all(color: AppColors.goldHairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Champion crest or trophy fallback.
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.gold.withValues(alpha: 0.16),
+                      border: Border.all(color: AppColors.goldHairline),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: champion?.crestUrl != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: PremiumImage(
+                              url: champion!.crestUrl,
+                              fit: BoxFit.contain,
+                            ),
+                          )
+                        : const Icon(Icons.emoji_events_rounded,
+                            size: 20, color: AppColors.gold),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Eyebrow('YOUR BRACKET', gold: true, size: 10),
+                        const SizedBox(height: 2),
+                        Text(
+                          champion != null
+                              ? 'Champion: ${champion!.shortName}'
+                              : 'Pick your champion',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: AppColors.fg,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (scored)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        '${bracket.pointsAwarded} pts',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.gold,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  backgroundColor: AppColors.surface3,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    bracket.isLocked
+                        ? 'Locked  ·  $filled / $_totalSlots picks'
+                        : '$filled / $_totalSlots picks',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const Spacer(),
+                  if (!bracket.isLocked && filled < _totalSlots)
+                    const Text(
+                      'Tap to continue →',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

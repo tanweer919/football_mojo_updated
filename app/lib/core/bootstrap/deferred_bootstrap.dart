@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ads/admob_service.dart';
 import '../analytics/clarity_service.dart';
+import '../deeplink/chottu_link_service.dart';
 import '../network/dio_provider.dart';
 import '../notifications/fcm_service.dart';
 import '../router/app_router.dart';
@@ -62,6 +63,17 @@ class _DeferredBootstrap {
     Future.microtask(() => _initClarity(context));
     Future.microtask(AppUpdatesService.checkAll);
     Future.microtask(inAppUpdateService.check);
+
+    // ChottuLink — deep linking + shareable links.
+    Future.microtask(() async {
+      await ChottuLinkService.instance.init();
+      ChottuLinkService.instance.listenForLinks((rawUrl) {
+        final route = ChottuLinkService.instance.parseDeepLink(rawUrl);
+        if (route != null) {
+          ref.read(appRouterProvider).go(route);
+        }
+      });
+    });
   }
 
   Future<void> _initClarity(BuildContext context) async {

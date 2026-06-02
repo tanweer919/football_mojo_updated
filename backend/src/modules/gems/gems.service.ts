@@ -15,7 +15,11 @@ export const GEM_RULES = {
   predictionExact: 10,        // exact score
   bracketGroupWinner: 15,     // per correct 1st place
   bracketRunnerUp: 5,         // per correct 2nd place
-  bracketChampion: 250,       // correct champion
+  bracketR16Reach: 15,        // per correct "reached R16" pick
+  bracketQfReach: 30,         // per correct "reached QF" pick
+  bracketSfReach: 60,         // per correct "reached SF" pick
+  bracketFinalist: 100,       // per correct "reached final" pick
+  bracketChampion: 500,       // correct champion (bumped — biggest WC moment)
   dailyLogin: 5,              // once per UTC day
   fantasyTier: {              // by gameweek rank
     top1: 500,
@@ -186,12 +190,23 @@ export class GemsService {
     userId: string,
     bracketId: string,
     slot: string,
-    kind: 'group_winner' | 'runner_up' | 'champion',
+    kind:
+      | 'group_winner'
+      | 'runner_up'
+      | 'r16_reach'
+      | 'qf_reach'
+      | 'sf_reach'
+      | 'finalist'
+      | 'champion',
   ): Promise<void> {
     const map = {
       group_winner: { amount: GEM_RULES.bracketGroupWinner, source: 'BRACKET_GROUP_WINNER' as GemSource },
-      runner_up:    { amount: GEM_RULES.bracketRunnerUp,    source: 'BRACKET_RUNNER_UP' as GemSource },
-      champion:     { amount: GEM_RULES.bracketChampion,    source: 'BRACKET_CHAMPION' as GemSource },
+      runner_up:    { amount: GEM_RULES.bracketRunnerUp,    source: 'BRACKET_RUNNER_UP'    as GemSource },
+      r16_reach:    { amount: GEM_RULES.bracketR16Reach,    source: 'BRACKET_R16_REACH'    as GemSource },
+      qf_reach:     { amount: GEM_RULES.bracketQfReach,     source: 'BRACKET_QF_REACH'     as GemSource },
+      sf_reach:     { amount: GEM_RULES.bracketSfReach,     source: 'BRACKET_SF_REACH'     as GemSource },
+      finalist:     { amount: GEM_RULES.bracketFinalist,    source: 'BRACKET_FINALIST'     as GemSource },
+      champion:     { amount: GEM_RULES.bracketChampion,    source: 'BRACKET_CHAMPION'     as GemSource },
     }[kind];
     await this.credit({
       userId,
@@ -288,6 +303,10 @@ export class GemsService {
         predictionExact: GEM_RULES.predictionExact,
         bracketGroupWinner: GEM_RULES.bracketGroupWinner,
         bracketRunnerUp: GEM_RULES.bracketRunnerUp,
+        bracketR16Reach: GEM_RULES.bracketR16Reach,
+        bracketQfReach: GEM_RULES.bracketQfReach,
+        bracketSfReach: GEM_RULES.bracketSfReach,
+        bracketFinalist: GEM_RULES.bracketFinalist,
         bracketChampion: GEM_RULES.bracketChampion,
         dailyLogin: GEM_RULES.dailyLogin,
         fantasy: GEM_RULES.fantasyTier,

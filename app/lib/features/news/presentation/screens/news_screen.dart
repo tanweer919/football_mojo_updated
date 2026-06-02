@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
@@ -86,12 +87,30 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                 ),
               );
             }
+            // Inject a banner ad every 5 articles.
+            final adInterval = 5;
+            final totalAds = page.items.length ~/ adInterval;
+            final totalItems = page.items.length + totalAds;
             return ListView.separated(
               controller: _ctrl,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              itemCount: page.items.length,
+              itemCount: totalItems,
               separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (_, i) => NewsCard(article: page.items[i], indexInList: i),
+              itemBuilder: (_, i) {
+                // Every (adInterval+1)th slot is an ad.
+                final adsBefore = adInterval > 0 ? i ~/ (adInterval + 1) : 0;
+                final isAdSlot = adInterval > 0 && (i + 1) % (adInterval + 1) == 0;
+                if (isAdSlot) {
+                  return const PitchBannerAd(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                  );
+                }
+                final articleIndex = i - adsBefore;
+                if (articleIndex >= page.items.length) {
+                  return const SizedBox.shrink();
+                }
+                return NewsCard(article: page.items[articleIndex], indexInList: articleIndex);
+              },
             );
           },
         ),
