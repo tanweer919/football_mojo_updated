@@ -225,12 +225,13 @@ class _Front extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (card.template.artUrl.isNotEmpty)
-                        PremiumImage(url: card.template.artUrl, fit: BoxFit.contain)
-                      else
-                        // No player art on this template — show a clear
-                        // crest-style placeholder instead of a blank panel.
-                        Center(
+                      // Player art when present and it loads; otherwise a
+                      // clear crest-style placeholder (covers empty AND
+                      // broken/404 URLs) instead of a blank/cyan panel.
+                      PremiumImage(
+                        url: card.template.artUrl,
+                        fit: BoxFit.contain,
+                        fallback: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -253,6 +254,7 @@ class _Front extends StatelessWidget {
                             ],
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),

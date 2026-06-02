@@ -28,13 +28,14 @@ class PremiumImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final placeholder = _Shimmer(theme: theme);
+    // Dark, on-brand fallback for a missing/broken image. Previously this
+    // used the M3 `surfaceContainerHighest`, which on the seeded colour
+    // scheme is a bright cyan — a broken card photo then rendered as a
+    // glaring cyan rectangle.
     final fb = fallback ??
-        ColoredBox(
-          color: theme.colorScheme.surfaceContainerHighest,
-          child: Icon(
-            Icons.image_outlined,
-            color: theme.colorScheme.outlineVariant,
-          ),
+        const ColoredBox(
+          color: Color(0xFF1A1815),
+          child: Icon(Icons.image_not_supported_outlined, color: Color(0x66FFFFFF)),
         );
 
     Widget image;
