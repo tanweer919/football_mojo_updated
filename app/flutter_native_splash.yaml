@@ -10,13 +10,10 @@ flutter_native_splash:
   web: false
 
   # Android 12+ renders the icon inside a CIRCULAR mask (the visible area
-  # is roughly the inner 2/3 of the supplied image). Any artwork near the
-  # edges/corners — including the wordmark — gets clipped by the circle.
-  # splash_icon_a12.png is the icon scaled to ~58% on a brand-coloured
-  # canvas so the whole mark sits inside the safe circle, uncut.
-  # (Regenerate with: cp splash_icon.png t.png; sips -z 600 600 t.png;
-  #  sips --padToHeightWidth 1024 1024 --padColor 0F0E0D t.png
-  #  --out splash_icon_a12.png)
+  # is roughly the inner 2/3 ≈ 66.7% of the supplied image). No wordmark
+  # here (text would get clipped by the circle) — just the white football
+  # mark, scaled to ~64% on the brand background so it's as large as
+  # possible while sitting fully inside the safe circle, uncut.
   android_12:
     color:      "#0F0E0D"
     color_dark: "#0F0E0D"
