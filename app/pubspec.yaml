@@ -111,13 +111,13 @@ flutter_launcher_icons:
   android: true
   ios: true
   # iOS + legacy (pre-Android-8) launcher icon: the full square art.
-  image_path: "assets/images/app_icon5.png"
+  image_path: "assets/images/app_icon6.png"
   # Adaptive icon layers (Android 8+). The launcher masks the outer ~1/3
   # of the canvas (only the centre 66.7% is guaranteed visible), so the
-  # foreground is app_icon5 scaled into that safe zone on a black canvas
-  # (app_icon5's own corners are pure black, so it's seamless against the
-  # matching black background layer — the gold ball never gets clipped).
-  adaptive_icon_foreground: "assets/images/app_icon5_foreground.png"
+  # foreground is app_icon6 scaled so the ball lands at ~64% of the canvas
+  # on a black canvas (app_icon6's corners are pure black, so it's
+  # seamless against the matching black background — the ball never clips).
+  adaptive_icon_foreground: "assets/images/app_icon6_foreground.png"
   adaptive_icon_background: "#000000"
   # The foreground is ALREADY padded into the safe zone, so suppress the
   # package's default 16% inset (which would double-pad and shrink the
