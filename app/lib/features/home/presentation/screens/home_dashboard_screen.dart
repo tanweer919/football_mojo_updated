@@ -177,6 +177,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _NewsList(),
             ),
+
+            // Your team news — aggregated headlines for every followed
+            // team, anchored at the very bottom. Hides itself when the
+            // user follows nothing or there are no tagged articles.
+            const _AllTeamNewsSection(),
+
             const SizedBox(height: 24),
           ],
         ),
@@ -583,30 +589,35 @@ class _MatchFeatureCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _MatchHeroBadge(match: match),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
+              // Symmetric three-column layout (mirrors the World Cup
+              // opening-match card): each team is a centred crest-above-
+              // name column, the score / kickoff chip sits dead centre.
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _MatchHeroSide(team: match.homeTeam, alignEnd: true)),
-                  const SizedBox(width: 12),
+                  Expanded(child: _MatchHeroSide(team: match.homeTeam)),
                   _MatchHeroCenter(match: match),
-                  const SizedBox(width: 12),
-                  Expanded(child: _MatchHeroSide(team: match.awayTeam, alignEnd: false)),
+                  Expanded(child: _MatchHeroSide(team: match.awayTeam)),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 10),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(child: _MatchHeroStatus(match: match)),
-                  if (match.venue != null && match.venue!.isNotEmpty)
-                    Expanded(
+                  Flexible(child: _MatchHeroStatus(match: match)),
+                  if (match.venue != null && match.venue!.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    const Text('·',
+                        style: TextStyle(color: AppColors.muted, fontSize: 11)),
+                    const SizedBox(width: 8),
+                    Flexible(
                       child: Text(
                         match.venue!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
@@ -615,6 +626,7 @@ class _MatchFeatureCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ],
@@ -689,41 +701,37 @@ class _MatchHeroBadge extends StatelessWidget {
 }
 
 class _MatchHeroSide extends StatelessWidget {
-  const _MatchHeroSide({required this.team, required this.alignEnd});
+  const _MatchHeroSide({required this.team});
   final TeamDto team;
-  final bool alignEnd;
 
   @override
   Widget build(BuildContext context) {
-    final crest = SizedBox(
-      width: 44,
-      height: 44,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-      ),
-    );
-    final name = Text(
-      team.shortName ?? team.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-      style: const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        color: AppColors.fg,
-        letterSpacing: -0.2,
-        height: 1.1,
-      ),
-    );
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        crest,
-        const SizedBox(height: 8),
-        name,
+        SizedBox(
+          width: 52,
+          height: 52,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          team.shortName ?? team.name,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.fg,
+            letterSpacing: -0.2,
+            height: 1.15,
+          ),
+        ),
       ],
     );
   }
@@ -734,49 +742,38 @@ class _MatchHeroCenter extends StatelessWidget {
   final MatchDto match;
   @override
   Widget build(BuildContext context) {
-    // Live or finished → show the score; upcoming → show kickoff time.
+    // Live or finished → show the score; upcoming → the kickoff time.
     final isLiveOrFinished = match.isLive || match.isFinished;
-    if (isLiveOrFinished) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0x8C0F0E0D),
-          borderRadius: BorderRadius.circular(AppRadii.r3),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Text(
-          '${match.homeScore}  –  ${match.awayScore}',
-          style: const TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.fg,
-            letterSpacing: -0.4,
-            fontFeatures: [FontFeature.tabularFigures()],
+    final label = isLiveOrFinished
+        ? '${match.homeScore} – ${match.awayScore}'
+        : DateFormat('HH:mm').format(match.kickoffAt.toLocal());
+    // Sized to the crest height (52) so the chip sits centred against the
+    // crests in the symmetric three-column row.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SizedBox(
+        height: 52,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0x8C0F0E0D),
+              borderRadius: BorderRadius.circular(AppRadii.r3),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: isLiveOrFinished ? 20 : 17,
+                fontWeight: FontWeight.w800,
+                color: isLiveOrFinished ? AppColors.fg : AppColors.gold,
+                letterSpacing: -0.4,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
           ),
-        ),
-      );
-    }
-    // Upcoming — show the kickoff time chip in user timezone.
-    final local = match.kickoffAt.toLocal();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0x8C0F0E0D),
-        borderRadius: BorderRadius.circular(AppRadii.r3),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Text(
-        DateFormat('HH:mm').format(local),
-        style: const TextStyle(
-          fontFamily: 'JetBrainsMono',
-          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: AppColors.gold,
-          letterSpacing: -0.3,
-          fontFeatures: [FontFeature.tabularFigures()],
         ),
       ),
     );
@@ -2262,12 +2259,10 @@ class _FollowedTeamsRail extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Team news — headlines from ALL followed teams (most engaging content first)
-            for (final team in teams)
-              _FollowedTeamNews(teamId: team.id),
             Container(height: 1, color: AppColors.borderSoft),
             const SizedBox(height: 8),
-            // Fixtures — results + upcoming
+            // Fixtures — results + upcoming. (Team news moved to its own
+            // "Your team news" section at the bottom of the home screen.)
             _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
           ],
         ),
@@ -2276,31 +2271,56 @@ class _FollowedTeamsRail extends ConsumerWidget {
   }
 }
 
-/// Shows up to 3 news articles for a followed team inside the team card.
-class _FollowedTeamNews extends ConsumerWidget {
-  const _FollowedTeamNews({required this.teamId});
-  final String teamId;
+/// Bottom-of-home section aggregating news across every followed team.
+/// Renders nothing when the user follows no teams or there are no
+/// matching articles, so it never leaves an empty header behind.
+class _AllTeamNewsSection extends ConsumerWidget {
+  const _AllTeamNewsSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(teamNewsProvider(teamId));
-    return async.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+    final async = ref.watch(allTeamNewsProvider);
+    return async.maybeWhen(
       data: (articles) {
         if (articles.isEmpty) return const SizedBox.shrink();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Eyebrow('Team news', gold: true, size: 9),
-            const SizedBox(height: 6),
-            for (int i = 0; i < articles.length; i++) ...[
-              if (i > 0) Container(height: 1, color: AppColors.borderSoft.withValues(alpha: 0.5)),
-              _TeamNewsRow(article: articles[i]),
-            ],
+            _SectionHead(
+              title: 'Your team news',
+              action: 'All news →',
+              onAction: () => context.push(RoutePaths.news),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  border: Border.all(color: AppColors.borderSoft),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1A1815), Color(0xFF110F0D)],
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < articles.length; i++) ...[
+                      if (i > 0)
+                        Container(
+                          height: 1,
+                          color: AppColors.borderSoft.withValues(alpha: 0.5),
+                        ),
+                      _TeamNewsRow(article: articles[i]),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         );
       },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }

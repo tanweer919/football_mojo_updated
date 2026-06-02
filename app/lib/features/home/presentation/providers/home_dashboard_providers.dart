@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../news/data/models/news_article.dart';
-import '../../../news/data/repositories/news_repository.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
 
@@ -28,33 +26,32 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
       DateTime(now.year, now.month, now.day + i),
   ];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
-  // Two layers of dedupe:
-  //   1. Same match id appearing in adjacent-day queries (UTC bucket
-  //      bleed for late-night kickoffs).
-  //   2. Same real-world fixture with DIFFERENT ids — the WC seed
-  //      uses synthetic ids like `WC2026-GF-portugal-dr-congo`, while
-  //      api-football inserts the same match again with a numeric
-  //      id once the fixture publishes. We dedupe on the natural
-  //      key (homeId|awayId|kickoff-hour) so the same Portugal vs
-  //      DR Congo doesn't show twice. Prefer the row that has live
-  //      data (status != SCHEDULED) when collapsing duplicates so
-  //      the live row wins over the seed placeholder.
-  final byKey = <String, MatchDto>{};
+  // The same real-world fixture can appear as TWO different DB rows:
+  // the WC seed inserts a match with a synthetic id (and possibly its
+  // own team-id codes + a placeholder kickoff time), while the
+  // api-football poller inserts the same fixture with a numeric id,
+  // its own team ids, and the official time. Dedup-by-id misses these.
+  //
+  // We collapse on a source-agnostic natural key: the two team NAMES
+  // (normalised + order-independent) plus the UTC calendar date. Two
+  // teams never play each other twice on one calendar day, so this is
+  // safe and survives both id mismatches and within-day time drift.
+  // When two rows collapse we keep the most "real" one — a live /
+  // finished row beats a SCHEDULED placeholder.
+  String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   String keyOf(MatchDto m) {
     final t = m.kickoffAt.toUtc();
-    final hour = '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}T${t.hour.toString().padLeft(2, '0')}';
-    return '${m.homeTeam.id}|${m.awayTeam.id}|$hour';
+    final date = '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+    final pair = [norm(m.homeTeam.name), norm(m.awayTeam.name)]..sort();
+    return '${pair[0]}|${pair[1]}|$date';
   }
+  int rank(MatchDto m) => m.status == MatchStatus.SCHEDULED ? 0 : 1;
+  final byKey = <String, MatchDto>{};
   for (final m in results.expand((e) => e)) {
     final k = keyOf(m);
     final existing = byKey[k];
-    if (existing == null) {
+    if (existing == null || rank(m) > rank(existing)) {
       byKey[k] = m;
-    } else {
-      // Prefer the row that's live/finished over a SCHEDULED twin.
-      final existingIsScheduled = existing.status == MatchStatus.SCHEDULED;
-      final candidateBetter = existingIsScheduled && m.status != MatchStatus.SCHEDULED;
-      if (candidateBetter) byKey[k] = m;
     }
   }
   final all = byKey.values.toList();
@@ -77,13 +74,3 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
     next: upcoming.isEmpty ? null : upcoming.first,
   );
 });
-
-/// News filtered by team ID — used by the "Your teams" section to show
-/// relevant stories for followed teams. Limited to 3 items for the home feed.
-final teamNewsProvider = FutureProvider.family<List<NewsArticleDto>, String>(
-  (ref, teamId) async {
-    final repo = ref.read(newsRepositoryProvider);
-    final page = await repo.list(teamId: teamId, limit: 3);
-    return page.items;
-  },
-);

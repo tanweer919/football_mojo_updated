@@ -49,6 +49,21 @@ final homeNewsProvider = FutureProvider<NewsPage>((ref) async {
   return NewsPage(items: sorted, nextCursor: page.nextCursor);
 });
 
+/// Aggregated news across ALL the user's followed teams, for the
+/// "Your team news" section at the bottom of the home screen. Uses the
+/// repo's multi-team `teamIds` filter (OR-joined server-side) in a
+/// single request, newest first. Returns an empty list when the user
+/// follows nothing — the section hides itself in that case.
+final allTeamNewsProvider = FutureProvider<List<NewsArticleDto>>((ref) async {
+  final profile = ref.watch(myProfileProvider).valueOrNull;
+  final ids = profile?.followedTeams.map((t) => t.id).toList() ?? const <String>[];
+  if (ids.isEmpty) return const [];
+  final page = await ref.read(newsRepositoryProvider).list(teamIds: ids, limit: 12);
+  final items = [...page.items]
+    ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+  return items;
+});
+
 /// Relative time formatter — shared so home + reader screens render the
 /// same "2h ago" / "just now" string. Kept here to avoid a top-level
 /// helper module for one function.
