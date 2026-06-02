@@ -30,7 +30,7 @@ export class PredictionsController {
   @Post('bracket')
   bracket(
     @CurrentUser('uid') uid: string,
-    @Body() body: { competitionId: string; picks: Record<string, string> },
+    @Body() body: { competitionId: string; picks: Record<string, any> },
   ) {
     return this.predictions.submitBracket(uid, body.competitionId, body.picks);
   }
