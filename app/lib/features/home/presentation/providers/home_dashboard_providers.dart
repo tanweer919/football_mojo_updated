@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../news/data/models/news_article.dart';
+import '../../../news/data/repositories/news_repository.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
 
@@ -74,3 +76,13 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
     next: upcoming.isEmpty ? null : upcoming.first,
   );
 });
+
+/// News filtered by team ID — used by the "Your teams" section to show
+/// relevant stories for followed teams. Limited to 3 items for the home feed.
+final teamNewsProvider = FutureProvider.family<List<NewsArticleDto>, String>(
+  (ref, teamId) async {
+    final repo = ref.read(newsRepositoryProvider);
+    final page = await repo.list(teamId: teamId, limit: 3);
+    return page.items;
+  },
+);

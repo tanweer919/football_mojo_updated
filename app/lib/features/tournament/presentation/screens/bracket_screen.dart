@@ -9,7 +9,7 @@ import '../../../predictions/data/predictions_repository.dart';
 import '../../../world_cup/data/world_cup_models.dart';
 import '../../../world_cup/data/world_cup_repository.dart';
 import '../../data/wc2026_bracket.dart';
-import '../widgets/bracket_share_card.dart';
+import '../widgets/bracket_prediction_card.dart';
 
 /// World Cup bracket predictor — Telegraph-style.
 ///
@@ -112,6 +112,79 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     return null;
   }
 
+  /// Resolve the user's MATCH_<n>_WINNER picks into one team list per
+  /// knockout round, for the shareable prediction graphic. Missing picks
+  /// are simply skipped (the card hides empty rounds), so this works for
+  /// partial brackets too — though we only surface the share prompt once
+  /// a champion is set (see [_isComplete]).
+  BracketPrediction _buildPrediction(Map<String, WcTeamRef> teamsById) {
+    List<WcTeamRef> winners(Iterable<int> matchNumbers) => [
+          for (final n in matchNumbers)
+            if (_picks['MATCH_${n}_WINNER'] is String &&
+                teamsById[_picks['MATCH_${n}_WINNER']] != null)
+              teamsById[_picks['MATCH_${n}_WINNER']]!,
+        ];
+    final groupWinners = <WcTeamRef>[
+      for (final l in wcGroupLetters)
+        if (_picks['GROUP_${l}_1'] is String &&
+            teamsById[_picks['GROUP_${l}_1']] != null)
+          teamsById[_picks['GROUP_${l}_1']]!,
+    ];
+    final championId = _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] as String?;
+    return BracketPrediction(
+      groupWinners: groupWinners,
+      lastSixteen: winners([for (var n = 73; n <= 88; n++) n]),
+      quarterFinalists: winners([for (var n = 89; n <= 96; n++) n]),
+      semiFinalists: winners([for (var n = 97; n <= 100; n++) n]),
+      finalists: winners(const [101, 102]),
+      champion: championId == null ? null : teamsById[championId],
+    );
+  }
+
+  /// A "complete" prediction has a champion picked — that can only happen
+  /// once the entire knockout chain resolves, so it's the signal we use
+  /// to offer the share-your-prediction prompt after saving.
+  bool _isComplete() =>
+      _picks['MATCH_${wc2026ChampionMatchNumber}_WINNER'] is String;
+
+  /// Render the prediction graphic to a PNG and hand it (plus a ChottuLink
+  /// deep link) to the share sheet. Used by the app-bar share button and
+  /// the post-save prompt. Falls back to a link-only share if the groups
+  /// haven't loaded or the PNG render fails.
+  Future<void> _sharePrediction(List<WcGroup>? groups) async {
+    if (groups == null) {
+      await ChottuLinkService.instance.shareBracket();
+      return;
+    }
+    final teamsById = <String, WcTeamRef>{
+      for (final g in groups)
+        for (final s in g.standings) s.team.id: s.team,
+    };
+    final prediction = _buildPrediction(teamsById);
+    String? imagePath;
+    try {
+      imagePath = await ShareService.instance.renderArtifactToFile(
+        context: context,
+        logicalSize: const Size(1080, 1350),
+        filename: 'pitch_prediction.png',
+        builder: (_) => BracketPredictionCard(prediction: prediction),
+      );
+    } catch (_) {
+      imagePath = null;
+    }
+    final pts = ref
+        .read(myBracketProvider(widget.competitionId))
+        .valueOrNull
+        ?.pointsAwarded ??
+        0;
+    await ChottuLinkService.instance.shareBracket(
+      championName: prediction.champion?.name,
+      championCrestUrl: prediction.champion?.crestUrl,
+      pointsAwarded: pts,
+      imagePath: imagePath,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupsAsync = ref.watch(wcGroupsProvider(widget.competitionId));
@@ -128,53 +201,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
           IconButton(
             tooltip: 'Share',
             icon: const Icon(Icons.ios_share_rounded),
-            onPressed: () async {
-              final groups = groupsAsync.valueOrNull;
-              // Groups still loading — share with a plain deep link
-              // anyway (no PNG yet) so the button is never a dead end.
-              if (groups == null) {
-                await ChottuLinkService.instance.shareBracket();
-                return;
-              }
-              final teamsById = {
-                for (final g in groups)
-                  for (final s in g.standings) s.team.id: s.team,
-              };
-              final championId = _picks['MATCH_104_WINNER'] as String?;
-              final champion = championId == null ? null : teamsById[championId];
-              // Share card expects String→String for group/champion picks.
-              final shareMap = <String, String>{
-                for (final e in _picks.entries)
-                  if (e.value is String && (e.key.startsWith('GROUP_') && e.key.endsWith('_1')))
-                    'GROUP_${e.key.substring(6, 7)}_1': e.value as String,
-                if (championId != null) 'CHAMPION': championId,
-              };
-              // Render the share card PNG first, then hand both PNG +
-              // ChottuLink deep link to the share sheet so previews look
-              // good and the link opens the bracket screen on tap.
-              String? imagePath;
-              try {
-                imagePath = await ShareService.instance.renderArtifactToFile(
-                  context: context,
-                  logicalSize: const Size(1080, 1350),
-                  filename: 'pitch_bracket.png',
-                  builder: (_) => BracketShareCard(
-                    groups: groups,
-                    picks: shareMap,
-                    championTeam: champion,
-                  ),
-                );
-              } catch (_) {
-                imagePath = null;
-              }
-              final pts = mineAsync.valueOrNull?.pointsAwarded ?? 0;
-              await ChottuLinkService.instance.shareBracket(
-                championName: champion?.name,
-                championCrestUrl: champion?.crestUrl,
-                pointsAwarded: pts,
-                imagePath: imagePath,
-              );
-            },
+            onPressed: () => _sharePrediction(groupsAsync.valueOrNull),
           ),
           IconButton(
             tooltip: 'Leaderboard',
@@ -332,6 +359,12 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(saved.isLocked ? 'Bracket locked — saved' : 'Bracket saved')),
       );
+      // Complete bracket (champion picked) → invite them to share the
+      // prediction graphic. Not gated on lock state — sharing a complete
+      // bracket is worthwhile whether or not kickoff has begun.
+      if (_isComplete()) {
+        await _promptShare();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -346,6 +379,93 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     if (raw.contains('bracket_locked')) return 'Bracket is locked — kickoff has begun.';
     if (raw.contains('401') || raw.contains('unauthorized')) return 'Sign in to save your bracket.';
     return 'Could not save bracket. Try again.';
+  }
+
+  /// Bottom sheet shown after a complete bracket is saved, inviting the
+  /// user to share the prediction graphic. "Maybe later" just dismisses.
+  Future<void> _promptShare() async {
+    final groups = ref.read(wcGroupsProvider(widget.competitionId)).valueOrNull;
+    final share = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: const Color(0xFF161310),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const Center(
+                child: Icon(Icons.emoji_events_rounded,
+                    color: Color(0xFFEBD9A8), size: 40),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Your bracket is complete!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Share your road-to-the-trophy prediction and challenge your '
+                'friends to make theirs on FootballMojo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFD9B65A),
+                  foregroundColor: const Color(0xFF1E1810),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.ios_share_rounded, size: 18),
+                label: const Text(
+                  'Share my prediction',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                onPressed: () => Navigator.of(sheetCtx).pop(true),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(sheetCtx).pop(false),
+                child: const Text(
+                  'Maybe later',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (share == true && mounted) {
+      await _sharePrediction(groups);
+    }
   }
 }
 
