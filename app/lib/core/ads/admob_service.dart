@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -22,6 +22,14 @@ class AdmobService {
   bool _initialised = false;
   InterstitialAd? _interstitial;
   RewardedAd? _rewarded;
+
+  /// Flips to true once UMP consent is resolved AND the Mobile Ads SDK is
+  /// initialised, i.e. ads may now be requested. Ad widgets listen to this
+  /// so a banner created before consent resolves shows up the moment it
+  /// becomes available. Stays false if the user is in a consent region and
+  /// declines — so no ad is ever requested without consent.
+  final ValueNotifier<bool> ready = ValueNotifier<bool>(false);
+  bool get canRequestAds => ready.value;
 
   /// Interstitial frequency cap — only show after every Nth trigger AND no
   /// more than once per [_interstitialCooldown]. Both guards apply, so a
@@ -83,10 +91,64 @@ class AdmobService {
         testAndroid: _testRewardedAndroid, testIos: _testRewardedIos,
       );
 
-  // ── Init ─────────────────────────────────────────────────────────────
+  // ── Init + consent (UMP / GDPR) ──────────────────────────────────────
 
+  /// Gathers user consent via Google's User Messaging Platform, then — only
+  /// if ads are permitted — initialises the Mobile Ads SDK and pre-caches
+  /// the full-screen formats.
+  ///
+  /// UMP handles the GDPR/EEA + UK consent form automatically based on the
+  /// messages configured in the AdMob console (Privacy & messaging → GDPR).
+  /// Users outside a consent region are returned `canRequestAds == true`
+  /// immediately with no form shown.
+  ///
+  /// Testing the EEA form on a device: add the device's hashed ID from
+  /// logcat to [ConsentDebugSettings.testIdentifiers] and set
+  /// `debugGeography: DebugGeography.debugGeographyEea`.
   static Future<void> initialise() async {
     if (kIsWeb || instance._initialised) return;
+    await instance._gatherConsentThenInit();
+  }
+
+  Future<void> _gatherConsentThenInit() async {
+    // 1. Resolve consent. Wrap the callback API in a Future.
+    final consent = Completer<void>();
+    final params = ConsentRequestParameters();
+    ConsentInformation.instance.requestConsentInfoUpdate(
+      params,
+      () {
+        // Show the GDPR form if (and only if) the region requires it.
+        ConsentForm.loadAndShowConsentFormIfRequired((FormError? error) {
+          if (error != null) {
+            debugPrint('⚠️ UMP form error: ${error.errorCode} ${error.message}');
+          }
+          if (!consent.isCompleted) consent.complete();
+        });
+      },
+      (FormError error) {
+        debugPrint('⚠️ UMP consent update failed: ${error.errorCode} ${error.message}');
+        if (!consent.isCompleted) consent.complete();
+      },
+    );
+    await consent.future;
+
+    // 2. Only request ads if consent allows. canRequestAds is true outside
+    //    consent regions and once consent is granted; false if a required
+    //    user declined. Fail-open ONLY on an unexpected SDK error.
+    bool allowed;
+    try {
+      allowed = await ConsentInformation.instance.canRequestAds();
+    } catch (e) {
+      debugPrint('⚠️ canRequestAds error, proceeding best-effort: $e');
+      allowed = true;
+    }
+    if (!allowed) {
+      debugPrint('⏸ Ads not permitted — consent not granted');
+      ready.value = false;
+      return;
+    }
+
+    // 3. Init the SDK + halal-safe request config, then pre-cache.
     await MobileAds.instance.initialize();
     await MobileAds.instance.updateRequestConfiguration(
       RequestConfiguration(
@@ -95,12 +157,12 @@ class AdmobService {
         tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
       ),
     );
-    instance._initialised = true;
-    debugPrint('✅ AdMob initialised');
+    _initialised = true;
+    ready.value = true;
+    debugPrint('✅ AdMob initialised (consent resolved)');
 
-    // Pre-cache interstitial + rewarded for snappy display.
-    instance._loadInterstitial();
-    instance._loadRewarded();
+    _loadInterstitial();
+    _loadRewarded();
   }
 
   // ── Banner ───────────────────────────────────────────────────────────

@@ -47,6 +47,24 @@ class _BannerBodyState extends State<_BannerBody> {
   @override
   void initState() {
     super.initState();
+    // Only request the banner once UMP consent is resolved and the SDK is
+    // ready. If it isn't yet, wait for the `ready` notifier to flip so we
+    // never fire an ad request without consent.
+    final ads = AdmobService.instance;
+    if (ads.canRequestAds) {
+      _create();
+    } else {
+      ads.ready.addListener(_onReady);
+    }
+  }
+
+  void _onReady() {
+    if (AdmobService.instance.canRequestAds && _ad == null && mounted) {
+      _create();
+    }
+  }
+
+  void _create() {
     _ad = AdmobService.instance.createBanner(
       onLoaded: () {
         if (mounted) setState(() => _loaded = true);
@@ -59,6 +77,7 @@ class _BannerBodyState extends State<_BannerBody> {
 
   @override
   void dispose() {
+    AdmobService.instance.ready.removeListener(_onReady);
     _ad?.dispose();
     super.dispose();
   }
