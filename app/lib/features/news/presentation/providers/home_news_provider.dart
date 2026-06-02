@@ -21,19 +21,19 @@ final homeNewsProvider = FutureProvider<NewsPage>((ref) async {
   final repo = ref.read(newsRepositoryProvider);
 
   // Pull a larger window than we'll show so the image-prioritisation sort
-  // has room to find images. 8 is enough for the home hero + 2 rows.
+  // has room to find images. 12 covers the home hero + up to 6 rows.
   NewsPage page;
   if (teamId != null) {
     // First try: scope to the followed team.
-    page = await repo.list(teamId: teamId, limit: 8);
+    page = await repo.list(teamId: teamId, limit: 12);
     // Fallback when the team filter returns nothing. Most articles don't
     // carry team IDs yet, so this fallback fires for nearly every user
     // until the RSS aggregator starts tagging by team.
     if (page.items.isEmpty) {
-      page = await repo.list(limit: 8);
+      page = await repo.list(limit: 12);
     }
   } else {
-    page = await repo.list(limit: 8);
+    page = await repo.list(limit: 12);
   }
 
   final sorted = [...page.items];

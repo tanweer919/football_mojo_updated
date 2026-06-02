@@ -1447,9 +1447,9 @@ class _NewsList extends ConsumerWidget {
           );
         }
         // Hero takes the lead story (already image-prioritised by the
-        // provider); the next two render as compact rows under it.
+        // provider); the rest render as compact rows under it.
         final hero = page.items.first;
-        final rest = page.items.skip(1).take(2).toList();
+        final rest = page.items.skip(1).take(6).toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

@@ -54,7 +54,7 @@ android {
         multiDexEnabled = true
         // Default = AdMob's official sample App ID. Safe to use in dev/CI —
         // serves test ads. Release builds override this below with our real ID.
-        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+        manifestPlaceholders["admobAppId"] = "ca-app-pub-3528263454526689~2685435320"
     }
 
     // signingConfigs MUST be declared before buildTypes references it.
