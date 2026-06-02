@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/design/rarity_theme.dart';
@@ -75,6 +76,19 @@ class _FantasyHomeScreenState extends ConsumerState<FantasyHomeScreen> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          CircleIconButton(
+            icon: Icons.ios_share_rounded,
+            onPressed: () {
+              final t = tournament.valueOrNull;
+              ChottuLinkService.instance.shareFantasyLineup(
+                slug: resolvedSlug,
+                tournamentName: t?.name,
+                gameweekName: gw.valueOrNull?.name,
+                totalPoints: lineup?.totalPoints,
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           CircleIconButton(
             icon: Icons.groups_rounded,
             onPressed: () => context.push(

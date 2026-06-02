@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -28,6 +29,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Matches'),
+        actions: [
+          IconButton(
+            tooltip: 'Share',
+            icon: const Icon(Icons.ios_share_rounded),
+            onPressed: () => ChottuLinkService.instance.shareApp(),
+          ),
+        ],
       ),
       // SafeArea(bottom: true) keeps the day-strip + match list off the
       // system gesture pill on edge-to-edge devices. Top is handled by

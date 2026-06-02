@@ -12,8 +12,8 @@ import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
-import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/premium_image.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
@@ -94,6 +94,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         padding: const EdgeInsets.only(bottom: 110),
+        // Section rhythm: _SectionHead now owns its own top/bottom
+        // padding (see widget definition) so the column body doesn't
+        // need ad-hoc SizedBox spacers between sections. The constant
+        // we use everywhere is the _SectionGap below — apply it ONCE
+        // between major non-section-head blocks (hero/cards), let
+        // _SectionHead handle the rest.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -104,94 +110,72 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 12),
             _WcHero(remaining: _wcCountdown),
 
-            // Bracket card — surfaces the user's current bracket directly
-            // on home so it's visible (not buried behind a CTA button).
-            // Shows champion + progress when in-flight, points when scored,
-            // CTA when not started.
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _BracketCard(),
-            ),
-
-            // Your teams — either the followed-team digest or a prompt
-            // to pick teams. Sits directly under the WC hero because
-            // following is the single biggest signal we have for what
-            // content the user cares about.
-            const _YourTeamsSection(),
-
-            // (Removed: the "Get ready" hype strip felt like promo noise
-            // once the followed-teams section was richer. Anything that
-            // was there is one level deeper in Fantasy / Cards / Predictions.)
-
-            const SizedBox(height: 8),
+            // Match hero — the single most relevant match right now.
+            // Live first, then the next upcoming kickoff. Bigger card
+            // with kickoff time in the user's tz + competition badge.
             _SectionHead(
-              title: 'Live now',
+              title: 'Match',
               action: 'All matches →',
               onAction: () => context.push(RoutePaths.matches),
             ),
-            const SizedBox(height: 10),
-            const _LiveStrip(),
+            const _NextMatchHero(),
+
+            // Bracket card — user's WC2026 bracket: champion + progress,
+            // or a CTA when they haven't started.
+            const _SectionGap(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _BracketCard(),
+            ),
+
+            // Your teams — followed-team digest or prompt to pick teams.
+            const _SectionGap(),
+            const _YourTeamsSection(),
+
+            // Followed-team fixtures — live + upcoming matches involving
+            // any team the user follows. Rendered only when the user
+            // actually follows teams; the widget short-circuits otherwise.
+            const _FollowedMatchesSection(),
 
             // European leagues — hidden during WC mode since all domestic
             // seasons are over and the section is empty.
             _EuroLeaguesSection(wcMode: ref.watch(wcModeProvider)),
 
-            // Group spotlight — surfaces the seeded WC2026 standings so
-            // pre-tournament the home page already shows draw structure.
-            const SizedBox(height: 8),
+            // Group spotlight — seeded WC2026 standings so pre-tournament
+            // the home page already shows draw structure.
             _SectionHead(
               title: 'World Cup groups',
               action: 'All groups →',
               onAction: () => context.push(RoutePaths.standings),
             ),
-            const SizedBox(height: 10),
             const _GroupSpotlight(),
 
-            // WC upcoming schedule — next 4 WC matches
-            const SizedBox(height: 16),
-            _SectionHead(
-              title: 'WC schedule',
-              action: 'Full draw →',
-              onAction: () => context.push(RoutePaths.matches),
-            ),
-            const SizedBox(height: 10),
-            const _WcUpcomingMatches(),
+            // (Removed: WC upcoming schedule + host venues — both moved
+            // to /world-cup screen so tournament context lives there.)
 
-            // Host venues — the 3 host nations + venue count
-            const SizedBox(height: 16),
-            const _SectionHead(title: 'Host venues'),
-            const SizedBox(height: 10),
-            const _WcHostVenues(),
-
-            // Featured Iconic / Legendary cards — pulled from the seeded
-            // market catalogue (works pre-WC because cards are seeded).
-            const SizedBox(height: 16),
+            // Featured Iconic / Legendary cards from the seeded market.
             _SectionHead(
               title: 'Featured cards',
               action: 'Market →',
               onAction: () => context.push('/market'),
             ),
-            const SizedBox(height: 10),
             const _FeaturedCardsStrip(),
 
-            const SizedBox(height: 16),
             _SectionHead(
               title: 'Your form',
               action: 'Manager →',
               onAction: () => context.push(RoutePaths.fantasyHome),
             ),
-            const SizedBox(height: 14),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _FantasyCard(),
             ),
-            const SizedBox(height: 24),
+
             _SectionHead(
               title: "Today's stories",
               action: 'All news →',
               onAction: () => context.push(RoutePaths.news),
             ),
-            const SizedBox(height: 14),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _NewsList(),
@@ -249,29 +233,10 @@ class _Appbar extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: () => context.push(RoutePaths.profile),
-            child: const _AppbarAvatar(),
+            child: const UserAvatar(size: 36, fontSize: 14),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _AppbarAvatar extends StatelessWidget {
-  const _AppbarAvatar();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36, height: 36,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Color(0xFFC99A3D), Color(0xFF7E5A1F)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.person_outline, color: Color(0xFF1E1810), size: 18),
     );
   }
 }
@@ -341,94 +306,88 @@ class _WcHero extends StatelessWidget {
     final secs = remaining.inSeconds % 60;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF211D17), Color(0xFF110F0D)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
-          borderRadius: BorderRadius.circular(AppRadii.r5),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
           border: Border.all(color: AppColors.goldHairline),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.7),
-              blurRadius: 60,
-              offset: const Offset(0, 32),
-              spreadRadius: -28,
-            ),
-          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              children: const [
-                Text('★ ', style: TextStyle(color: AppColors.goldDeep, fontSize: 11, height: 1)),
-                Eyebrow('FIFA WORLD CUP 2026', gold: true, size: 11),
-              ],
-            ),
-            const SizedBox(height: 18),
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.2,
-                  color: AppColors.fg,
-                  height: 1.0,
-                ),
+            // Title block — eyebrow + small CTA
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const TextSpan(text: 'The world\nplays in '),
-                  TextSpan(
-                    text: '${days.clamp(0, 999)} days',
-                    style: const TextStyle(
-                      fontFamily: 'IowanOldStyle',
-                      fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.gold,
-                      fontSize: 30,
+                  Row(
+                    children: const [
+                      Text('★ ',
+                          style: TextStyle(color: AppColors.goldDeep, fontSize: 10, height: 1)),
+                      Flexible(
+                        child: Eyebrow('WORLD CUP 2026', gold: true, size: 10),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Kicks off 11 Jun',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.fg,
+                      letterSpacing: -0.3,
+                      height: 1.1,
                     ),
                   ),
-                  const TextSpan(text: '.'),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => context.push(RoutePaths.bracket),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Make bracket',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.gold,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.arrow_forward,
+                            color: AppColors.gold, size: 12),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-            const Eyebrow('United States · Canada · Mexico · 16 cities'),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: _CountdownCell(n: days,  l: 'Days')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: hours, l: 'Hours')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: mins,  l: 'Min')),
-                const SizedBox(width: 6),
-                Expanded(child: _CountdownCell(n: secs,  l: 'Sec')),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: GoldButton(
-                    label: 'Make your bracket',
-                    onPressed: () => context.push(RoutePaths.bracket),
-                    expand: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GhostButton(
-                  label: 'Global Cup',
-                  onPressed: () => context.push(RoutePaths.fantasyHome),
-                  small: true,
-                ),
-              ],
+            // Compact countdown cells — half the previous height
+            Expanded(
+              flex: 7,
+              child: Row(
+                children: [
+                  Expanded(child: _CountdownCell(n: days,  l: 'D')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: hours, l: 'H')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: mins,  l: 'M')),
+                  const SizedBox(width: 4),
+                  Expanded(child: _CountdownCell(n: secs,  l: 'S')),
+                ],
+              ),
             ),
           ],
         ),
@@ -444,28 +403,39 @@ class _CountdownCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       decoration: BoxDecoration(
         color: const Color(0x8C0F0E0D),
         borderRadius: BorderRadius.circular(AppRadii.r2),
         border: Border.all(color: AppColors.borderSoft),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             n.toString().padLeft(2, '0'),
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 26,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
-              letterSpacing: -1.04,
+              letterSpacing: -0.6,
               color: AppColors.gold,
               height: 1.0,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 6),
-          Eyebrow(l, size: 9),
+          const SizedBox(height: 2),
+          Text(
+            l,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: AppColors.muted,
+              letterSpacing: 0.8,
+              height: 1.0,
+            ),
+          ),
         ],
       ),
     );
@@ -476,6 +446,17 @@ class _CountdownCell extends StatelessWidget {
 // SECTION HEAD
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Uniform vertical gap between home-page sections. Use between
+/// non-section-head blocks (e.g. the WC hero → bracket card). Sections
+/// that start with a _SectionHead already get their own top spacing from
+/// the head's internal padding, so they don't need this.
+class _SectionGap extends StatelessWidget {
+  const _SectionGap();
+  static const double height = 18;
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: height);
+}
+
 class _SectionHead extends StatelessWidget {
   const _SectionHead({required this.title, this.action, this.onAction});
   final String title;
@@ -484,7 +465,10 @@ class _SectionHead extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
+      // Self-contained spacing: 18px above for separation from the
+      // previous section, 10px below to its own content. Callers never
+      // need to wrap this in a SizedBox.
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -519,50 +503,780 @@ class _SectionHead extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LIVE STRIP — wired to liveMatchesProvider
+// MATCH HERO — one big card showing the next/current match
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _LiveStrip extends ConsumerWidget {
-  const _LiveStrip();
+/// Single-match feature card. Picks the most relevant match right now:
+///   1. Any live match (first one — the live feed is already
+///      newest-first / by-priority server-side).
+///   2. Otherwise the next upcoming kickoff (followed teams preferred,
+///      then chronological).
+/// Rendered larger than the legacy strip with competition badge, both
+/// crests, score or kickoff time, and a live pulse / kickoff countdown
+/// status line. All times formatted in the user's local timezone.
+class _NextMatchHero extends ConsumerWidget {
+  const _NextMatchHero();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final live = ref.watch(liveMatchesProvider);
-    return live.when(
-      loading: () => SizedBox(
-        height: 168,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: 3,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => const SizedBox(width: 240, child: MatchCardSkeleton()),
+    final fixtures = ref.watch(homeFixturesProvider);
+    final followedIds = ref
+        .watch(myProfileProvider)
+        .maybeWhen(
+          data: (p) => (p?.followedTeams ?? const <ProfileTeam>[])
+              .map((t) => t.id)
+              .toSet(),
+          orElse: () => <String>{},
+        );
+
+    final liveList = live.valueOrNull;
+    final fixtureBundle = fixtures.valueOrNull;
+
+    // Loading-priority order: if both are still loading show the skeleton.
+    if (live.isLoading && fixtures.isLoading) {
+      return const _HeroSkeleton();
+    }
+
+    // Pick the match: live (followed first) → upcoming (followed first).
+    MatchDto? selected;
+    if (liveList != null && liveList.isNotEmpty) {
+      selected = _firstPreferringFollowed(liveList, followedIds);
+    }
+    if (selected == null &&
+        fixtureBundle != null &&
+        fixtureBundle.upcoming.isNotEmpty) {
+      selected = _firstPreferringFollowed(fixtureBundle.upcoming, followedIds);
+    }
+
+    if (selected == null) {
+      // Nothing live, nothing upcoming in the window — render the
+      // standing "no matches" fallback so the section is never empty.
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: _NoLiveNowTile(),
+      );
+    }
+    return _MatchFeatureCard(match: selected);
+  }
+
+  static MatchDto _firstPreferringFollowed(
+    List<MatchDto> matches,
+    Set<String> followed,
+  ) {
+    if (followed.isEmpty) return matches.first;
+    for (final m in matches) {
+      if (followed.contains(m.homeTeam.id) ||
+          followed.contains(m.awayTeam.id)) {
+        return m;
+      }
+    }
+    return matches.first;
+  }
+}
+
+class _HeroSkeleton extends StatelessWidget {
+  const _HeroSkeleton();
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Skeleton(height: 140, radius: 14),
+    );
+  }
+}
+
+/// Big feature card used by the "Match" section. Showcases one match
+/// with competition pill, both crests + names, central score / time
+/// chip, and a status line (LIVE pulse + minute, or kickoff countdown).
+class _MatchFeatureCard extends StatelessWidget {
+  const _MatchFeatureCard({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLive = match.isLive;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/matches/${match.id}'),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1F1B16), Color(0xFF120F0D)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            border: Border.all(
+              color: isLive
+                  ? AppColors.live.withValues(alpha: 0.5)
+                  : AppColors.goldHairline,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _MatchHeroBadge(match: match),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: _MatchHeroSide(team: match.homeTeam, alignEnd: true)),
+                  const SizedBox(width: 12),
+                  _MatchHeroCenter(match: match),
+                  const SizedBox(width: 12),
+                  Expanded(child: _MatchHeroSide(team: match.awayTeam, alignEnd: false)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(height: 1, color: AppColors.borderSoft),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: _MatchHeroStatus(match: match)),
+                  if (match.venue != null && match.venue!.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        match.venue!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: AppColors.muted,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-      error: (e, _) => const _StripEmpty(
-        title: 'Live scores paused',
-        subtitle: 'Couldn’t reach the score feed. Pull to refresh.',
-        glyph: EmptyGlyph.football,
-      ),
-      data: (matches) {
-        if (matches.isEmpty) {
-          // No live matches in this very moment. Don't editorialise about
-          // the season — there are usually matches kicking off in a few
-          // hours regardless of the time of year. The European leagues
-          // section below has results + fixtures so home isn't dry.
-          return const _NoLiveNowTile();
-        }
-        return SizedBox(
-          height: 168,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            physics: const BouncingScrollPhysics(),
-            itemCount: matches.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) => _LiveCard(match: matches[i]),
+    );
+  }
+}
+
+class _MatchHeroBadge extends StatelessWidget {
+  const _MatchHeroBadge({required this.match});
+  final MatchDto match;
+  @override
+  Widget build(BuildContext context) {
+    final comp = _competitionLabel(match.competitionId);
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: AppColors.goldHairline),
           ),
-        );
-      },
+          child: Text(
+            comp,
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+        const Spacer(),
+        if (match.isLive) ...[
+          const LiveDot(),
+          const SizedBox(width: 6),
+          const Text(
+            'LIVE',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: AppColors.live,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Friendly competition name from id; falls back to the id itself.
+  static String _competitionLabel(String? id) {
+    if (id == null) return 'MATCH';
+    const map = <String, String>{
+      'PL_2025':         'PREMIER LEAGUE',
+      'LALIGA_2025':     'LA LIGA',
+      'BUNDESLIGA_2025': 'BUNDESLIGA',
+      'SERIEA_2025':     'SERIE A',
+      'LIGUE1_2025':     'LIGUE 1',
+      'UCL_2025':        'UCL',
+      'UEL_2025':        'UEL',
+      'WC2026':          'WORLD CUP 2026',
+    };
+    return map[id] ?? id.toUpperCase();
+  }
+}
+
+class _MatchHeroSide extends StatelessWidget {
+  const _MatchHeroSide({required this.team, required this.alignEnd});
+  final TeamDto team;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final crest = SizedBox(
+      width: 44,
+      height: 44,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+      ),
+    );
+    final name = Text(
+      team.shortName ?? team.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: AppColors.fg,
+        letterSpacing: -0.2,
+        height: 1.1,
+      ),
+    );
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        crest,
+        const SizedBox(height: 8),
+        name,
+      ],
+    );
+  }
+}
+
+class _MatchHeroCenter extends StatelessWidget {
+  const _MatchHeroCenter({required this.match});
+  final MatchDto match;
+  @override
+  Widget build(BuildContext context) {
+    // Live or finished → show the score; upcoming → show kickoff time.
+    final isLiveOrFinished = match.isLive || match.isFinished;
+    if (isLiveOrFinished) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0x8C0F0E0D),
+          borderRadius: BorderRadius.circular(AppRadii.r3),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Text(
+          '${match.homeScore}  –  ${match.awayScore}',
+          style: const TextStyle(
+            fontFamily: 'JetBrainsMono',
+            fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.fg,
+            letterSpacing: -0.4,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      );
+    }
+    // Upcoming — show the kickoff time chip in user timezone.
+    final local = match.kickoffAt.toLocal();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0x8C0F0E0D),
+        borderRadius: BorderRadius.circular(AppRadii.r3),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Text(
+        DateFormat('HH:mm').format(local),
+        style: const TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: AppColors.gold,
+          letterSpacing: -0.3,
+          fontFeatures: [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchHeroStatus extends StatelessWidget {
+  const _MatchHeroStatus({required this.match});
+  final MatchDto match;
+  @override
+  Widget build(BuildContext context) {
+    if (match.isLive) {
+      return Text(
+        "${match.minute ?? 0}' · IN PROGRESS",
+        style: const TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.live,
+          letterSpacing: 0.8,
+        ),
+      );
+    }
+    if (match.isFinished) {
+      return const Text(
+        'FULL TIME',
+        style: TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.muted,
+          letterSpacing: 0.8,
+        ),
+      );
+    }
+    final local = match.kickoffAt.toLocal();
+    final now = DateTime.now();
+    final daysAhead = DateTime(local.year, local.month, local.day)
+        .difference(DateTime(now.year, now.month, now.day))
+        .inDays;
+    final dayLabel = daysAhead == 0
+        ? 'TODAY'
+        : daysAhead == 1
+            ? 'TOMORROW'
+            : DateFormat('EEE d MMM').format(local).toUpperCase();
+    final tzAbbrev = local.timeZoneName;
+    return Text(
+      '$dayLabel · ${DateFormat('HH:mm').format(local)} $tzAbbrev',
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        color: AppColors.gold,
+        letterSpacing: 0.6,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOLLOWED MATCHES SECTION — strip-style list of followed-team fixtures
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Section that lists matches involving any team the user follows.
+/// Renders only when the profile has at least one followed team; in
+/// the empty-state case it shrinks to nothing so the page doesn't show
+/// an empty header. Live matches come first, then chronological
+/// upcoming. Up to 4 rows on home — full list one tap away.
+class _FollowedMatchesSection extends ConsumerWidget {
+  const _FollowedMatchesSection();
+  static const _maxVisible = 4;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(myProfileProvider);
+    final followedIds = profileAsync.maybeWhen(
+      data: (p) => (p?.followedTeams ?? const <ProfileTeam>[])
+          .map((t) => t.id)
+          .toSet(),
+      orElse: () => <String>{},
+    );
+    if (followedIds.isEmpty) return const SizedBox.shrink();
+
+    final live = ref.watch(liveMatchesProvider);
+    final fixtures = ref.watch(homeFixturesProvider);
+
+    final liveMatches = (live.valueOrNull ?? const <MatchDto>[])
+        .where((m) => _isFollowed(m, followedIds))
+        .toList();
+    final upcomingMatches = (fixtures.valueOrNull?.upcoming ?? const <MatchDto>[])
+        .where((m) =>
+            _isFollowed(m, followedIds) &&
+            !liveMatches.any((lm) => lm.id == m.id))
+        .toList();
+
+    final rows = <Widget>[];
+    final maxLive = (_maxVisible).clamp(0, liveMatches.length);
+    for (var i = 0; i < maxLive; i++) {
+      rows.add(_LiveRowItem(match: liveMatches[i]));
+      if (i < maxLive - 1) rows.add(const _LiveDivider());
+    }
+    final remaining = _maxVisible - maxLive;
+    final pickUpcoming = upcomingMatches.take(remaining).toList();
+    if (rows.isNotEmpty && pickUpcoming.isNotEmpty) {
+      rows.add(const _UpNextDivider());
+    }
+    for (var i = 0; i < pickUpcoming.length; i++) {
+      rows.add(_UpcomingRowItem(match: pickUpcoming[i]));
+      if (i < pickUpcoming.length - 1) rows.add(const _LiveDivider());
+    }
+
+    if (rows.isEmpty) {
+      // Followed teams have no live + no fixtures in the window — show
+      // a small placeholder rather than a giant empty card.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHead(
+            title: 'Following matches',
+            action: 'All matches →',
+            onAction: () => context.push(RoutePaths.matches),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'No upcoming matches yet for ${profileAsync.valueOrNull?.followedTeams.length ?? 0} '
+              'followed team${(profileAsync.valueOrNull?.followedTeams.length ?? 0) == 1 ? "" : "s"}.',
+              style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.4),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHead(
+          title: 'Following matches',
+          action: 'All matches →',
+          onAction: () => context.push(RoutePaths.matches),
+        ),
+        _LiveCard(children: rows),
+      ],
+    );
+  }
+
+  static bool _isFollowed(MatchDto m, Set<String> followed) =>
+      followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id);
+}
+
+class _UpNextDivider extends StatelessWidget {
+  const _UpNextDivider();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
+          const SizedBox(width: 8),
+          const Text(
+            'UP NEXT',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: AppColors.borderSoft)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveCard extends StatelessWidget {
+  const _LiveCard({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.surface2, AppColors.surface],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+class _LiveDivider extends StatelessWidget {
+  const _LiveDivider();
+  @override
+  Widget build(BuildContext context) => const Divider(
+        height: 1,
+        thickness: 1,
+        color: AppColors.borderSoft,
+        indent: 12,
+        endIndent: 12,
+      );
+}
+
+
+/// Compact single-line live match row — both crests, names, score and
+/// minute marker all visible at a glance.
+class _LiveRowItem extends StatelessWidget {
+  const _LiveRowItem({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    final homeWinning = match.homeScore > match.awayScore;
+    final awayWinning = match.awayScore > match.homeScore;
+    return InkWell(
+      onTap: () => context.push('/matches/${match.id}'),
+      borderRadius: BorderRadius.circular(AppRadii.r3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _LiveSideName(
+                team: match.homeTeam,
+                alignEnd: true,
+                winning: homeWinning,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _LiveScoreChip(
+              home: match.homeScore,
+              away: match.awayScore,
+              minute: match.minute,
+              isLive: match.isLive,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _LiveSideName(
+                team: match.awayTeam,
+                alignEnd: false,
+                winning: awayWinning,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Upcoming-match version of [_LiveRowItem]. Same layout but the centre
+/// chip shows the kickoff time + relative-day label ("Today", "Sat")
+/// instead of a live score.
+class _UpcomingRowItem extends StatelessWidget {
+  const _UpcomingRowItem({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.push('/matches/${match.id}'),
+      borderRadius: BorderRadius.circular(AppRadii.r3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _LiveSideName(
+                team: match.homeTeam,
+                alignEnd: true,
+                winning: false,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _UpcomingTimeChip(kickoff: match.kickoffAt),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _LiveSideName(
+                team: match.awayTeam,
+                alignEnd: false,
+                winning: false,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UpcomingTimeChip extends StatelessWidget {
+  const _UpcomingTimeChip({required this.kickoff});
+  final DateTime kickoff;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final local = kickoff.toLocal();
+    final isToday = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final daysAhead = DateTime(local.year, local.month, local.day)
+        .difference(DateTime(now.year, now.month, now.day))
+        .inDays;
+    final dayLabel = isToday
+        ? 'Today'
+        : daysAhead == 1
+            ? 'Tomorrow'
+            : DateFormat('EEE d MMM').format(local);
+    final timeLabel = DateFormat('HH:mm').format(local);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0x8C0F0E0D),
+            borderRadius: BorderRadius.circular(AppRadii.r2),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            timeLabel,
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.fg,
+              letterSpacing: -0.2,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          dayLabel.toUpperCase(),
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 8.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.gold,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveSideName extends StatelessWidget {
+  const _LiveSideName({
+    required this.team,
+    required this.alignEnd,
+    required this.winning,
+  });
+  final TeamDto team;
+  final bool alignEnd;
+  final bool winning;
+
+  @override
+  Widget build(BuildContext context) {
+    final crest = SizedBox(
+      width: 20,
+      height: 20,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+      ),
+    );
+    final name = Flexible(
+      child: Text(
+        team.shortName ?? team.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          color: winning ? AppColors.gold : AppColors.fg,
+        ),
+      ),
+    );
+    return Row(
+      mainAxisAlignment:
+          alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: alignEnd
+          ? [name, const SizedBox(width: 8), crest]
+          : [crest, const SizedBox(width: 8), name],
+    );
+  }
+}
+
+class _LiveScoreChip extends StatelessWidget {
+  const _LiveScoreChip({
+    required this.home,
+    required this.away,
+    required this.minute,
+    required this.isLive,
+  });
+  final int home;
+  final int away;
+  final int? minute;
+  final bool isLive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0x8C0F0E0D),
+            borderRadius: BorderRadius.circular(AppRadii.r2),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            '$home–$away',
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.fg,
+              letterSpacing: -0.3,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLive) ...[
+              const LiveDot(),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              "${minute ?? 0}'",
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: AppColors.pitch,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -571,11 +1285,10 @@ class _StripEmpty extends StatelessWidget {
   const _StripEmpty({
     required this.title,
     required this.subtitle,
-    this.glyph = EmptyGlyph.football,
   });
   final String title;
   final String subtitle;
-  final EmptyGlyph glyph;
+  static const EmptyGlyph glyph = EmptyGlyph.football;
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -595,102 +1308,6 @@ class _StripEmpty extends StatelessWidget {
   }
 }
 
-class _LiveCard extends StatelessWidget {
-  const _LiveCard({required this.match});
-  final MatchDto match;
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/matches/${match.id}'),
-      child: Container(
-        width: 240,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.surface2, AppColors.surface],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.borderSoft),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(child: Eyebrow('LIVE', size: 9)),
-                if (match.isLive) const LiveDot(),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _LiveRow(team: match.homeTeam, score: match.homeScore, winning: match.homeScore > match.awayScore),
-            const SizedBox(height: 6),
-            _LiveRow(team: match.awayTeam, score: match.awayScore, winning: match.awayScore > match.homeScore),
-            const Spacer(),
-            Text(
-              "${match.minute ?? 0}'",
-              style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-                color: AppColors.pitch,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveRow extends StatelessWidget {
-  const _LiveRow({required this.team, required this.score, required this.winning});
-  final TeamDto team;
-  final int score;
-  final bool winning;
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 22, height: 16,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            team.shortName ?? team.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: AppColors.fg,
-            ),
-          ),
-        ),
-        Text(
-          score.toString(),
-          style: TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: winning ? AppColors.gold : AppColors.fg,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FANTASY CARD — wired to currentGameweek + myLineup
@@ -1510,13 +2127,11 @@ class _EuroLeaguesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
         _SectionHead(
           title: 'European leagues',
           action: 'Full schedule →',
           onAction: () => context.push(RoutePaths.matches),
         ),
-        const SizedBox(height: 10),
         const _LeagueDigest(),
       ],
     );
@@ -2524,230 +3139,6 @@ class _GroupTeamCell extends StatelessWidget {
             fontSize: 9,
             fontWeight: FontWeight.w700,
             color: row.played > 0 ? AppColors.gold : AppColors.muted2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WC UPCOMING MATCHES — next 4 WC2026 fixtures
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Shows the next 4 WC2026 matches from the home fixtures provider.
-/// Falls back to a friendly empty state before the tournament starts.
-class _WcUpcomingMatches extends ConsumerWidget {
-  const _WcUpcomingMatches();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(homeFixturesProvider);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: async.when(
-        loading: () => const Skeleton(height: 160, radius: 16),
-        error: (_, __) => const _StripEmpty(
-          title: 'Schedule unavailable',
-          subtitle: "Couldn't reach the fixtures feed. Pull to refresh.",
-        ),
-        data: (f) {
-          final wcMatches = f.upcoming
-              .where((m) => m.competitionId == 'WC2026')
-              .take(4)
-              .toList();
-          if (wcMatches.isEmpty) {
-            return Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadii.r4),
-                border: Border.all(color: AppColors.borderSoft),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.event_note, color: AppColors.gold, size: 22),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'World Cup fixtures drop when the draw is finalised.',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: AppColors.muted,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Check back closer to June 2026.',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: AppColors.muted2,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadii.r4),
-              border: Border.all(color: AppColors.borderSoft),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final m in wcMatches) _LeagueFixtureRow(match: m),
-                const SizedBox(height: 6),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WC HOST VENUES — 3 host countries
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Static host-cities strip — USA / Mexico / Canada with venue counts.
-class _WcHostVenues extends StatelessWidget {
-  const _WcHostVenues();
-
-  static const _hosts = [
-    _HostCountry(
-      flag: '🇺🇸',
-      name: 'United States',
-      venues: 11,
-      cities: 'New York, LA, Dallas, Miami, Seattle …',
-    ),
-    _HostCountry(
-      flag: '🇲🇽',
-      name: 'Mexico',
-      venues: 3,
-      cities: 'Mexico City, Monterrey, Guadalajara',
-    ),
-    _HostCountry(
-      flag: '🇨🇦',
-      name: 'Canada',
-      venues: 2,
-      cities: 'Toronto, Vancouver',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.borderSoft),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Column(
-          children: [
-            for (var i = 0; i < _hosts.length; i++) ...[
-              if (i > 0) ...[
-                const SizedBox(height: 8),
-                Container(height: 1, color: AppColors.borderSoft),
-                const SizedBox(height: 8),
-              ],
-              _HostRow(host: _hosts[i]),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HostCountry {
-  const _HostCountry({
-    required this.flag,
-    required this.name,
-    required this.venues,
-    required this.cities,
-  });
-  final String flag;
-  final String name;
-  final int venues;
-  final String cities;
-}
-
-class _HostRow extends StatelessWidget {
-  const _HostRow({required this.host});
-  final _HostCountry host;
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(host.flag, style: const TextStyle(fontSize: 26)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    host.name,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.fg,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(99),
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      '${host.venues} ${host.venues == 1 ? 'venue' : 'venues'}',
-                      style: const TextStyle(
-                        fontFamily: 'JetBrainsMono',
-                        fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.gold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                host.cities,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11.5,
-                  color: AppColors.muted,
-                  height: 1.3,
-                ),
-              ),
-            ],
           ),
         ),
       ],

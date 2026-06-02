@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:chottu_link/chottu_link.dart';
 import 'package:chottu_link/dynamic_link/cl_dynamic_link_behaviour.dart';
@@ -178,6 +180,61 @@ class ChottuLinkService {
     );
   }
 
+  /// Share the user's WC2026 bracket. Optionally attaches a pre-rendered
+  /// PNG (see `ShareService.renderArtifactToFile`).
+  Future<void> shareBracket({
+    String? championName,
+    String? championCrestUrl,
+    int? pointsAwarded,
+    String? imagePath,
+  }) async {
+    final hasChampion = championName != null && championName.isNotEmpty;
+    final title = hasChampion
+        ? 'My WC 2026 bracket — $championName for the cup'
+        : 'My WC 2026 bracket on FootballMojo';
+    final description = pointsAwarded != null && pointsAwarded > 0
+        ? '$pointsAwarded pts so far. Build yours and beat me.'
+        : 'Build yours and see if you can beat me.';
+    final shareText = hasChampion
+        ? "I've got $championName lifting the cup 🏆 Make your bracket:\n\n"
+        : "My WC 2026 bracket is in. Make yours:\n\n";
+    _createAndShare(
+      deepLink: '$_baseUrl/bracket',
+      utmCampaign: 'bracket_share',
+      linkName: 'bracket_share',
+      socialTitle: title,
+      socialDescription: description,
+      socialImageUrl: championCrestUrl,
+      shareText: shareText,
+      imagePath: imagePath,
+    );
+  }
+
+  /// Share the user's fantasy lineup for a specific gameweek.
+  Future<void> shareFantasyLineup({
+    required String slug,
+    String? tournamentName,
+    String? gameweekName,
+    double? totalPoints,
+    String? imagePath,
+  }) async {
+    final pts = totalPoints != null ? totalPoints.toStringAsFixed(1) : null;
+    final title = pts != null
+        ? '$pts pts — ${gameweekName ?? "my lineup"} on FootballMojo'
+        : 'My ${tournamentName ?? "fantasy"} lineup on FootballMojo';
+    _createAndShare(
+      deepLink: '$_baseUrl/fantasy?slug=$slug',
+      utmCampaign: 'fantasy_share',
+      linkName: 'fantasy_${slug}_lineup',
+      socialTitle: title,
+      socialDescription: 'Pick your XI and compete in the Global Cup.',
+      shareText: pts != null
+          ? 'My PITCH lineup — $pts pts. Pick yours:\n\n'
+          : 'My PITCH lineup is set. Pick yours:\n\n',
+      imagePath: imagePath,
+    );
+  }
+
   /// Share the app itself.
   Future<void> shareApp() async {
     _createAndShare(
@@ -192,7 +249,7 @@ class ChottuLinkService {
 
   // ── Internal ─────────────────────────────────────────────────────────
 
-  void _createAndShare({
+  Future<void> _createAndShare({
     required String deepLink,
     required String utmCampaign,
     required String linkName,
@@ -200,7 +257,11 @@ class ChottuLinkService {
     required String socialDescription,
     String? socialImageUrl,
     required String shareText,
-  }) {
+    String? imagePath,
+  }) async {
+    // share_plus rejects `files: []` outright (ArgumentError) — pass null
+    // when we have no attachment, a single-item list otherwise.
+    final List<XFile>? files = imagePath != null ? [XFile(imagePath)] : null;
     final parameters = CLDynamicLinkParameters(
       link: Uri.parse(deepLink),
       domain: _domain,
@@ -215,17 +276,48 @@ class ChottuLinkService {
       socialImageUrl: socialImageUrl,
     );
 
-    ChottuLink.createDynamicLink(
-      parameters: parameters,
-      onSuccess: (link) {
-        debugPrint('✅ ChottuLink created: $link');
-        SharePlus.instance.share(ShareParams(text: '$shareText$link'));
-      },
-      onError: (error) {
-        debugPrint('❌ ChottuLink error: ${error.description}');
-        // Fallback: share without deep link
-        SharePlus.instance.share(ShareParams(text: shareText));
-      },
-    );
+    // The ChottuLink SDK is callback-based; if its native side hangs (auth
+    // failure, network drop, init never completed) neither callback ever
+    // fires and the share button does nothing. We bridge into a Future
+    // with a 5s timeout: success → share with dynamic link; timeout or
+    // error → fall back to sharing the raw deep link so the UX never
+    // dead-ends.
+    final completer = Completer<String?>();
+    try {
+      ChottuLink.createDynamicLink(
+        parameters: parameters,
+        onSuccess: (link) {
+          debugPrint('✅ ChottuLink created: $link');
+          if (!completer.isCompleted) completer.complete(link);
+        },
+        onError: (error) {
+          debugPrint('❌ ChottuLink error: ${error.description}');
+          if (!completer.isCompleted) completer.complete(null);
+        },
+      );
+    } catch (e) {
+      debugPrint('❌ ChottuLink threw synchronously: $e');
+      if (!completer.isCompleted) completer.complete(null);
+    }
+
+    String? dynamicLink;
+    try {
+      dynamicLink = await completer.future
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        debugPrint('❌ ChottuLink timed out — falling back to raw deep link');
+        return null;
+      });
+    } catch (_) {
+      dynamicLink = null;
+    }
+
+    final urlToShare = dynamicLink ?? deepLink;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(text: '$shareText$urlToShare', files: files),
+      );
+    } catch (e) {
+      debugPrint('❌ SharePlus failed: $e');
+    }
   }
 }

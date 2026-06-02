@@ -17,15 +17,27 @@ class HomeFixtures {
 
 final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
   final repo = ref.read(scoresRepositoryProvider);
-  // Pull a wider window: 7 days back + 7 days forward so the home page
-  // always has rich content regardless of match scheduling gaps.
+  // Window: 3 days back → 21 days forward. The forward edge is wide
+  // enough to capture WC2026 fixtures while they're still 1-3 weeks
+  // out so the "Matches" strip can fall back to the next upcoming
+  // game when nothing is live today. Day-level fixtures are cached
+  // server-side so 25 parallel calls cost little.
   final now = DateTime.now();
   final days = <DateTime>[
-    for (int i = -7; i <= 7; i++)
+    for (int i = -3; i <= 21; i++)
       DateTime(now.year, now.month, now.day + i),
   ];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
-  final all = results.expand((e) => e).toList();
+  // Backend's per-day query slots a match into its UTC date; that means
+  // a 22:00-local-time kickoff falls into "today" and "tomorrow" buckets
+  // in different timezones, so the same match can come back twice across
+  // adjacent day queries. Dedupe by match id before slotting into recent/
+  // upcoming so we never render the same fixture twice on home.
+  final dedup = <String, MatchDto>{};
+  for (final m in results.expand((e) => e)) {
+    dedup.putIfAbsent(m.id, () => m);
+  }
+  final all = dedup.values.toList();
 
   final upcoming = all
       .where((m) =>

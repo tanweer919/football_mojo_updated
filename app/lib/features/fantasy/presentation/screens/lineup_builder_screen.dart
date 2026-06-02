@@ -16,6 +16,7 @@ import '../../../../core/widgets/premium_image.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
 import '../../data/models/fantasy_models.dart';
 import '../../data/repositories/fantasy_repository.dart';
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/share/share_service.dart';
 import '../providers/fantasy_providers.dart';
 import '../providers/live_scoring_provider.dart';
@@ -81,12 +82,12 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
     super.dispose();
   }
 
-  void _shareLineup(
+  Future<void> _shareLineup(
     BuildContext context,
     FantasyLineupDto lineup,
     Map<String, PlayerValuationDto> byId,
     FantasyTournamentDto tournament,
-  ) {
+  ) async {
     final namesById = <String, String>{
       for (final entry in byId.entries) entry.key: entry.value.player.name,
     };
@@ -95,10 +96,9 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
         entry.key: entry.value.player.team.shortName ?? entry.value.player.team.name,
     };
     final gwName = ref.read(currentGameweekProvider(widget.slug)).valueOrNull?.name ?? 'Gameweek';
-    ShareService.instance.shareArtifact(
+    final imagePath = await ShareService.instance.renderArtifactToFile(
       context: context,
       logicalSize: const Size(1080, 1350),
-      text: 'My PITCH lineup — ${lineup.totalPoints.toStringAsFixed(1)} pts',
       filename: 'pitch_lineup.png',
       builder: (_) => LineupShareCard(
         lineup: lineup,
@@ -107,6 +107,13 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
         tournamentName: tournament.name,
         gameweekName: gwName,
       ),
+    );
+    await ChottuLinkService.instance.shareFantasyLineup(
+      slug: widget.slug,
+      tournamentName: tournament.name,
+      gameweekName: gwName,
+      totalPoints: lineup.totalPoints,
+      imagePath: imagePath,
     );
   }
 

@@ -75,7 +75,7 @@ export async function generateUniqueUserTag(
 export async function createUserWithUniqueTag(
   prisma: PrismaClient,
   uid: string,
-  opts: { email?: string | null; displayName?: string | null },
+  opts: { email?: string | null; displayName?: string | null; photoUrl?: string | null },
 ): Promise<string> {
   for (let attempt = 0; attempt < 4; attempt++) {
     const tag = await generateUniqueUserTag(prisma, opts);
@@ -85,6 +85,7 @@ export async function createUserWithUniqueTag(
           id: uid,
           email: opts.email ?? null,
           displayName: opts.displayName ?? null,
+          photoUrl: opts.photoUrl ?? null,
           userTag: tag,
         },
       });

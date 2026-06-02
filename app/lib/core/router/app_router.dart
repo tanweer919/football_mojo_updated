@@ -30,6 +30,7 @@ import '../../features/news/presentation/screens/news_reader_screen.dart';
 import '../../features/news/presentation/screens/news_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/predictions/presentation/screens/predictions_leaderboard_screen.dart';
+import '../../features/legal/presentation/legal_content_screen.dart';
 import '../../features/profile/presentation/screens/notification_center_screen.dart';
 import '../../features/profile/presentation/screens/notification_preferences_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -112,6 +113,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.awardPicks,
         builder: (_, __) => const AwardPicksScreen(),
+      ),
+
+      // Static legal / help pages
+      GoRoute(
+        path: RoutePaths.privacyPolicy,
+        builder: (_, __) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.termsOfService,
+        builder: (_, __) => const TermsOfServiceScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.helpCentre,
+        builder: (_, __) => const HelpCentreScreen(),
       ),
 
       // Fantasy / Global Cup / H2H
