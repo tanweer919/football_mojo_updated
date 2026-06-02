@@ -16,6 +16,7 @@ import '../../../../core/widgets/pitch_hero_stack.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../data/profile_models.dart';
 import '../../data/profile_repository.dart';
 
@@ -338,7 +339,9 @@ class _Hero extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _BigAvatar(initials: _initialsFor(profile)),
+            // Centralised: pulls photoUrl from profile (with Firebase
+            // fallback) so the hero avatar matches the appbar's.
+            const UserAvatar(size: 64, fontSize: 22),
             const SizedBox(width: 18),
             Expanded(
               child: Column(
@@ -400,43 +403,6 @@ class _Hero extends StatelessWidget {
     );
   }
 
-  String _initialsFor(Profile p) {
-    final n = p.displayName ?? p.email ?? 'PM';
-    final parts = n.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return n.substring(0, n.length >= 2 ? 2 : 1).toUpperCase();
-  }
-}
-
-class _BigAvatar extends StatelessWidget {
-  const _BigAvatar({required this.initials});
-  final String initials;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 64, height: 64,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFC99A3D), Color(0xFF7E5A1F)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(color: AppColors.goldHairline, blurRadius: 0, spreadRadius: 2),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontWeight: FontWeight.w800,
-          fontSize: 22,
-          color: Color(0xFF1E1810),
-        ),
-      ),
-    );
-  }
 }
 
 class _StatsRow extends StatelessWidget {

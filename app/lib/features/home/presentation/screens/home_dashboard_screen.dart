@@ -13,6 +13,7 @@ import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/loading_skeletons.dart';
 import '../../../../core/widgets/premium_image.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../album/data/models/card_models.dart' show CardRarity;
@@ -93,6 +94,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         padding: const EdgeInsets.only(bottom: 110),
+        // Section rhythm: _SectionHead now owns its own top/bottom
+        // padding (see widget definition) so the column body doesn't
+        // need ad-hoc SizedBox spacers between sections. The constant
+        // we use everywhere is the _SectionGap below — apply it ONCE
+        // between major non-section-head blocks (hero/cards), let
+        // _SectionHead handle the rest.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -103,84 +110,67 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 12),
             _WcHero(remaining: _wcCountdown),
 
-            // Bracket card — surfaces the user's current bracket directly
-            // on home so it's visible (not buried behind a CTA button).
-            // Shows champion + progress when in-flight, points when scored,
-            // CTA when not started.
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _BracketCard(),
-            ),
-
-            // Live now — moved above followed-teams: when a match is in
-            // progress the user almost always wants to see the score
-            // first, before scrolling past their followed teams.
-            const SizedBox(height: 8),
+            // Live & next — moved above the bracket card and your-teams.
+            // When a match is in progress, the live score is the most
+            // time-sensitive thing on the page; everything else can wait.
             _SectionHead(
-              title: 'Live now',
+              title: 'Matches',
               action: 'All matches →',
               onAction: () => context.push(RoutePaths.matches),
             ),
-            const SizedBox(height: 10),
             const _LiveStrip(),
 
+            // Bracket card — user's WC2026 bracket: champion + progress,
+            // or a CTA when they haven't started.
+            const _SectionGap(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _BracketCard(),
+            ),
+
             // Your teams — followed-team digest or prompt to pick teams.
+            const _SectionGap(),
             const _YourTeamsSection(),
 
             // European leagues — hidden during WC mode since all domestic
             // seasons are over and the section is empty.
             _EuroLeaguesSection(wcMode: ref.watch(wcModeProvider)),
 
-            // Group spotlight — surfaces the seeded WC2026 standings so
-            // pre-tournament the home page already shows draw structure.
-            const SizedBox(height: 8),
+            // Group spotlight — seeded WC2026 standings so pre-tournament
+            // the home page already shows draw structure.
             _SectionHead(
               title: 'World Cup groups',
               action: 'All groups →',
               onAction: () => context.push(RoutePaths.standings),
             ),
-            const SizedBox(height: 10),
             const _GroupSpotlight(),
 
-            // (Removed: WC upcoming schedule — moved to /world-cup screen
-            // alongside the other tournament context so the home page
-            // doesn't double-list it.)
+            // (Removed: WC upcoming schedule + host venues — both moved
+            // to /world-cup screen so tournament context lives there.)
 
-            // Host venues — the 3 host nations + venue count
-            const SizedBox(height: 16),
-            const _SectionHead(title: 'Host venues'),
-            const SizedBox(height: 10),
-            const _WcHostVenues(),
-
-            // Featured Iconic / Legendary cards — pulled from the seeded
-            // market catalogue (works pre-WC because cards are seeded).
-            const SizedBox(height: 16),
+            // Featured Iconic / Legendary cards from the seeded market.
             _SectionHead(
               title: 'Featured cards',
               action: 'Market →',
               onAction: () => context.push('/market'),
             ),
-            const SizedBox(height: 10),
             const _FeaturedCardsStrip(),
 
-            const SizedBox(height: 16),
             _SectionHead(
               title: 'Your form',
               action: 'Manager →',
               onAction: () => context.push(RoutePaths.fantasyHome),
             ),
-            const SizedBox(height: 14),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _FantasyCard(),
             ),
-            const SizedBox(height: 24),
+
             _SectionHead(
               title: "Today's stories",
               action: 'All news →',
               onAction: () => context.push(RoutePaths.news),
             ),
-            const SizedBox(height: 14),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _NewsList(),
@@ -238,29 +228,10 @@ class _Appbar extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: () => context.push(RoutePaths.profile),
-            child: const _AppbarAvatar(),
+            child: const UserAvatar(size: 36, fontSize: 14),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _AppbarAvatar extends StatelessWidget {
-  const _AppbarAvatar();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36, height: 36,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Color(0xFFC99A3D), Color(0xFF7E5A1F)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.person_outline, color: Color(0xFF1E1810), size: 18),
     );
   }
 }
@@ -470,6 +441,17 @@ class _CountdownCell extends StatelessWidget {
 // SECTION HEAD
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Uniform vertical gap between home-page sections. Use between
+/// non-section-head blocks (e.g. the WC hero → bracket card). Sections
+/// that start with a _SectionHead already get their own top spacing from
+/// the head's internal padding, so they don't need this.
+class _SectionGap extends StatelessWidget {
+  const _SectionGap();
+  static const double height = 18;
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: height);
+}
+
 class _SectionHead extends StatelessWidget {
   const _SectionHead({required this.title, this.action, this.onAction});
   final String title;
@@ -478,7 +460,10 @@ class _SectionHead extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
+      // Self-contained spacing: 18px above for separation from the
+      // previous section, 10px below to its own content. Callers never
+      // need to wrap this in a SizedBox.
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -516,66 +501,147 @@ class _SectionHead extends StatelessWidget {
 // LIVE STRIP — wired to liveMatchesProvider
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Combined live + next-match strip.
+///
+/// Behaviour:
+///   - When there ARE live matches: show up to [_maxVisible] in a
+///     compact vertical list, sorted so followed-teams' games come first.
+///   - When there are NO live matches: show the next 1-2 upcoming
+///     fixtures instead, again preferring followed teams. Section title
+///     in the parent reads "Matches" (renamed from "Live now") so this
+///     dual-purpose strip matches the section name.
 class _LiveStrip extends ConsumerWidget {
   const _LiveStrip();
 
   /// Cap visible rows so the section stays glanceable. The full list is
   /// one tap away via the "All matches →" action in the section head.
   static const _maxVisible = 4;
+  /// When there are no live games, surface this many upcoming matches
+  /// so the strip still has something time-relevant.
+  static const _maxUpcoming = 2;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final live = ref.watch(liveMatchesProvider);
+    final fixtures = ref.watch(homeFixturesProvider);
+    final followedIds = ref
+        .watch(myProfileProvider)
+        .maybeWhen(
+          data: (p) => (p?.followedTeams ?? const <ProfileTeam>[])
+              .map((t) => t.id)
+              .toSet(),
+          orElse: () => <String>{},
+        );
     return live.when(
-      loading: () => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: List.generate(
-            3,
-            (_) => const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Skeleton(height: 40, radius: 10),
-            ),
-          ),
-        ),
-      ),
+      loading: () => const _LiveSkeleton(),
       error: (e, _) => const _StripEmpty(
         title: 'Live scores paused',
         subtitle: 'Couldn’t reach the score feed. Pull to refresh.',
         glyph: EmptyGlyph.football,
       ),
       data: (matches) {
-        if (matches.isEmpty) return const _NoLiveNowTile();
-        final visible = matches.take(_maxVisible).toList();
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.surface2, AppColors.surface],
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(AppRadii.r4),
-              border: Border.all(color: AppColors.borderSoft),
-            ),
-            child: Column(
+        if (matches.isNotEmpty) {
+          final sorted = _prioritise(matches, followedIds);
+          final visible = sorted.take(_maxVisible).toList();
+          return _LiveCard(
+            children: [
+              for (var i = 0; i < visible.length; i++) ...[
+                _LiveRowItem(match: visible[i]),
+                if (i < visible.length - 1) const _LiveDivider(),
+              ],
+            ],
+          );
+        }
+        // No live → show the next upcoming matches (followed teams first).
+        return fixtures.when(
+          loading: () => const _LiveSkeleton(),
+          error: (_, __) => const _NoLiveNowTile(),
+          data: (f) {
+            if (f.upcoming.isEmpty) return const _NoLiveNowTile();
+            final sortedUpcoming = _prioritise(f.upcoming, followedIds);
+            final visible = sortedUpcoming.take(_maxUpcoming).toList();
+            return _LiveCard(
               children: [
                 for (var i = 0; i < visible.length; i++) ...[
-                  _LiveRowItem(match: visible[i]),
-                  if (i < visible.length - 1)
-                    const Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: AppColors.borderSoft,
-                      indent: 12,
-                      endIndent: 12,
-                    ),
+                  _UpcomingRowItem(match: visible[i]),
+                  if (i < visible.length - 1) const _LiveDivider(),
                 ],
               ],
-            ),
-          ),
+            );
+          },
         );
       },
+    );
+  }
+
+  /// Stable sort that pulls any match involving a followed team to the
+  /// front of the list while preserving the original ordering otherwise.
+  static List<MatchDto> _prioritise(List<MatchDto> matches, Set<String> followed) {
+    if (followed.isEmpty) return matches;
+    final indexed = [
+      for (var i = 0; i < matches.length; i++)
+        (matches[i], i, _isFollowed(matches[i], followed) ? 0 : 1),
+    ];
+    indexed.sort((a, b) {
+      final byFollowed = a.$3.compareTo(b.$3);
+      return byFollowed != 0 ? byFollowed : a.$2.compareTo(b.$2);
+    });
+    return [for (final e in indexed) e.$1];
+  }
+
+  static bool _isFollowed(MatchDto m, Set<String> followed) =>
+      followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id);
+}
+
+class _LiveCard extends StatelessWidget {
+  const _LiveCard({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.surface2, AppColors.surface],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+class _LiveDivider extends StatelessWidget {
+  const _LiveDivider();
+  @override
+  Widget build(BuildContext context) => const Divider(
+        height: 1,
+        thickness: 1,
+        color: AppColors.borderSoft,
+        indent: 12,
+        endIndent: 12,
+      );
+}
+
+class _LiveSkeleton extends StatelessWidget {
+  const _LiveSkeleton();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: List.generate(
+          3,
+          (_) => const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Skeleton(height: 40, radius: 10),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -622,6 +688,105 @@ class _LiveRowItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Upcoming-match version of [_LiveRowItem]. Same layout but the centre
+/// chip shows the kickoff time + relative-day label ("Today", "Sat")
+/// instead of a live score.
+class _UpcomingRowItem extends StatelessWidget {
+  const _UpcomingRowItem({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.push('/matches/${match.id}'),
+      borderRadius: BorderRadius.circular(AppRadii.r3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _LiveSideName(
+                team: match.homeTeam,
+                alignEnd: true,
+                winning: false,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _UpcomingTimeChip(kickoff: match.kickoffAt),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _LiveSideName(
+                team: match.awayTeam,
+                alignEnd: false,
+                winning: false,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UpcomingTimeChip extends StatelessWidget {
+  const _UpcomingTimeChip({required this.kickoff});
+  final DateTime kickoff;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final local = kickoff.toLocal();
+    final isToday = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final daysAhead = DateTime(local.year, local.month, local.day)
+        .difference(DateTime(now.year, now.month, now.day))
+        .inDays;
+    final dayLabel = isToday
+        ? 'Today'
+        : daysAhead == 1
+            ? 'Tomorrow'
+            : DateFormat('EEE d MMM').format(local);
+    final timeLabel = DateFormat('HH:mm').format(local);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0x8C0F0E0D),
+            borderRadius: BorderRadius.circular(AppRadii.r2),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            timeLabel,
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.fg,
+              letterSpacing: -0.2,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          dayLabel.toUpperCase(),
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 8.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.gold,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1580,13 +1745,11 @@ class _EuroLeaguesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
         _SectionHead(
           title: 'European leagues',
           action: 'Full schedule →',
           onAction: () => context.push(RoutePaths.matches),
         ),
-        const SizedBox(height: 10),
         const _LeagueDigest(),
       ],
     );
@@ -2594,144 +2757,6 @@ class _GroupTeamCell extends StatelessWidget {
             fontSize: 9,
             fontWeight: FontWeight.w700,
             color: row.played > 0 ? AppColors.gold : AppColors.muted2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WC HOST VENUES — 3 host countries
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Static host-cities strip — USA / Mexico / Canada with venue counts.
-class _WcHostVenues extends StatelessWidget {
-  const _WcHostVenues();
-
-  static const _hosts = [
-    _HostCountry(
-      flag: '🇺🇸',
-      name: 'United States',
-      venues: 11,
-      cities: 'New York, LA, Dallas, Miami, Seattle …',
-    ),
-    _HostCountry(
-      flag: '🇲🇽',
-      name: 'Mexico',
-      venues: 3,
-      cities: 'Mexico City, Monterrey, Guadalajara',
-    ),
-    _HostCountry(
-      flag: '🇨🇦',
-      name: 'Canada',
-      venues: 2,
-      cities: 'Toronto, Vancouver',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.borderSoft),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Column(
-          children: [
-            for (var i = 0; i < _hosts.length; i++) ...[
-              if (i > 0) ...[
-                const SizedBox(height: 8),
-                Container(height: 1, color: AppColors.borderSoft),
-                const SizedBox(height: 8),
-              ],
-              _HostRow(host: _hosts[i]),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HostCountry {
-  const _HostCountry({
-    required this.flag,
-    required this.name,
-    required this.venues,
-    required this.cities,
-  });
-  final String flag;
-  final String name;
-  final int venues;
-  final String cities;
-}
-
-class _HostRow extends StatelessWidget {
-  const _HostRow({required this.host});
-  final _HostCountry host;
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(host.flag, style: const TextStyle(fontSize: 26)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    host.name,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.fg,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(99),
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      '${host.venues} ${host.venues == 1 ? 'venue' : 'venues'}',
-                      style: const TextStyle(
-                        fontFamily: 'JetBrainsMono',
-                        fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.gold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                host.cities,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11.5,
-                  color: AppColors.muted,
-                  height: 1.3,
-                ),
-              ),
-            ],
           ),
         ),
       ],
