@@ -28,7 +28,16 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
       DateTime(now.year, now.month, now.day + i),
   ];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
-  final all = results.expand((e) => e).toList();
+  // Backend's per-day query slots a match into its UTC date; that means
+  // a 22:00-local-time kickoff falls into "today" and "tomorrow" buckets
+  // in different timezones, so the same match can come back twice across
+  // adjacent day queries. Dedupe by match id before slotting into recent/
+  // upcoming so we never render the same fixture twice on home.
+  final dedup = <String, MatchDto>{};
+  for (final m in results.expand((e) => e)) {
+    dedup.putIfAbsent(m.id, () => m);
+  }
+  final all = dedup.values.toList();
 
   final upcoming = all
       .where((m) =>

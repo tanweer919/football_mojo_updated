@@ -259,7 +259,9 @@ class ChottuLinkService {
     required String shareText,
     String? imagePath,
   }) async {
-    final files = imagePath != null ? [XFile(imagePath)] : <XFile>[];
+    // share_plus rejects `files: []` outright (ArgumentError) — pass null
+    // when we have no attachment, a single-item list otherwise.
+    final List<XFile>? files = imagePath != null ? [XFile(imagePath)] : null;
     final parameters = CLDynamicLinkParameters(
       link: Uri.parse(deepLink),
       domain: _domain,

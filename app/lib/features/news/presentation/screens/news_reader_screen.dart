@@ -23,7 +23,6 @@ class NewsReaderScreen extends ConsumerStatefulWidget {
 
 class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
   static const _heroMaxHeight = 280.0;
-  static const _heroMinHeight = 0.0;
   // Pixels of WebView scroll over which the hero collapses to compact.
   static const _scrollRange = 220.0;
 
@@ -31,14 +30,24 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
   bool _loading = true;
   NewsArticleDto? _article;
 
-  /// Current WebView scrollY, surfaced by JS injection. Drives the hero
-  /// height interpolation so the hero slides away as the user scrolls.
-  double _scrollY = 0;
+  /// Drives the hero height animation without rebuilding the WebView.
+  /// Previously we called setState on every scroll event, which rebuilt
+  /// the full subtree (including WebViewWidget); during fast scrolls
+  /// that thrashed the WebView and caused juddery/wacky scroll behaviour.
+  /// A ValueNotifier scoped just to the hero animates without touching
+  /// the WebView at all.
+  final ValueNotifier<double> _scrollY = ValueNotifier(0);
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollY.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -47,17 +56,14 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColors.bg);
-    // Channel that the injected JS uses to report scrollY back to us.
-    // The web-view's own scroll surface is opaque to the Flutter scroll
-    // gesture system, so JS injection is the only way to track it
-    // without yanking the article into native rendering.
+    // JS channel — the injected listener reports scrollY back here.
+    // We bridge straight into the ValueNotifier so neither setState nor
+    // the WebView's parent ever rebuilds on scroll.
     controller.addJavaScriptChannel(
       'PitchScroll',
       onMessageReceived: (msg) {
         final y = double.tryParse(msg.message) ?? 0;
-        if (mounted && (y - _scrollY).abs() > 1) {
-          setState(() => _scrollY = y);
-        }
+        if ((y - _scrollY.value).abs() > 1) _scrollY.value = y;
       },
     );
     controller.setNavigationDelegate(
@@ -73,9 +79,7 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
     setState(() {});
   }
 
-  /// Posts scroll Y to the PitchScroll channel using rAF-throttled events
-  /// so we don't spam the bridge. Falls back to document scroll for sites
-  /// that wrap content in an inner scroller.
+  /// Posts scroll Y to the PitchScroll channel using rAF-throttled events.
   static const _scrollListenerJs = '''
     (() => {
       let ticking = false;
@@ -100,10 +104,6 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
   Widget build(BuildContext context) {
     final article = _article;
     final topInset = MediaQuery.viewPaddingOf(context).top;
-    final progress = (_scrollY / _scrollRange).clamp(0.0, 1.0);
-    final heroHeight = _heroMaxHeight +
-        topInset -
-        (_heroMaxHeight - _heroMinHeight) * progress;
     final compactHeight = topInset + kToolbarHeight;
 
     return Scaffold(
@@ -112,15 +112,27 @@ class _NewsReaderScreenState extends ConsumerState<NewsReaderScreen> {
           ? const Center(child: Skeleton(height: 320, width: 280, radius: 20))
           : Column(
               children: [
-                // Hero shrinks as the WebView scrolls. At max collapse it
-                // becomes a thin AppBar-equivalent with back/share controls.
-                _Hero(
-                  article: article,
-                  onBack: () => context.pop(),
-                  onShare: _share,
-                  height: heroHeight.clamp(compactHeight, _heroMaxHeight + topInset),
-                  topInset: topInset,
-                  progress: progress,
+                // Hero shrinks as the WebView scrolls. AnimatedBuilder
+                // scopes the rebuild to JUST the hero — the WebView
+                // stays mounted and uninterrupted while the user scrolls,
+                // so there's no jitter on the article content itself.
+                ValueListenableBuilder<double>(
+                  valueListenable: _scrollY,
+                  builder: (context, y, _) {
+                    final progress = (y / _scrollRange).clamp(0.0, 1.0);
+                    final heroHeight = (_heroMaxHeight +
+                            topInset -
+                            (_heroMaxHeight - 0.0) * progress)
+                        .clamp(compactHeight, _heroMaxHeight + topInset);
+                    return _Hero(
+                      article: article,
+                      onBack: () => context.pop(),
+                      onShare: _share,
+                      height: heroHeight,
+                      topInset: topInset,
+                      progress: progress,
+                    );
+                  },
                 ),
                 if (_controller != null) ...[
                   if (_loading)
@@ -167,8 +179,6 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Title/source fade out as the hero collapses so the compact bar
-    // only shows the controls + a subtle source line.
     final titleOpacity = (1.0 - progress * 1.8).clamp(0.0, 1.0);
     return SizedBox(
       height: height,
@@ -197,8 +207,6 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
-          // Solid bg behind the controls once the hero is mostly collapsed —
-          // keeps the back/share buttons legible against any page header.
           if (progress > 0.85)
             Positioned.fill(
               child: DecoratedBox(
@@ -246,6 +254,8 @@ class _Hero extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Eyebrow(
+                          // Use local timezone — article timestamps come back
+                          // as UTC and need to be presented in the reader's tz.
                           DateFormat('d MMM · h:mm a').format(article.publishedAt.toLocal()),
                           size: 9,
                         ),
