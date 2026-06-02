@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
@@ -205,6 +206,12 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       for (final g in groups)
         for (final s in g.standings) s.team.id: s.team,
     };
+    // Off-screen capture happens in ~2 frames — far too quick for crests
+    // to download. Precache every team crest into the image cache FIRST so
+    // the poster renders them all on the first painted frame (the card
+    // also disables the fade-in). Without this, only already-cached crests
+    // would appear and the rest would be blank.
+    await _precacheCrests(teamsById.values);
     final prediction = _buildPrediction(teamsById);
     try {
       // Tall poster: fixed 1080 width, intrinsic height (the full bracket
@@ -218,6 +225,22 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Warm the image cache for every crest URL so the off-screen poster
+  /// render finds them in memory. Each precache is guarded so a single
+  /// 404 / bad URL can't fail the whole batch, and the batch is bounded
+  /// by a timeout so a slow CDN can't hang the share.
+  Future<void> _precacheCrests(Iterable<WcTeamRef> teams) async {
+    final urls = <String>{
+      for (final t in teams)
+        if (t.crestUrl != null && t.crestUrl!.isNotEmpty) t.crestUrl!,
+    };
+    if (urls.isEmpty || !mounted) return;
+    await Future.wait(
+      urls.map((u) => precacheImage(CachedNetworkImageProvider(u), context)
+          .catchError((_) {})),
+    ).timeout(const Duration(seconds: 6), onTimeout: () => const []);
   }
 
   WcTeamRef? _championOf(List<WcGroup>? groups) {

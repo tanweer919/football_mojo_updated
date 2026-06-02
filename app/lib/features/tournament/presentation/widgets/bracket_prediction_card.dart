@@ -304,7 +304,7 @@ class _ChampionBanner extends StatelessWidget {
             height: 60,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(9),
-              child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+              child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain, fadeInDuration: Duration.zero),
             ),
           ),
           const SizedBox(width: 16),
@@ -448,7 +448,7 @@ class _GroupTeamRow extends StatelessWidget {
             height: 16,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(3),
-              child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+              child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain, fadeInDuration: Duration.zero),
             ),
           ),
           const SizedBox(width: 6),
@@ -497,7 +497,7 @@ class _ThirdsWrap extends StatelessWidget {
                   height: 18,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(3),
-                    child: PremiumImage(url: t.crestUrl, fit: BoxFit.contain),
+                    child: PremiumImage(url: t.crestUrl, fit: BoxFit.contain, fadeInDuration: Duration.zero),
                   ),
                 ),
                 const SizedBox(width: 7),
@@ -618,7 +618,7 @@ class _TieTeamLine extends StatelessWidget {
           height: crestSize,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: PremiumImage(url: team!.crestUrl, fit: BoxFit.contain),
+            child: PremiumImage(url: team!.crestUrl, fit: BoxFit.contain, fadeInDuration: Duration.zero),
           ),
         ),
         const SizedBox(width: 8),
