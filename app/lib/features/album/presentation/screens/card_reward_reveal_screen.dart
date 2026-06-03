@@ -31,6 +31,10 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
     with TickerProviderStateMixin {
   late final AnimationController _master;
   late final AnimationController _idle;
+  /// Back / swipe-back is blocked until the reveal animation finishes, so the
+  /// card can't be dismissed mid-flight. The CTAs (which pop explicitly) only
+  /// appear once it's done anyway.
+  bool _revealed = false;
 
   @override
   void initState() {
@@ -38,7 +42,10 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
     _master = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700))..forward();
     _idle = AnimationController(vsync: this, duration: const Duration(seconds: 4));
     _master.addStatusListener((s) {
-      if (s == AnimationStatus.completed && mounted) _idle.repeat();
+      if (s == AnimationStatus.completed && mounted) {
+        _idle.repeat();
+        setState(() => _revealed = true);
+      }
     });
   }
 
@@ -72,7 +79,9 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
   @override
   Widget build(BuildContext context) {
     final t = widget.card.template;
-    return Scaffold(
+    return PopScope(
+      canPop: _revealed,
+      child: Scaffold(
       backgroundColor: AppColors.bgDeep,
       body: AnimatedBuilder(
         animation: Listenable.merge([_master, _idle]),
@@ -189,6 +198,7 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
             ],
           );
         },
+      ),
       ),
     );
   }
