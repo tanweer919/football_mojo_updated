@@ -66,11 +66,25 @@ class WalletScreen extends ConsumerWidget {
             const SizedBox(height: 10),
             _EarnRules(catalog: catalog),
             const SizedBox(height: 18),
-            Text('Store',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
+            Row(
+              children: [
+                Text('Store',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => context.push(RoutePaths.shop),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Open shop'),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             _Store(
               onPurchased: () {
@@ -213,15 +227,33 @@ class _SpendCatalog extends StatelessWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('$e'),
       data: (c) {
+        final theme = Theme.of(context);
         return Column(
           children: [
-            for (final entry in c.packs.entries)
-              _RuleRow(
-                icon: Icons.inventory_2_outlined,
-                label: '${_titleCase(entry.key)} card pack',
-                amount: entry.value,
-                debit: true,
+            // Cards are bought in the shop as transparent bundles + singles
+            // (no random "packs"), so this links out rather than listing
+            // price rows for a mechanic that doesn't exist.
+            InkWell(
+              onTap: () => context.push(RoutePaths.shop),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.storefront_outlined, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Card bundles & singles',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ),
+                    Text('Shop',
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
+                    Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.primary),
+                  ],
+                ),
               ),
+            ),
             _RuleRow(
               icon: Icons.palette_outlined,
               label: 'Profile flair',
@@ -239,9 +271,6 @@ class _SpendCatalog extends StatelessWidget {
       },
     );
   }
-
-  static String _titleCase(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
 class _Store extends ConsumerWidget {
