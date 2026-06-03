@@ -134,9 +134,13 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
       },
       onDismissed: () {
         // Reward is handled in onReward (fires first). If they closed early
-        // without earning, just release the button.
-        if (!mounted) return;
-        if (!earned) setState(() => _busy = false);
+        // without earning, release the button AND tell them why no card
+        // appeared — a silent no-op reads as "broken". Rewarded ads are
+        // always user-dismissible (AdMob policy); we can't prevent the close,
+        // so we make the outcome clear instead.
+        if (!mounted || earned) return;
+        setState(() => _busy = false);
+        _toast('No card — the ad needs to finish playing. Try again anytime.');
       },
     );
   }

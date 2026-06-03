@@ -31,10 +31,6 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
     with TickerProviderStateMixin {
   late final AnimationController _master;
   late final AnimationController _idle;
-  /// Back / swipe-back is blocked until the reveal animation finishes, so the
-  /// card can't be dismissed mid-flight. The CTAs (which pop explicitly) only
-  /// appear once it's done anyway.
-  bool _revealed = false;
 
   @override
   void initState() {
@@ -42,10 +38,7 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
     _master = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700))..forward();
     _idle = AnimationController(vsync: this, duration: const Duration(seconds: 4));
     _master.addStatusListener((s) {
-      if (s == AnimationStatus.completed && mounted) {
-        _idle.repeat();
-        setState(() => _revealed = true);
-      }
+      if (s == AnimationStatus.completed && mounted) _idle.repeat();
     });
   }
 
@@ -79,9 +72,7 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
   @override
   Widget build(BuildContext context) {
     final t = widget.card.template;
-    return PopScope(
-      canPop: _revealed,
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.bgDeep,
       body: AnimatedBuilder(
         animation: Listenable.merge([_master, _idle]),
@@ -195,10 +186,21 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
                   ),
                 ),
               ),
+              // Always-available exit — top-right close. Visible from the very
+              // first frame so the reveal can be dismissed at any time (even
+              // mid-animation); the user is never trapped waiting it out.
+              Positioned(
+                top: MediaQuery.viewPaddingOf(context).top + 6,
+                right: 6,
+                child: IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 24),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
             ],
           );
         },
-      ),
       ),
     );
   }
