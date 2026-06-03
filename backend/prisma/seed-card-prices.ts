@@ -16,14 +16,33 @@
  * Prices are intentionally a touch high vs the gem earn-rate so the FREE
  * rewarded-ad card stays worthwhile — gems buy the SPECIFIC card you want.
  *
- * Run AFTER `seed:cards`:  `npm run seed:prices`
+ * Run AFTER `seed:cards`:
+ *   npm run seed:prices
+ *   docker compose exec api npm run seed:prices
+ *
+ * Self-contained — does NOT import from `src/`. The runtime container only
+ * ships `dist/`, so a `from '../src/...'` import fails with MODULE_NOT_FOUND
+ * there. The price table below is duplicated from
+ * `src/modules/cards/cards.pricing.ts` — keep the two in sync (both short,
+ * rarely change).
  */
 
 import { CardRarity, PrismaClient } from '@prisma/client';
 import 'dotenv/config';
-import { CARD_GEM_PRICES, BUNDLE_DISCOUNT } from '../src/modules/cards/cards.pricing';
 
 const prisma = new PrismaClient();
+
+// Mirrors CARD_GEM_PRICES + BUNDLE_DISCOUNT in src/modules/cards/cards.pricing.ts.
+// Keep in sync — Docker container doesn't ship src/, so we duplicate.
+const CARD_GEM_PRICES: Record<CardRarity, number | null> = {
+  COMMON: 60,
+  UNCOMMON: 120,
+  RARE: 250,
+  EPIC: 500,
+  LEGENDARY: 1000,
+  ICONIC: null,
+};
+const BUNDLE_DISCOUNT = 0.85;
 
 // Rarities we sell singly + bundle. ICONIC excluded (null price → premium).
 const SELLABLE: CardRarity[] = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'];
