@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/ads/admob_service.dart';
 import '../../../../core/config/remote_app_config.dart';
+import '../../../../core/network/api_error.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../iap/data/iap_service.dart';
@@ -159,11 +160,16 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      final msg = '$e';
-      if (msg.contains('daily_cap')) {
+      // Read the backend error CODE from the response body — DioException
+      // .toString() omits it, which is why every failure used to collapse to
+      // the generic "could not grant" message.
+      final code = apiErrorCode(e);
+      if (code.contains('daily_cap')) {
         _toast("That's all the free cards for today — come back tomorrow!");
-      } else if (msg.contains('album_complete')) {
+      } else if (code.contains('album_complete')) {
         _toast('You already own every card in this tier — nice!');
+      } else if (code.contains('drop')) {
+        _toast('That card drop is closed right now. Try again later.');
       } else {
         _toast('Could not grant your card. Please try again.');
       }

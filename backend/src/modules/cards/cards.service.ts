@@ -325,6 +325,11 @@ export class CardsService {
         WHERE t.rarity = ${rarity}::"CardRarity"
           AND t."artUrl" <> ''
           AND t."mintedCount" < t."totalSupply"
+          -- Only cards we can actually mint right now: respect the drop window,
+          -- else minting.award throws drop_closed/drop_not_open_yet (a 400 that
+          -- looked like "reward failed"). Stage-locked editions have windows.
+          AND (t."dropOpensAt" IS NULL OR t."dropOpensAt" <= NOW())
+          AND (t."dropClosesAt" IS NULL OR t."dropClosesAt" > NOW())
           AND NOT EXISTS (
             SELECT 1 FROM "OwnedCard" o
             WHERE o."templateId" = t.id AND o."ownerId" = ${userId}
