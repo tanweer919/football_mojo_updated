@@ -12,6 +12,7 @@ class RoutePaths {
   static const news        = '/news';
   static const album       = '/album';
   static const market      = '/market';
+  static const shop        = '/shop';       // gem shop: bundles + single cards
   static const profile     = '/profile';
 
   // Detail

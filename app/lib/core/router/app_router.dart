@@ -23,6 +23,7 @@ import '../../features/h2h/presentation/screens/h2h_screen.dart';
 import '../../features/home/presentation/screens/home_dashboard_screen.dart';
 import '../../features/home/presentation/screens/home_shell.dart';
 import '../../features/market/presentation/screens/cards_market_screen.dart';
+import '../../features/market/presentation/screens/gem_shop_screen.dart';
 import '../../features/market/presentation/screens/market_template_detail_screen.dart';
 import '../../features/matches/presentation/screens/match_detail_screen.dart';
 import '../../features/matches/presentation/screens/matches_screen.dart';
@@ -91,6 +92,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.marketCard,
         builder: (_, s) => MarketTemplateDetailScreen(templateId: s.pathParameters['templateId']!),
       ),
+      GoRoute(path: RoutePaths.shop,        builder: (_, __) => const GemShopScreen()),
       GoRoute(path: RoutePaths.profile,     builder: (_, __) => const ProfileScreen()),
       GoRoute(path: RoutePaths.settings,    builder: (_, __) => const SettingsScreen()),
       GoRoute(

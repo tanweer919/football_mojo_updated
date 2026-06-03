@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
@@ -135,6 +136,10 @@ class _CardsMarketScreenState extends ConsumerState<CardsMarketScreen> {
               _applyFilters(const MarketFilters());
             },
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: _ShopBanner(onTap: () => context.push(RoutePaths.shop)),
+          ),
           Expanded(
             child: RefreshIndicator(
               color: AppColors.gold,
@@ -174,6 +179,50 @@ class _CardsMarketScreenState extends ConsumerState<CardsMarketScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Gem-shop banner ──────────────────────────────────────────────────────
+
+class _ShopBanner extends StatelessWidget {
+  const _ShopBanner({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.goldHairline),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF241B12), Color(0xFF15100B)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.diamond_outlined, size: 18, color: AppColors.gold),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Spend your gems',
+                      style: TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.fg)),
+                  const SizedBox(height: 1),
+                  Text('Bundles & single cards — no mystery packs',
+                      style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppColors.muted.withValues(alpha: 0.95))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.gold),
+          ],
+        ),
       ),
     );
   }
