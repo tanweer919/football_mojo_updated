@@ -42,6 +42,16 @@
             <meta-data
                 android:name="io.flutter.embedding.android.SplashScreenDrawable"
                 android:resource="@drawable/launch_background"/>
+            <!-- Deep links are owned by the ChottuLink SDK, not Flutter's
+                 built-in router. Without this, Flutter intercepts the raw
+                 incoming URL (e.g. https://footballmojo.chottu.link/LStOKI)
+                 and GoRouter tries to navigate to "/LStOKI" → "Route not
+                 found". Disabling it lets the ChottuLink native SDK resolve
+                 the short link and emit the real deep link via onLinkReceived,
+                 which we map to the correct route in parseDeepLink. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false"/>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

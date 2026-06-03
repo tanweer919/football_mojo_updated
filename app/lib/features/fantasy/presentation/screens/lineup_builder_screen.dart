@@ -20,6 +20,7 @@ import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/share/share_service.dart';
 import '../providers/fantasy_providers.dart';
 import '../providers/live_scoring_provider.dart';
+import '../widgets/card_boost_badge.dart';
 import '../widgets/lineup_share_card.dart';
 import 'player_picker_sheet.dart';
 
@@ -167,6 +168,8 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
     final players = ref.watch(selectablePlayersProvider(widget.slug));
     final mine = ref.watch(myLineupProvider((slug: widget.slug, gameweekId: widget.gameweekId)));
     final gw = ref.watch(currentGameweekProvider(widget.slug));
+    final boosts =
+        ref.watch(ownedCardBoostsProvider).valueOrNull ?? const <String, CardBoost>{};
     // Activate the live-polling stream — refreshes lineup + leaderboard every
     // 30s while any match is LIVE. We don't display the badge here directly
     // because the topbar is custom; the data refresh is what matters.
@@ -202,6 +205,21 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
                   .where((s) => _picks[s] != null).length;
               final canSave = filled == 5 && !isOver;
 
+              // Projected GW points = each starter's recent-form average,
+              // scaled by captain (×2) and any owned-card boost. A pre-kickoff
+              // estimate so the user can see the payoff of captaincy + cards.
+              double projected = 0;
+              for (final slot in [_Slot.gk, _Slot.def, _Slot.mid, _Slot.utl, _Slot.fwd]) {
+                final id = _picks[slot];
+                if (id == null) continue;
+                final v = byId[id];
+                if (v == null) continue;
+                final mul = (slot == _captain ? 2.0 : 1.0) * (boosts[id]?.multiplier ?? 1.0);
+                projected += v.recentForm * mul;
+              }
+              final hasCardBoost = [_Slot.gk, _Slot.def, _Slot.mid, _Slot.utl, _Slot.fwd]
+                  .any((s) => _picks[s] != null && boosts[_picks[s]] != null);
+
               return Column(
                 children: [
                   _Topbar(
@@ -227,7 +245,15 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _StatusStrip(remaining: _untilLock, spent: spent, cap: cap, isOver: isOver, filled: filled),
+                          child: _StatusStrip(
+                            remaining: _untilLock,
+                            spent: spent,
+                            cap: cap,
+                            isOver: isOver,
+                            filled: filled,
+                            projected: projected,
+                            hasCardBoost: hasCardBoost,
+                          ),
                         ),
                         const SizedBox(height: 14),
                         Padding(
@@ -236,6 +262,7 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
                             picks: _picks,
                             byId: byId,
                             captain: _captain,
+                            boosts: boosts,
                             onSlotTap: (slot) => _openPicker(slot, byId, remaining),
                             onCaptainTap: (slot) => setState(() => _captain = slot),
                           ),
@@ -252,7 +279,8 @@ class _LineupBuilderScreenState extends ConsumerState<LineupBuilderScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
-                            'Tap a player to swap. Tap the captain badge to set captain (×2 points).',
+                            'Tap a player to swap. Tap the captain badge to set captain (×2 points). '
+                            'Own a player’s card? It boosts their points automatically — look for the ✦ badge.',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11,
@@ -471,12 +499,16 @@ class _StatusStrip extends StatelessWidget {
     required this.cap,
     required this.isOver,
     required this.filled,
+    required this.projected,
+    required this.hasCardBoost,
   });
   final Duration remaining;
   final double spent;
   final double cap;
   final bool isOver;
   final int filled;
+  final double projected;
+  final bool hasCardBoost;
 
   @override
   Widget build(BuildContext context) {
@@ -618,6 +650,44 @@ class _StatusStrip extends StatelessWidget {
               ],
             ),
           ),
+          // Projected points — recent-form estimate, captain ×2 and owned-card
+          // boosts folded in. Only meaningful once at least one slot is filled.
+          if (filled > 0) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.insights_outlined, size: 14, color: AppColors.pitch),
+                const SizedBox(width: 6),
+                const Eyebrow('Projected', size: 10),
+                const Spacer(),
+                if (hasCardBoost) ...[
+                  const Icon(Icons.auto_awesome, size: 11, color: AppColors.gold),
+                  const SizedBox(width: 3),
+                  const Text(
+                    'card boost',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  '${projected.toStringAsFixed(1)} pts',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.pitch,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -631,12 +701,14 @@ class _Pitch extends StatelessWidget {
     required this.picks,
     required this.byId,
     required this.captain,
+    required this.boosts,
     required this.onSlotTap,
     required this.onCaptainTap,
   });
   final Map<_Slot, String?> picks;
   final Map<String, PlayerValuationDto> byId;
   final _Slot captain;
+  final Map<String, CardBoost> boosts;
   final ValueChanged<_Slot> onSlotTap;
   final ValueChanged<_Slot> onCaptainTap;
   @override
@@ -679,6 +751,7 @@ class _Pitch extends StatelessWidget {
         slot: slot,
         player: p,
         captain: captain == slot && p != null,
+        boost: id == null ? null : boosts[id],
         onTap: () => onSlotTap(slot),
         onCaptainTap: () {
           if (p != null) onCaptainTap(slot);
@@ -731,12 +804,14 @@ class _Chip extends StatelessWidget {
     required this.slot,
     required this.player,
     required this.captain,
+    required this.boost,
     required this.onTap,
     required this.onCaptainTap,
   });
   final _Slot slot;
   final PlayerValuationDto? player;
   final bool captain;
+  final CardBoost? boost;
   final VoidCallback onTap;
   final VoidCallback onCaptainTap;
   @override
@@ -778,6 +853,11 @@ class _Chip extends StatelessWidget {
                   ),
                   child: _emptyContent(),
                 ),
+              ),
+            if (filled && boost != null)
+              Positioned(
+                top: -6, left: -6,
+                child: CardBoostBadge(boost: boost!, compact: true),
               ),
             if (filled)
               Positioned(

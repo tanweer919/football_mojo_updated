@@ -25,6 +25,14 @@ final myLineupProvider = FutureProvider.family<FantasyLineupDto?, ({String slug,
   return ref.read(fantasyRepositoryProvider).myLineup(args.slug, args.gameweekId);
 });
 
+/// Owned-card fantasy boosts (playerId → [CardBoost]) for the signed-in user.
+/// Drives the "+X% · RARITY" badge in the player picker + lineup builder so a
+/// user can see which of their cards lift a player's projected points. Empty
+/// for anonymous users or those with no cards.
+final ownedCardBoostsProvider = FutureProvider<Map<String, CardBoost>>((ref) {
+  return ref.read(fantasyRepositoryProvider).ownedCardMultipliers();
+});
+
 final leaderboardProvider = FutureProvider.family<List<LeaderboardEntry>, ({String slug, String gameweekId})>((ref, args) {
   return ref.read(fantasyRepositoryProvider).leaderboard(args.slug, args.gameweekId);
 });

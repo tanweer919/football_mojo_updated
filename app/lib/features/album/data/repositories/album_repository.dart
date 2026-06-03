@@ -61,6 +61,120 @@ class AlbumRepository {
     );
     return OwnedCardDto.fromJson(res.data!);
   }
+
+  /// Transparent bundles ("packs" with known contents) for sale with gems.
+  Future<List<CardBundleDto>> listBundles() async {
+    try {
+      final res = await _dio.get<List<dynamic>>('/v1/cards/bundles');
+      return (res.data ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(CardBundleDto.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      // Anonymous users get an empty shelf rather than an error wall.
+      if (e.response?.statusCode == 401) return const <CardBundleDto>[];
+      rethrow;
+    }
+  }
+
+  /// Buy a bundle with gems. Server debits once + mints every member card
+  /// atomically, returning the freshly-minted cards for the reveal.
+  Future<List<OwnedCardDto>> purchaseBundle(String bundleId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/v1/cards/bundles/$bundleId/purchase',
+    );
+    final cards = (res.data?['cards'] as List?) ?? const [];
+    return cards
+        .cast<Map<String, dynamic>>()
+        .map(OwnedCardDto.fromJson)
+        .toList(growable: false);
+  }
+}
+
+/// One member card inside a [CardBundleDto] — enough to render its tile in
+/// the transparent "here's exactly what you get" list.
+class BundleCardDto {
+  BundleCardDto({
+    required this.templateId,
+    required this.rarity,
+    required this.artUrl,
+    this.playerName,
+    this.teamName,
+    this.teamCrestUrl,
+    this.singlePrice,
+    this.ownedByMe = false,
+    this.soldOut = false,
+  });
+  factory BundleCardDto.fromJson(Map<String, dynamic> j) => BundleCardDto(
+        templateId: j['templateId'] as String,
+        rarity: CardRarity.values.firstWhere(
+          (r) => r.name == (j['rarity'] as String?),
+          orElse: () => CardRarity.COMMON,
+        ),
+        artUrl: j['artUrl'] as String? ?? '',
+        playerName: j['playerName'] as String?,
+        teamName: j['teamName'] as String?,
+        teamCrestUrl: j['teamCrestUrl'] as String?,
+        singlePrice: (j['singlePrice'] as num?)?.toInt(),
+        ownedByMe: j['ownedByMe'] as bool? ?? false,
+        soldOut: j['soldOut'] as bool? ?? false,
+      );
+  final String templateId;
+  final CardRarity rarity;
+  final String artUrl;
+  final String? playerName;
+  final String? teamName;
+  final String? teamCrestUrl;
+  final int? singlePrice;
+  final bool ownedByMe;
+  final bool soldOut;
+}
+
+/// A transparent bundle: a fixed list of cards for a fixed gem price, with
+/// the "save vs buying singly" delta. No randomness — the buyer sees [cards]
+/// before paying.
+class CardBundleDto {
+  CardBundleDto({
+    required this.id,
+    required this.name,
+    required this.gemPrice,
+    required this.cards,
+    this.description,
+    this.artUrl,
+    this.singleTotal = 0,
+    this.saving = 0,
+    this.soldOut = false,
+    this.dropClosesAt,
+  });
+  factory CardBundleDto.fromJson(Map<String, dynamic> j) => CardBundleDto(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        description: j['description'] as String?,
+        gemPrice: (j['gemPrice'] as num).toInt(),
+        artUrl: j['artUrl'] as String?,
+        cards: ((j['cards'] as List?) ?? const [])
+            .cast<Map<String, dynamic>>()
+            .map(BundleCardDto.fromJson)
+            .toList(growable: false),
+        singleTotal: (j['singleTotal'] as num?)?.toInt() ?? 0,
+        saving: (j['saving'] as num?)?.toInt() ?? 0,
+        soldOut: j['soldOut'] as bool? ?? false,
+        dropClosesAt: j['dropClosesAt'] == null
+            ? null
+            : DateTime.parse(j['dropClosesAt'] as String),
+      );
+  final String id;
+  final String name;
+  final String? description;
+  final int gemPrice;
+  final String? artUrl;
+  final List<BundleCardDto> cards;
+  final int singleTotal;
+  final int saving;
+  final bool soldOut;
+  final DateTime? dropClosesAt;
+
+  int get cardCount => cards.length;
 }
 
 /// Minimal DTO for the store listing — separate from `CardTemplateDto`
@@ -125,4 +239,8 @@ final albumProvider = FutureProvider<List<AlbumSetDto>>((ref) async {
 
 final storeFeaturedProvider = FutureProvider<List<StoreTemplate>>(
   (ref) => ref.read(albumRepositoryProvider).featuredForSale(),
+);
+
+final cardBundlesProvider = FutureProvider<List<CardBundleDto>>(
+  (ref) => ref.read(albumRepositoryProvider).listBundles(),
 );

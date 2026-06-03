@@ -88,6 +88,17 @@ export class CardsController {
     return this.cards.featuredForSale();
   }
 
+  // ─── Transparent bundles ("packs" with known contents) ───
+  @Get('bundles')
+  bundles(@CurrentUser('uid') uid: string) {
+    return this.cards.listBundles(uid);
+  }
+
+  @Post('bundles/:id/purchase')
+  purchaseBundle(@CurrentUser('uid') uid: string, @Param('id') id: string) {
+    return this.cards.purchaseBundle(uid, id);
+  }
+
   @Post('sets/:setId/check-completion')
   checkSet(@CurrentUser('uid') uid: string, @Param('setId') setId: string) {
     return this.cards.checkSetCompletion(uid, setId);

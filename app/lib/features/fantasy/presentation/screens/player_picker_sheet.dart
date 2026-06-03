@@ -8,7 +8,9 @@ import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../data/models/fantasy_models.dart';
+import '../../data/repositories/fantasy_repository.dart' show CardBoost;
 import '../providers/fantasy_providers.dart';
+import '../widgets/card_boost_badge.dart';
 
 /// Player picker — opens as a modal bottom sheet on top of the lineup
 /// builder. Restricted to:
@@ -71,6 +73,8 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(selectablePlayersProvider(widget.slug));
+    final boosts =
+        ref.watch(ownedCardBoostsProvider).valueOrNull ?? const <String, CardBoost>{};
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
@@ -125,6 +129,7 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
                     return _PlayerRow(
                       v: v,
                       affordable: affordable,
+                      boost: boosts[v.playerId],
                       onTap: affordable ? () => Navigator.of(context).pop(v.playerId) : null,
                       onTeamTap: () => setState(() => _teamFilter = v.player.team.name),
                     );
@@ -506,11 +511,13 @@ class _PlayerRow extends StatelessWidget {
   const _PlayerRow({
     required this.v,
     required this.affordable,
+    required this.boost,
     required this.onTap,
     required this.onTeamTap,
   });
   final PlayerValuationDto v;
   final bool affordable;
+  final CardBoost? boost;
   final VoidCallback? onTap;
   final VoidCallback onTeamTap;
 
@@ -616,6 +623,15 @@ class _PlayerRow extends StatelessWidget {
                           ),
                         ],
                       ),
+                      // Owned-card boost — shows the passive multiplier this
+                      // player carries because the user owns their card.
+                      if (boost != null) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: CardBoostBadge(boost: boost!),
+                        ),
+                      ],
                       // Season stat pills — only shown when we have data
                       // (avoids empty noise on freshly seeded squads).
                       if (v.seasonAppearances > 0) ...[

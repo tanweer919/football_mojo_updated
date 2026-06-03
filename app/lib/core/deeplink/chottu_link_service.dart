@@ -41,14 +41,41 @@ class ChottuLinkService {
   /// Subscribe to incoming deep links. Typically called once during
   /// app bootstrap (e.g. inside the root widget's `initState`).
   ///
-  /// [onLink] receives the **full deep-link URL** (e.g.
-  /// `https://footballmojo.in/news?id=abc123`). Use [parseDeepLink] to
-  /// extract the route + params and push via GoRouter.
+  /// [onLink] receives a **destination URL** that [parseDeepLink] can map
+  /// (e.g. `https://footballmojo.in/news?id=abc123`).
+  ///
+  /// The SDK's stream often hands us the SHORT link instead
+  /// (`https://footballmojo.chottu.link/LStOKI`) whose path is just an
+  /// opaque code — `parseDeepLink` can't route that. When the received URL
+  /// doesn't map to a known route, we resolve it to its real destination
+  /// via [ChottuLink.getAppLinkDataFromUrl] and forward THAT.
   void listenForLinks(void Function(String link) onLink) {
     ChottuLink.onLinkReceived.listen((String link) {
       debugPrint('✅ ChottuLink received: $link');
-      onLink(link);
+      _forwardResolved(link, onLink);
     });
+  }
+
+  void _forwardResolved(String url, void Function(String link) onLink) {
+    // Already a routable destination (e.g. footballmojo.in/bracket) → use it.
+    if (parseDeepLink(url) != null) {
+      onLink(url);
+      return;
+    }
+    // Otherwise it's a short link — resolve it to its destination first.
+    try {
+      ChottuLink.getAppLinkDataFromUrl(
+        shortUrl: url,
+        onSuccess: (resolved) {
+          final dest = resolved.link ?? resolved.shortLinkRaw;
+          debugPrint('✅ ChottuLink resolved: $dest');
+          if (dest != null && parseDeepLink(dest) != null) onLink(dest);
+        },
+        onError: (e) => debugPrint('❌ ChottuLink resolve failed: ${e.description}'),
+      );
+    } catch (e) {
+      debugPrint('❌ ChottuLink resolve threw: $e');
+    }
   }
 
   // ── Deep-link parsing ────────────────────────────────────────────────

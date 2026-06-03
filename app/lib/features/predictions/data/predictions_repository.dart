@@ -138,6 +138,10 @@ class BracketDto {
       );
 
   // ─── Typed read helpers ────────────────────────────────────────────────
+  // Picks shape (must match the bracket screen + backend):
+  //   GROUP_<letter>_<pos>  → teamId String   (12 × 4 = 48)
+  //   BEST_THIRDS           → List<letter>     (up to 8)
+  //   MATCH_<n>_WINNER      → teamId String    (R32..Final = 32, incl. bronze)
   String? slotPick(String key) {
     final v = picks[key];
     return v is String ? v : null;
@@ -147,15 +151,23 @@ class BracketDto {
     if (v is List) return v.whereType<String>().toList(growable: false);
     return const [];
   }
-  String? get championId => slotPick('CHAMPION');
-  int get groupPickCount => picks.keys.where((k) => k.startsWith('GROUP_')).length;
-  int get knockoutPickCount =>
-      reachPicks('REACH_R16').length +
-      reachPicks('REACH_QF').length +
-      reachPicks('REACH_SF').length +
-      reachPicks('REACH_FINAL').length;
-  int get totalPickCount =>
-      groupPickCount + knockoutPickCount + (championId != null ? 1 : 0);
+
+  /// Champion = winner of the final (match 104).
+  String? get championId => slotPick('MATCH_104_WINNER');
+
+  /// Filled group-position picks (GROUP_<L>_<pos> with a teamId).
+  int get groupPickCount =>
+      picks.keys.where((k) => k.startsWith('GROUP_') && picks[k] is String).length;
+
+  /// Selected best-third group letters (BEST_THIRDS list).
+  int get bestThirdsCount => reachPicks('BEST_THIRDS').length;
+
+  /// Filled knockout match winners (MATCH_<n>_WINNER with a teamId).
+  int get knockoutPickCount => picks.keys
+      .where((k) => k.startsWith('MATCH_') && k.endsWith('_WINNER') && picks[k] is String)
+      .length;
+
+  int get totalPickCount => groupPickCount + bestThirdsCount + knockoutPickCount;
 }
 
 class BracketLeaderRow {

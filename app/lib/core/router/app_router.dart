@@ -23,6 +23,7 @@ import '../../features/h2h/presentation/screens/h2h_screen.dart';
 import '../../features/home/presentation/screens/home_dashboard_screen.dart';
 import '../../features/home/presentation/screens/home_shell.dart';
 import '../../features/market/presentation/screens/cards_market_screen.dart';
+import '../../features/market/presentation/screens/gem_shop_screen.dart';
 import '../../features/market/presentation/screens/market_template_detail_screen.dart';
 import '../../features/matches/presentation/screens/match_detail_screen.dart';
 import '../../features/matches/presentation/screens/matches_screen.dart';
@@ -91,6 +92,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.marketCard,
         builder: (_, s) => MarketTemplateDetailScreen(templateId: s.pathParameters['templateId']!),
       ),
+      GoRoute(path: RoutePaths.shop,        builder: (_, __) => const GemShopScreen()),
       GoRoute(path: RoutePaths.profile,     builder: (_, __) => const ProfileScreen()),
       GoRoute(path: RoutePaths.settings,    builder: (_, __) => const SettingsScreen()),
       GoRoute(
@@ -183,9 +185,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => PlayerProfileScreen(playerId: s.pathParameters['id']!),
       ),
     ],
-    errorBuilder: (_, state) => Scaffold(
-      body: Center(child: Text('Route not found: ${state.matchedLocation}')),
-    ),
+    // Unknown route (e.g. a stray external link the SDKs didn't resolve) —
+    // bounce to home on the next frame instead of dead-ending on an error
+    // screen. Shows a brief spinner during the redirect.
+    errorBuilder: (ctx, state) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (ctx.mounted) ctx.go(RoutePaths.home);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    },
   );
 });
 
