@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/network/dio_provider.dart';
 import '../models/fantasy_models.dart';
 import '../models/league_models.dart';
@@ -97,6 +98,7 @@ class FantasyRepository {
         'captainId': captainId,
       },
     );
+    analyticsService.logFantasySubmit(contestId: '$slug/$gameweekId');
     return FantasyLineupDto.fromJson(res.data!);
   }
 

@@ -279,7 +279,7 @@ class _BuyCardButtonState extends ConsumerState<_BuyCardButton> {
       ref.invalidate(storeFeaturedProvider);
       ref.invalidate(marketTemplateProvider(widget.templateId));
       if (!mounted) return;
-      await Navigator.of(context).push<bool>(
+      await Navigator.of(context, rootNavigator: true).push<bool>(
         MaterialPageRoute(
           fullscreenDialog: true,
           builder: (_) => CardRewardRevealScreen(
