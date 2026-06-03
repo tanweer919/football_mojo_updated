@@ -34,13 +34,17 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
       onBack: () => context.canPop() ? context.pop() : context.go('/home'),
       trailing: CircleIconButton(icon: Icons.swap_horiz, onPressed: () {}),
       scrollable: false,
+      // The inner lists own their bottom inset (below) so content fills
+      // edge-to-edge — otherwise PitchScreen reserves a bottom band that
+      // shows as a dark bar above the floating tab bar.
+      bottomSafeArea: false,
       child: RefreshIndicator(
         onRefresh: () async => ref.invalidate(albumProvider),
         color: AppColors.gold,
         backgroundColor: AppColors.surface3,
         child: album.when(
           loading: () => GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, PitchScreen.bottomInset(context)),
             itemCount: 6,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -86,7 +90,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
 
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
+              padding: EdgeInsets.fromLTRB(0, 8, 0, PitchScreen.bottomInset(context)),
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),

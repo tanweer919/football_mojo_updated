@@ -186,18 +186,6 @@ class _CardRewardRevealScreenState extends State<CardRewardRevealScreen>
                   ),
                 ),
               ),
-              // Always-available exit — top-right close. Visible from the very
-              // first frame so the reveal can be dismissed at any time (even
-              // mid-animation); the user is never trapped waiting it out.
-              Positioned(
-                top: MediaQuery.viewPaddingOf(context).top + 6,
-                right: 6,
-                child: IconButton(
-                  tooltip: 'Close',
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 24),
-                  onPressed: () => Navigator.of(context).pop(false),
-                ),
-              ),
             ],
           );
         },

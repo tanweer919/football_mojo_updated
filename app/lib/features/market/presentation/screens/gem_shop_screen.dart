@@ -182,7 +182,7 @@ class _GemShopScreenState extends ConsumerState<GemShopScreen> {
   Future<void> _revealCards(List<OwnedCardDto> cards) async {
     for (var i = 0; i < cards.length; i++) {
       if (!mounted) return;
-      await Navigator.of(context, rootNavigator: true).push<bool>(
+      await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           fullscreenDialog: true,
           builder: (_) => CardRewardRevealScreen(

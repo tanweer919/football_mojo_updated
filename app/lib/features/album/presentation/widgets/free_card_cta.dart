@@ -134,13 +134,9 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
       },
       onDismissed: () {
         // Reward is handled in onReward (fires first). If they closed early
-        // without earning, release the button AND tell them why no card
-        // appeared — a silent no-op reads as "broken". Rewarded ads are
-        // always user-dismissible (AdMob policy); we can't prevent the close,
-        // so we make the outcome clear instead.
-        if (!mounted || earned) return;
-        setState(() => _busy = false);
-        _toast('No card — the ad needs to finish playing. Try again anytime.');
+        // without earning, just release the button.
+        if (!mounted) return;
+        if (!earned) setState(() => _busy = false);
       },
     );
   }
@@ -156,14 +152,8 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
       if (!mounted) return;
       setState(() => _busy = false);
       // Celebrate with the reward reveal, then optionally open the card.
-      // rootNavigator: true so it covers the tab bar — this CTA lives on
-      // shell screens (wallet/album), whose navigator sits BEHIND the
-      // floating tabbar; a non-root push would leave the tabbar on top.
-      final view = await Navigator.of(context, rootNavigator: true).push<bool>(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => CardRewardRevealScreen(card: card),
-        ),
+      final view = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => CardRewardRevealScreen(card: card)),
       );
       if (view == true && mounted) context.push('/album/${card.id}');
     } catch (e) {
