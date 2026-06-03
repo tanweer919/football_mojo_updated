@@ -3,8 +3,8 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must come AFTER android + kotlin (declarative DSL).
     id "dev.flutter.flutter-gradle-plugin"
+    // google-services stays — required by Firebase Analytics / Messaging / etc.
     id "com.google.gms.google-services"
-    id "com.google.firebase.crashlytics"
 }
 
 def keystoreProperties = new Properties()

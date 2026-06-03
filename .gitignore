@@ -49,3 +49,4 @@ app.*.map.json
 
 # FVM version cache (whether at root or under app/)
 **/.fvm/
+*.env

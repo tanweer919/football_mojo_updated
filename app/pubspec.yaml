@@ -74,7 +74,12 @@ dependencies:
   firebase_remote_config: ^4.2.5
   firebase_messaging: ^14.7.9
   firebase_analytics: ^10.7.4
-  firebase_crashlytics: ^3.4.9
+
+  # Observability — Sentry crash/error reporting.
+  # Crashes are symbolicated out of the box because release builds are NOT
+  # obfuscated (see lib/core/observability/observability_service.dart). DSN is
+  # passed at build time via --dart-define=SENTRY_DSN=...
+  sentry_flutter: ^9.0.0
 
   # Monetization (halal-configured: filtered ad categories in AdMob console)
   google_mobile_ads: ^5.1.0
