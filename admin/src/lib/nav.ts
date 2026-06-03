@@ -29,6 +29,11 @@ export const NAV: NavItem[] = [
     icon: 'M3 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm6-3v16M21 5v11a2 2 0 0 1-2 2',
   },
   {
+    label: 'Packs',
+    href: '/packs',
+    icon: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+  },
+  {
     label: 'Teams',
     href: '/teams',
     icon: 'M12 2 4 6v6c0 4.5 3.4 8.7 8 10 4.6-1.3 8-5.5 8-10V6l-8-4Z',
