@@ -87,11 +87,17 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ref.invalidate(homeFixturesProvider);
         ref.invalidate(newsFeedProvider);
         ref.invalidate(homeNewsProvider);
-        await Future.wait<dynamic>([
-          ref.read(liveMatchesProvider.future),
-          ref.read(homeFixturesProvider.future),
-          ref.read(homeNewsProvider.future),
-        ]);
+        // The invalidates above already trigger a refetch. Awaiting keeps
+        // the spinner up until data lands, but must never hang it — a slow
+        // or unreachable backend would otherwise spin forever. Bound it and
+        // swallow errors so the indicator always dismisses.
+        try {
+          await Future.wait<dynamic>([
+            ref.read(liveMatchesProvider.future),
+            ref.read(homeFixturesProvider.future),
+            ref.read(homeNewsProvider.future),
+          ]).timeout(const Duration(seconds: 10));
+        } catch (_) {/* refetch continues in the background */}
       },
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(

@@ -43,19 +43,26 @@ class _DeferredBootstrap {
     if (_done) return;
     _done = true;
 
+    // CRITICAL: several tasks below register long-lived listeners (FCM taps,
+    // ChottuLink deep links, auth-state changes) whose callbacks fire long
+    // after this method returns — by which point HomeShell's [ref] may be
+    // disposed. Reading a disposed WidgetRef throws ("Cannot use ref after
+    // the widget was disposed"), which silently killed deep-link navigation.
+    // Use the ROOT ProviderContainer instead: it lives for the whole app, so
+    // these callbacks can always read providers.
+    final container = ProviderScope.containerOf(context, listen: false);
+
     // Only spin up AdMob when the remote kill-switch allows it. A slow or
     // failed config fetch defaults to ads-on, so this never silently
     // disables ads on a flaky network.
     Future.microtask(() async {
-      final cfg = await ref.read(remoteAppConfigProvider.future);
+      final cfg = await container.read(remoteAppConfigProvider.future);
       if (cfg.adsEnabled) await AdmobService.initialise();
     });
     Future.microtask(FcmBootstrap.initialise);
-    // Wire push-tap deeplinks to the active GoRouter. Reads the provider
-    // lazily inside the closure so the call site can fire before the
-    // router instance is built.
+    // Wire push-tap deeplinks to the active GoRouter.
     Future.microtask(() => FcmBootstrap.installNotificationTaps(
-          (loc) => ref.read(appRouterProvider).go(loc),
+          (loc) => container.read(appRouterProvider).go(loc),
         ));
     // Register the device's FCM token with the server every time auth
     // state flips to signed-in. Anonymous users skip — push needs a uid.
@@ -64,7 +71,7 @@ class _DeferredBootstrap {
     Future.microtask(() {
       FirebaseAuth.instance.authStateChanges().listen((user) {
         if (user == null) return;
-        FcmBootstrap.ensureRegistered(ref.read(dioProvider), force: true);
+        FcmBootstrap.ensureRegistered(container.read(dioProvider), force: true);
       });
     });
     Future.microtask(() => _initClarity(context));
@@ -77,7 +84,7 @@ class _DeferredBootstrap {
       ChottuLinkService.instance.listenForLinks((rawUrl) {
         final route = ChottuLinkService.instance.parseDeepLink(rawUrl);
         if (route != null) {
-          ref.read(appRouterProvider).go(route);
+          container.read(appRouterProvider).go(route);
         }
       });
     });
