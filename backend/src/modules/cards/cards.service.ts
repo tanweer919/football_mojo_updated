@@ -300,7 +300,20 @@ export class CardsService {
   // ICONIC/LEGENDARY tiers (those stay paid/earned). Capped per UTC day to
   // stop ad-farming.
   static readonly REWARDED_AD_TIERS: CardRarity[] = ['UNCOMMON', 'RARE', 'EPIC'];
-  static readonly REWARDED_AD_DAILY_CAP = 5;
+  static readonly REWARDED_AD_DAILY_CAP = 10;
+
+  /// How many free (rewarded-ad) cards the user can still claim today. Lets
+  /// the client hide/disable the "watch ad" CTA once the cap is hit instead
+  /// of making them sit through an ad only to be refused.
+  async rewardedAdStatus(userId: string) {
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const claimedToday = await this.prisma.ownedCard.count({
+      where: { ownerId: userId, acquiredVia: 'REWARDED_AD', mintedAt: { gte: dayStart } },
+    });
+    const cap = CardsService.REWARDED_AD_DAILY_CAP;
+    return { claimedToday, cap, remaining: Math.max(0, cap - claimedToday) };
+  }
 
   async claimRewardedAd(userId: string) {
     // Per-day cap: count REWARDED_AD cards minted to this user since UTC midnight.

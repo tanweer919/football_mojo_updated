@@ -46,6 +46,11 @@ export class CardsController {
     return this.cards.claimDailyLogin(uid);
   }
 
+  @Get('claim/rewarded-ad/status')
+  rewardedAdStatus(@CurrentUser('uid') uid: string) {
+    return this.cards.rewardedAdStatus(uid);
+  }
+
   @Post('claim/rewarded-ad')
   async claimRewardedAd(
     @CurrentUser('uid') uid: string,
