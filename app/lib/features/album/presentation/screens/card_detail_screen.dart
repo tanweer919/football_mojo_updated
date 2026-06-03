@@ -15,6 +15,25 @@ import '../../../../core/widgets/skeleton.dart';
 import '../../data/models/card_models.dart';
 import '../../data/repositories/album_repository.dart';
 
+/// Normalise a raw player position code (api-football uses GK/DF/MF/FW; the
+/// fantasy layer uses GK/DEF/MID/FWD) to a short 2-3 letter badge label.
+String _positionShort(String p) => switch (p.toUpperCase()) {
+      'GK' => 'GK',
+      'DF' || 'DEF' || 'D' => 'DEF',
+      'MF' || 'MID' || 'M' => 'MID',
+      'FW' || 'FWD' || 'F' || 'ATT' => 'FWD',
+      _ => p.toUpperCase(),
+    };
+
+/// Full position word for the card back.
+String _positionLong(String p) => switch (_positionShort(p)) {
+      'GK' => 'Goalkeeper',
+      'DEF' => 'Defender',
+      'MID' => 'Midfielder',
+      'FWD' => 'Forward',
+      final s => s,
+    };
+
 /// Premium card detail. Top half is a 3D-tilted player card with foil/holo
 /// overlay, drag the card to tilt, tap to flip, with rarity-driven background
 /// gradient that fills the entire screen.
@@ -317,18 +336,48 @@ class _Front extends StatelessWidget {
                           height: 1.0,
                         ),
                       ),
-                      if (card.template.teamName != null)
-                        Text(
-                          card.template.teamName!.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.accent,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 11,
-                            letterSpacing: 1.4,
-                          ),
+                      if (card.template.position != null || card.template.teamName != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (card.template.position != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(color: theme.accent.withValues(alpha: 0.6)),
+                                ),
+                                child: Text(
+                                  _positionShort(card.template.position!),
+                                  style: TextStyle(
+                                    color: theme.accent,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (card.template.teamName != null)
+                              Flexible(
+                                child: Text(
+                                  card.template.teamName!.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: theme.accent,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -419,6 +468,8 @@ class _Back extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              if (card.template.position != null)
+                _Row(label: 'Position', value: _positionLong(card.template.position!), theme: theme),
               _Row(label: 'Edition', value: card.template.edition, theme: theme),
               _Row(label: 'Rarity', value: theme.label, theme: theme),
               _Row(label: 'Serial', value: '#${card.serialNumber} of ${card.template.totalSupply}', theme: theme),

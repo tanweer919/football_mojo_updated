@@ -8,6 +8,8 @@ import { AdminPlayersController } from './players.controller';
 import { AdminPlayersService } from './players.service';
 import { AdminCardsController } from './cards.controller';
 import { AdminCardsService } from './cards.service';
+import { AdminBundlesController } from './bundles.controller';
+import { AdminBundlesService } from './bundles.service';
 import { AdminUsersController } from './users.controller';
 import { AdminUsersService } from './users.service';
 import { AdminTeamsController } from './teams.controller';
@@ -27,6 +29,7 @@ import { PhotoBatchController } from './photo-batch.controller';
     AdminRoleGuard,
     AdminPlayersService,
     AdminCardsService,
+    AdminBundlesService,
     AdminUsersService,
     AdminTeamsService,
   ],
@@ -34,6 +37,7 @@ import { PhotoBatchController } from './photo-batch.controller';
     AdminDashboardController,
     AdminPlayersController,
     AdminCardsController,
+    AdminBundlesController,
     AdminUsersController,
     AdminTeamsController,
     AdminAwardsController,

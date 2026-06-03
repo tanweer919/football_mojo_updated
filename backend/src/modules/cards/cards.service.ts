@@ -69,6 +69,7 @@ export class CardsService {
       playerName: t.player?.name ?? null,
       teamName: t.player?.team?.name ?? null,
       teamCrestUrl: t.player?.team?.crestUrl ?? null,
+      position: t.player?.position ?? null,
       // Scarcity surface — exposed so the client can render mint caps,
       // drop windows, and per-user caps in the album / market tiles.
       dropOpensAt:  t.dropOpensAt ?? null,
@@ -225,6 +226,7 @@ export class CardsService {
         playerName: card.template.player?.name ?? null,
         teamName: card.template.player?.team?.name ?? null,
         teamCrestUrl: card.template.player?.team?.crestUrl ?? null,
+        position: card.template.player?.position ?? null,
         dropOpensAt: card.template.dropOpensAt ?? null,
         dropClosesAt: card.template.dropClosesAt ?? null,
         maxPerUser: card.template.maxPerUser ?? null,

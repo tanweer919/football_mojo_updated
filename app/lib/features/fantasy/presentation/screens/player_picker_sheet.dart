@@ -60,7 +60,12 @@ class _PickerSheet extends ConsumerStatefulWidget {
 class _PickerSheetState extends ConsumerState<_PickerSheet> {
   String _query = '';
   _Sort _sort = _Sort.form;
-  bool _onlyAffordable = true;
+  // Default OFF: over-budget players stay VISIBLE and selectable (the price
+  // shows red as a hint). Hiding them made swaps feel broken — after a squad
+  // nears the cap, every pricier replacement vanished. Budget is enforced at
+  // save instead (the save bar blocks an over-budget XI).
+  bool _onlyAffordable = false;
+  bool _myCardsOnly = false;      // only players the user owns a card of
   bool _inFormOnly = false;       // rating ≥ 7.0
   bool _startersOnly = false;     // appearances ≥ 10
   /// For the UTL slot the user can narrow further to a single position
@@ -93,6 +98,9 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
             onPositionFilter: (p) => setState(() => _positionFilter = p),
             onlyAffordable: _onlyAffordable,
             onAffordableTap: () => setState(() => _onlyAffordable = !_onlyAffordable),
+            myCardsOnly: _myCardsOnly,
+            onMyCardsTap: () => setState(() => _myCardsOnly = !_myCardsOnly),
+            showMyCards: boosts.isNotEmpty,
             inFormOnly: _inFormOnly,
             onInFormTap: () => setState(() => _inFormOnly = !_inFormOnly),
             startersOnly: _startersOnly,
@@ -111,12 +119,14 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
                 onRetry: () => ref.invalidate(selectablePlayersProvider(widget.slug)),
               ),
               data: (all) {
-                final filtered = _applyFilters(all)..sort(_sorter);
+                final filtered = _applyFilters(all, boosts.keys.toSet())..sort(_sorter);
                 if (filtered.isEmpty) {
                   return _Empty(
-                    hint: _onlyAffordable
-                        ? 'No players match within budget. Toggle "In budget" off to widen the search.'
-                        : 'No players match the current filters.',
+                    hint: _myCardsOnly
+                        ? 'None of your owned-card players fit this slot. Turn off "My cards" to see everyone.'
+                        : _onlyAffordable
+                            ? 'No players match within budget. Toggle "In budget" off to widen the search.'
+                            : 'No players match the current filters.',
                   );
                 }
                 return ListView.separated(
@@ -130,7 +140,9 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
                       v: v,
                       affordable: affordable,
                       boost: boosts[v.playerId],
-                      onTap: affordable ? () => Navigator.of(context).pop(v.playerId) : null,
+                      // Always selectable — over-budget is a hint, not a block.
+                      // The save bar stops an over-budget XI from being saved.
+                      onTap: () => Navigator.of(context).pop(v.playerId),
                       onTeamTap: () => setState(() => _teamFilter = v.player.team.name),
                     );
                   },
@@ -143,7 +155,10 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
     );
   }
 
-  List<PlayerValuationDto> _applyFilters(List<PlayerValuationDto> all) {
+  List<PlayerValuationDto> _applyFilters(
+    List<PlayerValuationDto> all,
+    Set<String> ownedPlayerIds,
+  ) {
     return all.where((p) {
       // Position guard — UTL slot allows DEF/MID/FWD; the chip row can
       // narrow further.
@@ -151,6 +166,8 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
       if (_positionFilter != null && p.position != _positionFilter) return false;
       // Already in squad.
       if (widget.exclude.contains(p.playerId)) return false;
+      // "My cards" — only players the user owns a collectible card of.
+      if (_myCardsOnly && !ownedPlayerIds.contains(p.playerId)) return false;
       // Budget.
       if (_onlyAffordable && p.price > widget.remainingBudget + 0.001) return false;
       // Form — null seasonRating means "unknown form", excluded under
@@ -339,6 +356,9 @@ class _FilterStrip extends StatelessWidget {
     required this.onPositionFilter,
     required this.onlyAffordable,
     required this.onAffordableTap,
+    required this.myCardsOnly,
+    required this.onMyCardsTap,
+    required this.showMyCards,
     required this.inFormOnly,
     required this.onInFormTap,
     required this.startersOnly,
@@ -353,6 +373,9 @@ class _FilterStrip extends StatelessWidget {
   final ValueChanged<PlayerPosition?> onPositionFilter;
   final bool onlyAffordable;
   final VoidCallback onAffordableTap;
+  final bool myCardsOnly;
+  final VoidCallback onMyCardsTap;
+  final bool showMyCards;
   final bool inFormOnly;
   final VoidCallback onInFormTap;
   final bool startersOnly;
@@ -377,6 +400,14 @@ class _FilterStrip extends StatelessWidget {
             onTap: onSortTap,
           ),
           const _Sep(),
+          if (showMyCards)
+            _Chip(
+              label: 'My cards',
+              icon: Icons.style_outlined,
+              selected: myCardsOnly,
+              onTap: onMyCardsTap,
+              hint: 'Players you own a card of',
+            ),
           _Chip(
             label: 'In budget',
             icon: Icons.account_balance_wallet_outlined,

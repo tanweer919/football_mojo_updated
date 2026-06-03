@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/auth/auth_repository.dart';
+import '../../../../core/auth/sign_in_sheet.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/network/api_error.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/pcard.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
@@ -11,6 +14,9 @@ import '../../../../core/widgets/pitch_scaffold.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../album/data/models/card_models.dart';
+import '../../../album/data/repositories/album_repository.dart';
+import '../../../album/presentation/screens/card_reward_reveal_screen.dart';
+import '../../../iap/data/gems_repository.dart';
 import '../../data/market_models.dart';
 import '../../data/market_repository.dart';
 import '../widgets/player_form_widgets.dart';
@@ -85,6 +91,20 @@ class _DetailBody extends ConsumerWidget {
 
         // ─── 3. Name + edition + team ────────────────────────────────
         _NameBlock(detail: detail),
+
+        // ─── 3b. Buy with gems — any priced card is buyable here ──────
+        if (card.purchasable && card.gemPrice != null) ...[
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _BuyCardButton(
+              templateId: templateId,
+              gemPrice: card.gemPrice!,
+              playerName: p?.name,
+              soldOut: card.isSoldOut,
+            ),
+          ),
+        ],
 
         // ─── 4. Last scores — form stats panel ───────────────────────
         if (form != null) ...[
@@ -182,6 +202,106 @@ class _DetailBody extends ConsumerWidget {
   static String _shortEdition(String edition) {
     final dash = edition.indexOf('-');
     return dash < 0 ? edition : edition.substring(0, dash);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUY WITH GEMS — lets any priced card be bought straight from its detail page
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BuyCardButton extends ConsumerStatefulWidget {
+  const _BuyCardButton({
+    required this.templateId,
+    required this.gemPrice,
+    required this.playerName,
+    required this.soldOut,
+  });
+  final String templateId;
+  final int gemPrice;
+  final String? playerName;
+  final bool soldOut;
+  @override
+  ConsumerState<_BuyCardButton> createState() => _BuyCardButtonState();
+}
+
+class _BuyCardButtonState extends ConsumerState<_BuyCardButton> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.soldOut) {
+      return const GoldButton(label: 'Sold out', expand: true, onPressed: null);
+    }
+    return GoldButton(
+      label: _busy ? '…' : 'Buy with gems · ${widget.gemPrice}',
+      icon: Icons.diamond_outlined,
+      expand: true,
+      onPressed: _busy ? null : _buy,
+    );
+  }
+
+  Future<void> _buy() async {
+    // Gate anonymous users into a real account before spending gems.
+    final existing = ref.read(authRepositoryProvider).currentUser;
+    if (existing == null || existing.isAnonymous) {
+      final user = await quickSignIn(context, ref);
+      if (user == null || !mounted) return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        title: Text('Buy ${widget.playerName ?? 'this card'}?',
+            style: const TextStyle(color: AppColors.fg, fontSize: 17, fontWeight: FontWeight.w800)),
+        content: Text('${widget.gemPrice} gems.',
+            style: const TextStyle(color: AppColors.fgSoft, fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.muted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Buy', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final card = await ref.read(albumRepositoryProvider).purchaseTemplate(widget.templateId);
+      // Refresh balance, this card's detail (supply/ownership) + the album.
+      ref.invalidate(gemBalanceProvider);
+      ref.invalidate(albumProvider);
+      ref.invalidate(storeFeaturedProvider);
+      ref.invalidate(marketTemplateProvider(widget.templateId));
+      if (!mounted) return;
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => CardRewardRevealScreen(
+            card: card,
+            eyebrow: 'Purchased',
+            title: 'A new card for\nyour collection.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(gemPurchaseErrorMessage(e)),
+            backgroundColor: AppColors.surface3,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 
