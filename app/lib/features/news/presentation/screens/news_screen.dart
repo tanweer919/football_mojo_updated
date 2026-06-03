@@ -82,6 +82,9 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
       title: 'News',
       onBack: context.canPop() ? () => context.pop() : null,
       scrollable: false,
+      // The tab lists own their bottom inset (see _NewsList), so they fill
+      // edge-to-edge under the floating tab bar — no dark band beneath.
+      bottomSafeArea: false,
       trailing: CircleIconButton(
         icon: Icons.ios_share_rounded,
         onPressed: () => ChottuLinkService.instance.shareApp(),
@@ -196,7 +199,9 @@ class _NewsList extends StatelessWidget {
     final totalItems = page.items.length + totalAds;
     return ListView.separated(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      // Bottom inset clears the floating tab bar so the last article and the
+      // list background reach the screen edge (no dark band beneath).
+      padding: EdgeInsets.fromLTRB(16, 8, 16, PitchScreen.bottomInset(context)),
       itemCount: totalItems,
       separatorBuilder: (_, __) => const SizedBox(height: 14),
       itemBuilder: (_, i) {

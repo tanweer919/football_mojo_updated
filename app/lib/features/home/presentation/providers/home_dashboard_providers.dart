@@ -17,14 +17,14 @@ class HomeFixtures {
 
 final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
   final repo = ref.read(scoresRepositoryProvider);
-  // Window: 3 days back → 21 days forward. The forward edge is wide
-  // enough to capture WC2026 fixtures while they're still 1-3 weeks
-  // out so the "Matches" strip can fall back to the next upcoming
-  // game when nothing is live today. Day-level fixtures are cached
-  // server-side so 25 parallel calls cost little.
+  // Window: 2 days back → 14 days forward (17 day-queries, down from 25)
+  // to cut network work on app load. Still wide enough to surface recent
+  // results + the next upcoming match (incl. the WC opener, ~a week out)
+  // for the home "Match" hero and the followed-team digest. Each day is
+  // cached server-side, but fewer client round-trips = faster, lighter load.
   final now = DateTime.now();
   final days = <DateTime>[
-    for (int i = -3; i <= 21; i++)
+    for (int i = -2; i <= 14; i++)
       DateTime(now.year, now.month, now.day + i),
   ];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));

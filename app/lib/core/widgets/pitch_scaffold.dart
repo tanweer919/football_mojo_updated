@@ -36,6 +36,7 @@ class PitchScreen extends StatelessWidget {
     this.onBack,
     this.trailing,
     this.scrollable = true,
+    this.bottomSafeArea = true,
   });
 
   final String title;
@@ -43,6 +44,22 @@ class PitchScreen extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? trailing;
   final bool scrollable;
+  /// When false, the screen does NOT reserve bottom space for the floating
+  /// tab bar / gesture area — the [child] is expected to own its own scroll
+  /// and apply the inset as list padding (so content fills edge-to-edge and
+  /// no dark band appears below it). Use for full-height scrollers like the
+  /// tabbed News screen. Read [PitchScreen.bottomInset] to get the value.
+  final bool bottomSafeArea;
+
+  /// The bottom inset a full-bleed scroller should pad its content by so the
+  /// last item clears the floating tab bar + gesture area. Mirrors the
+  /// padding [PitchScreen] applies internally.
+  static double bottomInset(BuildContext context) {
+    final inTabShell = TabShellScope.of(context);
+    return (inTabShell ? 110.0 : 0.0) +
+        MediaQuery.viewPaddingOf(context).bottom +
+        16;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,10 +107,13 @@ class PitchScreen extends StatelessWidget {
                       child: child,
                     ),
                   )
-                : Padding(
-                    padding: EdgeInsets.only(bottom: bottomInset),
-                    child: child,
-                  ),
+                : bottomSafeArea
+                    ? Padding(
+                        padding: EdgeInsets.only(bottom: bottomInset),
+                        child: child,
+                      )
+                    // Child owns its own bottom inset (full-bleed scroller).
+                    : child,
           ),
         ],
       ),
