@@ -18,6 +18,7 @@ _CardTemplateDto _$CardTemplateDtoFromJson(Map<String, dynamic> json) =>
       playerName: json['playerName'] as String?,
       teamName: json['teamName'] as String?,
       teamCrestUrl: json['teamCrestUrl'] as String?,
+      position: json['position'] as String?,
       dropOpensAt:
           json['dropOpensAt'] == null
               ? null
@@ -42,6 +43,7 @@ Map<String, dynamic> _$CardTemplateDtoToJson(_CardTemplateDto instance) =>
       'playerName': instance.playerName,
       'teamName': instance.teamName,
       'teamCrestUrl': instance.teamCrestUrl,
+      'position': instance.position,
       'dropOpensAt': instance.dropOpensAt?.toIso8601String(),
       'dropClosesAt': instance.dropClosesAt?.toIso8601String(),
       'maxPerUser': instance.maxPerUser,

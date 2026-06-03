@@ -18,6 +18,7 @@ abstract class CardTemplateDto with _$CardTemplateDto {
     String? playerName,
     String? teamName,
     String? teamCrestUrl,
+    String? position,
     // Scarcity primitives. All optional + defaulted so older payloads parse.
     DateTime? dropOpensAt,
     DateTime? dropClosesAt,
