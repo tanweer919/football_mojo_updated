@@ -143,8 +143,13 @@ flutter:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
+  # Only runtime assets are bundled. The PNGs in assets/images/ are
+  # build-time-only sources for flutter_launcher_icons + flutter_native_splash
+  # (those generators read them from disk, NOT via the asset bundle), so we
+  # deliberately do NOT list assets/images/ here — it keeps ~1.7 MB of icon /
+  # splash source art out of the shipped app. The app loads all in-app imagery
+  # over the network, so nothing else needs bundling.
   assets:
-    - assets/images/
     - shorebird.yaml
 
   # An image asset can refer to one or more resolution-specific "variants", see
