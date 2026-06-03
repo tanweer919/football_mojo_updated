@@ -183,9 +183,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => PlayerProfileScreen(playerId: s.pathParameters['id']!),
       ),
     ],
-    errorBuilder: (_, state) => Scaffold(
-      body: Center(child: Text('Route not found: ${state.matchedLocation}')),
-    ),
+    // Unknown route (e.g. a stray external link the SDKs didn't resolve) —
+    // bounce to home on the next frame instead of dead-ending on an error
+    // screen. Shows a brief spinner during the redirect.
+    errorBuilder: (ctx, state) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (ctx.mounted) ctx.go(RoutePaths.home);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    },
   );
 });
 

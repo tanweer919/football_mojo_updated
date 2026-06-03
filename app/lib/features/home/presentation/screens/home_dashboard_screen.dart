@@ -26,6 +26,7 @@ import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
 import '../../../news/presentation/providers/home_news_provider.dart';
 import '../../../predictions/data/predictions_repository.dart';
+import '../../../tournament/data/wc2026_bracket.dart' show wc2026TotalPicks;
 import '../../../world_cup/data/world_cup_models.dart';
 import '../../../world_cup/data/world_cup_repository.dart';
 import '../../../news/presentation/providers/news_feed_provider.dart';
@@ -3065,8 +3066,9 @@ class _BracketStatus extends StatelessWidget {
   final BracketDto bracket;
   final WcTeamRef? champion;
 
-  /// 24 groups + 16 R16 + 8 QF + 4 SF + 2 Final + 1 champion = 55.
-  static const _totalSlots = 55;
+  /// 48 group positions + 8 best-thirds + 32 knockout winners = 88.
+  /// Single source of truth so it can't drift from the bracket screen.
+  static const _totalSlots = wc2026TotalPicks;
 
   @override
   Widget build(BuildContext context) {
