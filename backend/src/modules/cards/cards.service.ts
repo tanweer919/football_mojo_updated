@@ -3,6 +3,7 @@ import { AcquisitionSource, CardRarity, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { GemsService } from '../gems/gems.service';
 import { MintingService } from './minting.service';
+import { cardGemPrice } from './cards.pricing';
 
 /// XP→level table. Doubling cadence keeps the curve interesting all the
 /// way to 5 stars without making the top unreachable for an active user.
@@ -444,6 +445,171 @@ export class CardsService {
       teamName: t.player?.team?.name ?? null,
       teamCrestUrl: t.player?.team?.crestUrl ?? null,
     }));
+  }
+
+  // ─── Transparent bundles ("packs" with KNOWN contents) ────────────────────
+  // A bundle is a fixed list of cards sold for a fixed gem price — the buyer
+  // sees exactly what they get before paying. No randomness → halal, and a
+  // repeatable gem sink. Priced at a slight discount vs buying the members
+  // singly (see BUNDLE_DISCOUNT).
+
+  /** Active bundles inside their availability window, enriched for display:
+   *  each member card flattened, plus the "save vs singly" delta and per-user
+   *  ownership flags. Sold-out members are flagged but the bundle stays
+   *  listed (the cards are minted on purchase). */
+  async listBundles(userId: string) {
+    const now = new Date();
+    const bundles = await this.prisma.cardBundle.findMany({
+      where: {
+        active: true,
+        OR: [{ dropOpensAt: null }, { dropOpensAt: { lte: now } }],
+        AND: [{ OR: [{ dropClosesAt: null }, { dropClosesAt: { gt: now } }] }],
+      },
+      include: {
+        entries: {
+          include: { template: { include: { player: { include: { team: true } } } } },
+        },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    // Which of the member templates does this user already own? (Drives a
+    // subtle "you already own this" hint — they still get a tradeable copy.)
+    const templateIds = [
+      ...new Set(bundles.flatMap((b) => b.entries.map((e) => e.templateId))),
+    ];
+    const ownedRows = templateIds.length
+      ? await this.prisma.ownedCard.findMany({
+          where: { ownerId: userId, templateId: { in: templateIds } },
+          select: { templateId: true },
+        })
+      : [];
+    const ownedSet = new Set(ownedRows.map((o) => o.templateId));
+
+    return bundles.map((b) => {
+      const cards = b.entries.map((e) => {
+        const t = e.template;
+        return {
+          templateId: t.id,
+          edition: t.edition,
+          rarity: t.rarity,
+          totalSupply: t.totalSupply,
+          mintedCount: t.mintedCount,
+          artUrl: t.artUrl,
+          frameStyle: t.frameStyle,
+          playerName: t.player?.name ?? null,
+          teamName: t.player?.team?.name ?? null,
+          teamCrestUrl: t.player?.team?.crestUrl ?? null,
+          singlePrice: cardGemPrice(t.rarity),
+          ownedByMe: ownedSet.has(t.id),
+          soldOut: t.mintedCount >= t.totalSupply,
+        };
+      });
+      const singleTotal = cards.reduce((s, c) => s + (c.singlePrice ?? 0), 0);
+      return {
+        id: b.id,
+        name: b.name,
+        description: b.description,
+        gemPrice: b.gemPrice,
+        artUrl: b.artUrl,
+        dropClosesAt: b.dropClosesAt ?? null,
+        cards,
+        cardCount: cards.length,
+        // Headline "save N gems" — only meaningful when the singles are
+        // priced and cost more than the bundle.
+        singleTotal,
+        saving: singleTotal > b.gemPrice ? singleTotal - b.gemPrice : 0,
+        soldOut: cards.some((c) => c.soldOut),
+      };
+    });
+  }
+
+  /** Buy a bundle: debit gems once, then mint every member card atomically
+   *  (all-or-nothing). Mirrors purchaseCard's debit→act→refund pattern, but
+   *  the whole mint runs in ONE transaction so a sold-out member can't leave
+   *  the user half-charged. Returns the enriched minted cards for the reveal. */
+  async purchaseBundle(userId: string, bundleId: string) {
+    const bundle = await this.prisma.cardBundle.findUnique({
+      where: { id: bundleId },
+      include: { entries: { include: { template: true } } },
+    });
+    if (!bundle || !bundle.active) throw new NotFoundException('bundle_not_found');
+    if (!bundle.entries.length) throw new BadRequestException('bundle_empty');
+
+    const now = new Date();
+    if (bundle.dropOpensAt && bundle.dropOpensAt.getTime() > now.getTime())
+      throw new BadRequestException('drop_not_open_yet');
+    if (bundle.dropClosesAt && bundle.dropClosesAt.getTime() <= now.getTime())
+      throw new BadRequestException('drop_closed');
+
+    // Pre-flight: every member must have supply + an open window. Catches the
+    // common "sold out" case BEFORE any gems move, so the refund path below is
+    // only ever hit on a genuine concurrent-buyer race.
+    for (const e of bundle.entries) {
+      const t = e.template;
+      if (t.mintedCount >= t.totalSupply) throw new BadRequestException('sold_out');
+      if (t.dropOpensAt && t.dropOpensAt.getTime() > now.getTime())
+        throw new BadRequestException('drop_not_open_yet');
+      if (t.dropClosesAt && t.dropClosesAt.getTime() <= now.getTime())
+        throw new BadRequestException('drop_closed');
+    }
+
+    // Debit once through the ledger (audited, dedupe-protected).
+    const debitRef = `${bundleId}:${Date.now()}`;
+    await this.gems.debit({
+      userId,
+      amount: bundle.gemPrice,
+      source: 'CARD_PACK_PURCHASE',
+      description: `Bought bundle “${bundle.name}”`,
+      refType: 'bundle',
+      refId: debitRef,
+    });
+
+    try {
+      // Atomic mint of every member. Incrementing then re-checking the cap
+      // inside the txn makes a sold-out race roll the WHOLE bundle back.
+      const mintedIds = await this.prisma.$transaction(
+        async (tx) => {
+          const ids: string[] = [];
+          for (const e of bundle.entries) {
+            const updated = await tx.cardTemplate.update({
+              where: { id: e.templateId },
+              data: { mintedCount: { increment: 1 } },
+            });
+            if (updated.mintedCount > updated.totalSupply)
+              throw new BadRequestException('sold_out');
+            const card = await tx.ownedCard.create({
+              data: {
+                templateId: e.templateId,
+                serialNumber: updated.mintedCount,
+                ownerId: userId,
+                firstOwnerId: userId,
+                acquiredVia: 'DIRECT_PURCHASE',
+                mintReason: `Bundle: ${bundle.name}`,
+              },
+            });
+            ids.push(card.id);
+          }
+          return ids;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 12_000 },
+      );
+
+      const cards = await Promise.all(mintedIds.map((id) => this.getOwnedCard(userId, id)));
+      return { bundleId, name: bundle.name, gemPrice: bundle.gemPrice, cards };
+    } catch (err) {
+      // Mint failed wholesale (txn rolled back) — refund the gems so the
+      // ledger stays balanced, then surface the error.
+      await this.gems.credit({
+        userId,
+        amount: bundle.gemPrice,
+        source: 'ADJUSTMENT',
+        description: `Refund — bundle “${bundle.name}” mint failed`,
+        refType: 'bundle-refund',
+        refId: debitRef,
+      });
+      throw err;
+    }
   }
 
   // ─── Set completion ────────────────────────────────────────────────────────

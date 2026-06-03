@@ -332,6 +332,7 @@ model CardTemplate {
   /// Counted at mint time by `count(OwnedCard.templateId, ownerId)`.
   maxPerUser    Int?
   setMemberships CardSetEntry[]
+  bundleEntries CardBundleEntry[]
   ownedCards    OwnedCard[]
   globalCupPrizes GlobalCupPrize[]
   /// Inverse for `CardSet.masterTemplate` — the set(s) this template
@@ -441,6 +442,36 @@ model SetCompletion {
   userId      String
   completedAt DateTime @default(now())
   @@unique([setId, userId])
+}
+
+// Transparent card bundle ("pack" with KNOWN contents). The buyer sees the
+// exact list of cards before paying gems — no randomness, no loot box.
+// Priced at a slight discount vs buying the members singly. Halal: a fixed
+// good for a fixed price, no gharar. Repeatable (no per-user cap) so it acts
+// as an ongoing gem sink.
+model CardBundle {
+  id           String            @id @default(cuid())
+  name         String                              // "Rising Stars", "Galácticos"
+  description  String?
+  gemPrice     Int                                 // total cost in gems
+  artUrl       String?                             // optional banner art
+  active       Boolean           @default(true)
+  sortOrder    Int               @default(0)       // display order, ascending
+  /// Optional availability window — mirrors CardTemplate drop windows.
+  dropOpensAt  DateTime?
+  dropClosesAt DateTime?
+  entries      CardBundleEntry[]
+  createdAt    DateTime          @default(now())
+}
+
+model CardBundleEntry {
+  id         String       @id @default(cuid())
+  bundleId   String
+  bundle     CardBundle   @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  templateId String
+  template   CardTemplate @relation(fields: [templateId], references: [id])
+  @@unique([bundleId, templateId])
+  @@index([bundleId])
 }
 
 // Card-for-card barter only. No money side, no cash equivalent. Halal trade.
