@@ -6,6 +6,7 @@ import '../../../../core/auth/auth_repository.dart';
 import '../../../../core/auth/sign_in_sheet.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/network/api_error.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -217,18 +218,12 @@ class _GemShopScreenState extends ConsumerState<GemShopScreen> {
 
   void _showError(Object e) {
     if (!mounted) return;
-    final raw = e.toString();
-    final msg = raw.contains('insufficient_gems')
-        ? 'Not enough gems — earn more, or watch an ad for a free card.'
-        : raw.contains('sold_out')
-            ? 'Sold out — that drop is gone.'
-            : raw.contains('drop_closed')
-                ? 'This drop has closed.'
-                : raw.contains('drop_not_open_yet')
-                    ? 'This drop hasn’t opened yet.'
-                    : 'Could not complete the purchase. Please try again.';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.surface3, duration: const Duration(seconds: 4)),
+      SnackBar(
+        content: Text(gemPurchaseErrorMessage(e)),
+        backgroundColor: AppColors.surface3,
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 }
