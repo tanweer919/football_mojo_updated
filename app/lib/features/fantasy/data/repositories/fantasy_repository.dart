@@ -5,9 +5,44 @@ import '../../../../core/network/dio_provider.dart';
 import '../models/fantasy_models.dart';
 import '../models/league_models.dart';
 
+/// The passive fantasy boost a user gets for owning a player's collectible
+/// card. Keyed by playerId in the map returned by [FantasyRepository
+/// .ownedCardMultipliers]. `multiplier` is the scoring factor the backend
+/// applies at rollup (e.g. 1.6 for ICONIC); [pctLabel] renders the "+60%"
+/// badge in the picker + lineup builder.
+class CardBoost {
+  const CardBoost({required this.rarity, required this.multiplier});
+  factory CardBoost.fromJson(Map<String, dynamic> j) => CardBoost(
+        rarity: j['rarity'] as String? ?? '',
+        multiplier: (j['multiplier'] as num?)?.toDouble() ?? 1.0,
+      );
+  final String rarity;
+  final double multiplier;
+
+  /// "+60%" — the percentage uplift over the 1.0 base, rounded.
+  String get pctLabel => '+${((multiplier - 1) * 100).round()}%';
+}
+
 class FantasyRepository {
   FantasyRepository(this._dio);
   final Dio _dio;
+
+  /// Owned-card boosts keyed by playerId for the signed-in user. The backend
+  /// auto-applies the user's highest-rarity card per player at scoring time;
+  /// this drives the "+X%" badges so the boost is visible while picking.
+  /// Returns an empty map for anonymous users (401) or anyone with no cards.
+  Future<Map<String, CardBoost>> ownedCardMultipliers() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/v1/fantasy/me/owned-multipliers');
+      final data = res.data ?? const <String, dynamic>{};
+      return data.map(
+        (k, v) => MapEntry(k, CardBoost.fromJson((v as Map).cast<String, dynamic>())),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) return const {};
+      rethrow;
+    }
+  }
 
   Future<List<FantasyTournamentDto>> listTournaments() async {
     final res = await _dio.get<List<dynamic>>('/v1/fantasy/tournaments');
