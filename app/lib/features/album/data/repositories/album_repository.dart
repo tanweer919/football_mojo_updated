@@ -36,6 +36,22 @@ class AlbumRepository {
     return OwnedCardDto.fromJson(res.data!);
   }
 
+  /// How many free (rewarded-ad) cards the user can still claim today.
+  /// Drives the "watch ad" CTA — hidden/disabled once the daily cap is hit.
+  Future<RewardedAdStatus> rewardedAdStatus() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/v1/cards/claim/rewarded-ad/status');
+      return RewardedAdStatus.fromJson(res.data!);
+    } on DioException catch (e) {
+      // No account yet (401): allow the attempt — the claim flow signs them
+      // in. Default to a full allowance so we don't wrongly hide the CTA.
+      if (e.response?.statusCode == 401) {
+        return RewardedAdStatus(claimedToday: 0, cap: 10, remaining: 10);
+      }
+      rethrow;
+    }
+  }
+
   Future<OwnedCardDto> claimRewardedAd(String ssvToken) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/v1/cards/claim/rewarded-ad',
@@ -231,7 +247,25 @@ class StoreTemplate {
   bool get isSoldOut => totalSupply > 0 && mintedCount >= totalSupply;
 }
 
+/// Remaining free (rewarded-ad) card claims for today.
+class RewardedAdStatus {
+  RewardedAdStatus({required this.claimedToday, required this.cap, required this.remaining});
+  factory RewardedAdStatus.fromJson(Map<String, dynamic> j) => RewardedAdStatus(
+        claimedToday: (j['claimedToday'] as num?)?.toInt() ?? 0,
+        cap: (j['cap'] as num?)?.toInt() ?? 10,
+        remaining: (j['remaining'] as num?)?.toInt() ?? 0,
+      );
+  final int claimedToday;
+  final int cap;
+  final int remaining;
+  bool get canClaim => remaining > 0;
+}
+
 final albumRepositoryProvider = Provider<AlbumRepository>((ref) => AlbumRepository(ref.read(dioProvider)));
+
+final rewardedAdStatusProvider = FutureProvider<RewardedAdStatus>(
+  (ref) => ref.read(albumRepositoryProvider).rewardedAdStatus(),
+);
 
 final albumProvider = FutureProvider<List<AlbumSetDto>>((ref) async {
   return ref.read(albumRepositoryProvider).fetchAlbum();

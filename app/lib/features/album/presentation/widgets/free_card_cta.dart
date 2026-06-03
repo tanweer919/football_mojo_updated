@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/ads/admob_service.dart';
 import '../../../../core/config/remote_app_config.dart';
+import '../../../../core/network/api_error.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../iap/data/iap_service.dart';
@@ -30,9 +31,19 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
     final isPro = ref.watch(isProActiveProvider);
     if (!adsEnabled || isPro) return const SizedBox.shrink();
 
+    final status = ref.watch(rewardedAdStatusProvider).valueOrNull;
+    final remaining = status?.remaining;
+    // Daily cap hit → don't let them watch an ad for nothing.
+    final capReached = remaining != null && remaining <= 0;
+    final subtitle = capReached
+        ? 'Daily limit reached — come back tomorrow'
+        : (remaining != null && status != null)
+            ? 'Watch a short ad for a free card · $remaining of ${status.cap} left today'
+            : 'Watch a short ad to add a card to your collection';
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _busy ? null : _watchForCard,
+      onTap: (_busy || capReached) ? null : _watchForCard,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
         decoration: BoxDecoration(
@@ -53,14 +64,18 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
                 border: Border.all(color: AppColors.goldHairline),
               ),
               alignment: Alignment.center,
-              child: const Icon(Icons.card_giftcard, color: AppColors.gold, size: 20),
+              child: Icon(
+                capReached ? Icons.lock_clock_outlined : Icons.card_giftcard,
+                color: AppColors.gold,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Free card',
                     style: TextStyle(
                       fontFamily: 'Inter',
@@ -70,10 +85,10 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
-                    'Watch a short ad to add a card to your collection',
-                    style: TextStyle(
+                    subtitle,
+                    style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
                       color: AppColors.muted,
@@ -88,6 +103,26 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
               const SizedBox(
                 width: 18, height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+              )
+            else if (capReached)
+              // Spent for today — show the count, not a (useless) Watch button.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface3,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Text(
+                  '${status!.cap}/${status.cap}',
+                  style: const TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.muted,
+                  ),
+                ),
               )
             else
               Container(
@@ -149,6 +184,7 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
       final card = await ref.read(albumRepositoryProvider).claimRewardedAd('');
       ref.invalidate(albumProvider);
       ref.invalidate(myProfileProvider);
+      ref.invalidate(rewardedAdStatusProvider); // decrement remaining → CTA disables at the cap
       if (!mounted) return;
       setState(() => _busy = false);
       // Celebrate with the reward reveal, then optionally open the card.
@@ -159,11 +195,16 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      final msg = '$e';
-      if (msg.contains('daily_cap')) {
+      // Read the backend error CODE from the response body — DioException
+      // .toString() omits it, which is why every failure used to collapse to
+      // the generic "could not grant" message.
+      final code = apiErrorCode(e);
+      if (code.contains('daily_cap')) {
         _toast("That's all the free cards for today — come back tomorrow!");
-      } else if (msg.contains('album_complete')) {
+      } else if (code.contains('album_complete')) {
         _toast('You already own every card in this tier — nice!');
+      } else if (code.contains('drop')) {
+        _toast('That card drop is closed right now. Try again later.');
       } else {
         _toast('Could not grant your card. Please try again.');
       }
