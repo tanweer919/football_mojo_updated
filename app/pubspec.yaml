@@ -119,9 +119,8 @@ flutter_launcher_icons:
   # (app_icon7) on black, flattened to a full square.
   image_path: "assets/images/app_icon7_full.png"
   # Adaptive icon layers (Android 8+). Foreground is the bright gold ball
-  # (from assets/images/app_icon7.png) on transparency, scaled to ~60% of
-  # the canvas, leaving a comfortable black margin / breathing space,
-  # over the black background layer.
+  # on transparency, scaled to ~60% of the canvas, leaving a comfortable
+  # black margin / breathing space, over the black background layer.
   adaptive_icon_foreground: "assets/images/app_icon7_foreground.png"
   adaptive_icon_background: "#000000"
   # Foreground is ALREADY padded into the safe zone, so suppress the
