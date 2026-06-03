@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
+import 'core/observability/observability_service.dart';
 
 /// Hard rule: anything `await`-ed here delays the first frame. Only put work
 /// here that's required to render the splash-replacement frame correctly.
@@ -44,7 +45,13 @@ Future<void> main() async {
     _initFirebase(),
   ]);
 
-  runApp(const ProviderScope(child: FootballMojoApp()));
+  // Wrap runApp so Sentry installs FlutterError.onError,
+  // PlatformDispatcher.onError and an error Zone BEFORE the first frame —
+  // this is the only thing that must run here rather than in the deferred
+  // bootstrap, because it has to be in place to catch startup + async errors.
+  await ObservabilityService.init(
+    appRunner: () => runApp(const ProviderScope(child: FootballMojoApp())),
+  );
 }
 
 Future<void> _initFirebase() async {

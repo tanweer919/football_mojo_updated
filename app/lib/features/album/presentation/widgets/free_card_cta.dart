@@ -188,8 +188,14 @@ class _FreeCardCtaState extends ConsumerState<FreeCardCta> {
       if (!mounted) return;
       setState(() => _busy = false);
       // Celebrate with the reward reveal, then optionally open the card.
-      final view = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => CardRewardRevealScreen(card: card)),
+      // rootNavigator: true + fullscreenDialog so it covers the floating tab
+      // bar — this CTA lives on the album (shell) screen, whose navigator sits
+      // BEHIND the tab bar; a non-root push leaves the tab bar painted on top.
+      final view = await Navigator.of(context, rootNavigator: true).push<bool>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => CardRewardRevealScreen(card: card),
+        ),
       );
       if (view == true && mounted) context.push('/album/${card.id}');
     } catch (e) {

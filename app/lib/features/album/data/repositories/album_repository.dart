@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/network/dio_provider.dart';
 import '../models/card_models.dart';
 
@@ -33,7 +34,9 @@ class AlbumRepository {
 
   Future<OwnedCardDto> claimDaily() async {
     final res = await _dio.post<Map<String, dynamic>>('/v1/cards/claim/daily');
-    return OwnedCardDto.fromJson(res.data!);
+    final card = OwnedCardDto.fromJson(res.data!);
+    analyticsService.logCardClaim(source: 'daily', cardId: card.id);
+    return card;
   }
 
   /// How many free (rewarded-ad) cards the user can still claim today.
@@ -57,7 +60,9 @@ class AlbumRepository {
       '/v1/cards/claim/rewarded-ad',
       data: {'ssvToken': ssvToken},
     );
-    return OwnedCardDto.fromJson(res.data!);
+    final card = OwnedCardDto.fromJson(res.data!);
+    analyticsService.logCardClaim(source: 'rewarded_ad', cardId: card.id);
+    return card;
   }
 
   /// Gem-store: templates currently for sale (purchasable + inside drop window).

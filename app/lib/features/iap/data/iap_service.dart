@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/analytics/analytics_service.dart';
+
 /// Halal-compliant IAP catalog. Three kinds of SKU only:
 ///   - Subscriptions:       pro_monthly, pro_yearly
 ///   - Defined consumables: gem packs of a known size
@@ -103,12 +105,34 @@ final iapServiceProvider = FutureProvider<IapService>((ref) async {
       if (p.status != PurchaseStatus.purchased && p.status != PurchaseStatus.restored) return;
       if (p.productID == IapCatalog.proMonthly || p.productID == IapCatalog.proYearly) {
         await ref.read(isProActiveProvider.notifier).set(true);
+      } else if (_gemsForProduct(p.productID) != null) {
+        // Only count genuine purchases, not restores, in the gem funnel.
+        if (p.status == PurchaseStatus.purchased) {
+          analyticsService.logGemPurchase(
+            productId: p.productID,
+            gems: _gemsForProduct(p.productID),
+          );
+        }
       }
     },
   );
   ref.onDispose(svc.dispose);
   return svc;
 });
+
+/// Gem count for a consumable SKU, or null if the product isn't a gem pack.
+int? _gemsForProduct(String productId) {
+  switch (productId) {
+    case IapCatalog.gems500:
+      return 500;
+    case IapCatalog.gems1200:
+      return 1200;
+    case IapCatalog.gems3000:
+      return 3000;
+    default:
+      return null;
+  }
+}
 
 final iapProductsProvider = FutureProvider<List<ProductDetails>>((ref) async {
   if (kIsWeb || !(Platform.isIOS || Platform.isAndroid)) return [];

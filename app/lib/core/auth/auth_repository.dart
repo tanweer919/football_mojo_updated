@@ -3,6 +3,8 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../analytics/analytics_service.dart';
+
 class AuthRepository {
   AuthRepository(this._auth);
   final FirebaseAuth _auth;
@@ -36,7 +38,13 @@ class AuthRepository {
     // ─────────────────────────────────────────────────────────────────────
     try {
       final result = await _auth.signInWithCredential(cred);
-      if (result.user != null) return result.user!;
+      if (result.user != null) {
+        if (result.additionalUserInfo?.isNewUser ?? false) {
+          analyticsService.logSignUp('google');
+        }
+        analyticsService.logLogin('google');
+        return result.user!;
+      }
     } on TypeError catch (_) {
       // fall through to the auth-state recovery
     } on PlatformException catch (e) {
@@ -51,8 +59,14 @@ class AuthRepository {
         .authStateChanges()
         .firstWhere((u) => u != null, orElse: () => null)
         .timeout(const Duration(seconds: 5), onTimeout: () => null);
-    if (user != null) return user;
-    if (_auth.currentUser != null) return _auth.currentUser!;
+    if (user != null) {
+      analyticsService.logLogin('google');
+      return user;
+    }
+    if (_auth.currentUser != null) {
+      analyticsService.logLogin('google');
+      return _auth.currentUser!;
+    }
     throw FirebaseAuthException(
       code: 'sign-in-failed',
       message: 'Google sign-in returned no user.',

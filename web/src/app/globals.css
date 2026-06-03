@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  html, body {
+    @apply bg-bg-deep text-fg antialiased;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse 900px 700px at 15% -10%, rgba(229,194,107,0.08), transparent 60%),
+      radial-gradient(ellipse 800px 600px at 100% 0%, rgba(62,173,106,0.06), transparent 55%),
+      radial-gradient(ellipse 700px 500px at 50% 120%, rgba(77,186,220,0.05), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  ::selection { background: rgba(229,194,107,0.30); color: #F7F2E6; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+}
+
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-6xl px-5 sm:px-8; }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.18em] uppercase font-mono text-gold;
+  }
+
+  /* Gradient gold text for headlines. */
+  .text-gold-grad {
+    background: linear-gradient(100deg, #F2DDA6 0%, #E5C26B 45%, #C99A3D 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-border bg-surface-1/70 backdrop-blur;
+  }
+
+  /* Primary gold button. */
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold-deep px-6 py-3 text-sm font-bold text-[#1E1810] transition hover:brightness-105 active:scale-[0.98];
+    box-shadow: 0 0 0 1px rgba(229,194,107,0.5), 0 14px 40px -10px rgba(229,194,107,0.45);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface-1/60 px-6 py-3 text-sm font-semibold text-fg-soft transition hover:border-gold/40 hover:text-fg;
+  }
+
+  /* Hairline divider with a faint glow. */
+  .hairline { @apply h-px w-full bg-gradient-to-r from-transparent via-border to-transparent; }
+}

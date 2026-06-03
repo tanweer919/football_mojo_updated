@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../features/album/presentation/screens/album_screen.dart';
 import '../../features/album/presentation/screens/card_detail_screen.dart';
@@ -44,6 +45,7 @@ import '../../features/tournament/presentation/screens/bracket_screen.dart';
 import '../../features/world_cup/presentation/screens/standings_screen.dart';
 import '../../features/world_cup/presentation/screens/top_scorers_screen.dart';
 import '../../features/world_cup/presentation/screens/world_cup_screen.dart';
+import '../analytics/analytics_service.dart';
 import '../auth/auth_providers.dart';
 import '../bootstrap/deferred_bootstrap.dart';
 import 'route_paths.dart';
@@ -54,9 +56,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: RoutePaths.home,
     refreshListenable: GoRouterRefreshNotifier(ref),
-    // Microsoft Clarity tracks screen-name changes via this observer.
-    // Safe to register before the SDK is initialised — calls queue.
-    observers: [clarityService.routeObserver],
+    // Route observers — all read each route's `settings.name`, so screen names
+    // are consistent across tools. Safe to register before the SDKs initialise;
+    // calls queue until ready.
+    //   - Microsoft Clarity: session-recording screen names.
+    //   - Firebase Analytics: automatic `screen_view` events.
+    //   - Sentry: navigation breadcrumbs + screen-load transactions.
+    observers: [
+      clarityService.routeObserver,
+      analyticsService.observer,
+      SentryNavigatorObserver(),
+    ],
     redirect: (ctx, state) {
       final path = state.matchedLocation;
       final completedOnboarding = auth.maybeWhen(data: (v) => v, orElse: () => true);
