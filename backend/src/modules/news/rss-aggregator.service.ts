@@ -111,6 +111,31 @@ export class RssAggregatorService implements OnModuleInit {
     return [...matched];
   }
 
+  // ── Football relevance gate ───────────────────────────────────────────────
+  // Some configured feeds are general-sport, so tennis/cricket/NBA/etc. leak
+  // in. We keep an article only when it's football-relevant: a known football
+  // team matched, OR it reads as football, OR it has no other-sport signal.
+  // We only DROP when there's a clear other-sport signal and no football one —
+  // so ambiguous/short football pieces are never wrongly filtered.
+  private static readonly OTHER_SPORT_RE =
+    /\b(tennis|atp|wta|wimbledon|roland.?garros|grand slam|cricket|ipl\b|t20|odi\b|test match|wicket|batsman|bowler|basketball|nba\b|wnba|nfl\b|touchdown|quarterback|super bowl|rugby|six nations|golf|pga\b|ryder cup|formula\s?1|f1\b|grand prix|motogp|nascar|baseball|mlb\b|nhl\b|ice hockey|ufc\b|mma\b|boxing|heavyweight|darts|snooker|tour de france|kabaddi)\b/i;
+  private static readonly FOOTBALL_RE =
+    /\b(football|soccer|premier league|la ?liga|bundesliga|serie a|ligue 1|eredivisie|champions league|europa league|conference league|world cup|fifa|uefa|epl\b|mls\b|goalkeeper|midfielder|defender|striker|forward|free.?kick|offside|matchday|on loan|clean sheet|var\b|el clasico|derby)\b/i;
+
+  private isFootball(
+    title: string,
+    summary: string | null,
+    tags: string[],
+    teamIds: string[],
+  ): boolean {
+    // A matched football team is the strongest possible signal.
+    if (teamIds.length > 0) return true;
+    const text = `${title}\n${summary ?? ''}\n${tags.join(' ')}`;
+    const hasOther = RssAggregatorService.OTHER_SPORT_RE.test(text);
+    if (!hasOther) return true; // no foreign-sport signal → assume football
+    return RssAggregatorService.FOOTBALL_RE.test(text); // foreign signal — keep only if also football
+  }
+
   @Interval('news-refresh', 600_000)
   async refresh() {
     if (this.running) return;
@@ -128,8 +153,31 @@ export class RssAggregatorService implements OnModuleInit {
         else this.log.warn(`feed failed: ${r.reason}`);
       }
       this.log.log(`news refresh: +${added} new across ${this.feeds.length} feeds`);
+      // Sweep out any non-football articles already stored (e.g. from before
+      // this filter existed, or a feed that's gone off-topic).
+      await this.purgeNonFootball().catch((e) =>
+        this.log.warn(`purge failed: ${(e as Error).message}`),
+      );
     } finally {
       this.running = false;
+    }
+  }
+
+  /// Delete already-stored articles that aren't football. Bounded to the most
+  /// recent rows (the ones users actually see) and reuses [isFootball], so it
+  /// stays DB-agnostic and consistent with the ingest gate.
+  private async purgeNonFootball(): Promise<void> {
+    const rows = await this.prisma.newsArticle.findMany({
+      orderBy: { publishedAt: 'desc' },
+      take: 500,
+      select: { id: true, title: true, summary: true, tags: true, teamIds: true },
+    });
+    const drop = rows
+      .filter((r) => !this.isFootball(r.title, r.summary, r.tags, r.teamIds))
+      .map((r) => r.id);
+    if (drop.length) {
+      await this.prisma.newsArticle.deleteMany({ where: { id: { in: drop } } });
+      this.log.log(`purged ${drop.length} non-football articles`);
     }
   }
 
@@ -148,6 +196,9 @@ export class RssAggregatorService implements OnModuleInit {
       // Team-name detection on title + summary. Populates teamIds[] so the
       // "Following" tab actually returns articles about the user's teams.
       const teamIds = this.matchTeams(title, summary);
+
+      // Skip non-football items (tennis/cricket/NBA/etc. from general feeds).
+      if (!this.isFootball(title, summary, tags, teamIds)) continue;
 
       const created = await this.prisma.newsArticle.upsert({
         where: { id },

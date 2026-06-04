@@ -88,7 +88,11 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   // if not yet resolvable). Used by the knockout match cards to render the
   // two head-to-head sides.
 
-  WcTeamRef? _resolveSlot(BracketSlotSource slot, Map<String, WcTeamRef> teamsById) {
+  WcTeamRef? _resolveSlot(
+    BracketSlotSource slot,
+    Map<String, WcTeamRef> teamsById,
+    Map<String, String> thirdAssign,
+  ) {
     if (slot is GroupSlot) {
       final teamId = _picks['GROUP_${slot.groupLetter}_${slot.position}'] as String?;
       return teamId == null ? null : teamsById[teamId];
@@ -105,27 +109,60 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
       if (winnerId == null) return null;
       final m = wc2026MatchesByNumber[slot.matchNumber];
       if (m == null) return null;
-      final left = _resolveSlot(m.left, teamsById);
-      final right = _resolveSlot(m.right, teamsById);
+      final left = _resolveSlot(m.left, teamsById, thirdAssign);
+      final right = _resolveSlot(m.right, teamsById, thirdAssign);
       if (left != null && left.id != winnerId) return left;
       if (right != null && right.id != winnerId) return right;
       return null;
     }
     if (slot is BestThird) {
-      // First of the user's best-thirds that's in this slot's eligible group
-      // set. FIFA's actual assignment is matrix-based — we approximate by
-      // using the first eligible third in the user's BEST_THIRDS list.
-      final picked = _bestThirds;
-      for (final g in slot.eligibleGroups) {
-        if (!picked.contains(g)) continue;
-        final teamId = _picks['GROUP_${g}_3'] as String?;
-        if (teamId != null && teamsById[teamId] != null) {
-          return teamsById[teamId];
-        }
-      }
-      return null;
+      // The group assigned to THIS slot by the one-to-one matching (see
+      // _bestThirdAssignment). Keyed by the slot's eligible-group signature.
+      final letter = thirdAssign[slot.eligibleGroups.join(',')];
+      if (letter == null) return null;
+      final teamId = _picks['GROUP_${letter}_3'] as String?;
+      return teamId == null ? null : teamsById[teamId];
     }
     return null;
+  }
+
+  /// Assign each of the 8 Round-of-32 best-third slots a DISTINCT
+  /// user-selected best-third group, respecting each slot's eligible-group
+  /// set, via a maximum bipartite matching (Kuhn's algorithm).
+  ///
+  /// The old resolver picked "the first eligible selected third" per slot
+  /// independently, so the same group's 3rd-placed team could fill two slots
+  /// — which is why a single team (e.g. Japan / Scotland) appeared twice in
+  /// the Round of 32. A one-to-one matching guarantees each selected third is
+  /// placed at most once. Returns: eligible-groups signature → group letter.
+  Map<String, String> _bestThirdAssignment() {
+    final picked = _bestThirds.toSet();
+    if (picked.isEmpty) return const {};
+    // The 8 best-third slots, in match order.
+    final slots = <List<String>>[];
+    for (final m in wc2026Matches) {
+      if (m.left is BestThird) slots.add((m.left as BestThird).eligibleGroups);
+      if (m.right is BestThird) slots.add((m.right as BestThird).eligibleGroups);
+    }
+    final letterToSlot = <String, int>{}; // group letter → slot index
+    bool augment(int slot, Set<String> seen) {
+      for (final g in slots[slot]) {
+        if (!picked.contains(g) || seen.contains(g)) continue;
+        seen.add(g);
+        final taken = letterToSlot[g];
+        if (taken == null || augment(taken, seen)) {
+          letterToSlot[g] = slot;
+          return true;
+        }
+      }
+      return false;
+    }
+    for (var s = 0; s < slots.length; s++) {
+      augment(s, <String>{});
+    }
+    final out = <String, String>{};
+    letterToSlot.forEach((letter, slot) => out[slots[slot].join(',')] = letter);
+    return out;
   }
 
   /// Resolve the user's picks into the full prediction poster model —
@@ -134,6 +171,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   /// (the card shows "TBD"), so this works for partial brackets too;
   /// we only surface the share prompt once a champion is set.
   FullBracketPrediction _buildPrediction(Map<String, WcTeamRef> teamsById) {
+    final thirdAssign = _bestThirdAssignment();
     // Groups — predicted finishing order 1..4 per letter.
     final groups = <GroupPrediction>[
       for (final l in wcGroupLetters)
@@ -160,8 +198,8 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
     // the cascade and reading the stored winner.
     TiePrediction tieFor(BracketMatch m) => TiePrediction(
           number: m.number,
-          left: _resolveSlot(m.left, teamsById),
-          right: _resolveSlot(m.right, teamsById),
+          left: _resolveSlot(m.left, teamsById, thirdAssign),
+          right: _resolveSlot(m.right, teamsById, thirdAssign),
           winnerId: _picks['MATCH_${m.number}_WINNER'] as String?,
         );
     List<TiePrediction> tiesIn(BracketRound round) => [
@@ -347,6 +385,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
             for (final g in groups)
               for (final s in g.standings) s.team.id: s.team,
           };
+          final thirdAssign = _bestThirdAssignment();
           final locked = mineAsync.maybeWhen(
             data: (b) => b?.isLocked ?? false,
             orElse: () => false,
@@ -368,7 +407,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
             lockAt: lockAt,
             points: pts,
             saving: _saving,
-            resolveSlot: (slot) => _resolveSlot(slot, teamsById),
+            resolveSlot: (slot) => _resolveSlot(slot, teamsById, thirdAssign),
             onReorderGroup: (letter, oldIndex, newIndex) {
               if (locked) return;
               setState(() {
@@ -841,7 +880,11 @@ class _GroupOrderCard extends StatelessWidget {
             // physics-none inside the parent ListView.
             ReorderableListView(
               shrinkWrap: true,
-              buildDefaultDragHandles: !locked,
+              // Explicit drag handles only (below) — the default long-press
+              // handle fought the outer ListView for the gesture, so dragging
+              // scrolled the page instead. Grabbing the handle now starts the
+              // reorder immediately and reliably.
+              buildDefaultDragHandles: false,
               physics: const NeverScrollableScrollPhysics(),
               onReorder: onReorder,
               children: [
@@ -895,8 +938,16 @@ class _GroupOrderCard extends StatelessWidget {
                             ),
                           ),
                           if (!locked)
-                            Icon(Icons.drag_handle_rounded,
-                                size: 18, color: theme.colorScheme.outline),
+                            ReorderableDragStartListener(
+                              index: i,
+                              child: Padding(
+                                // Bigger touch target so the handle is easy
+                                // to grab without nudging the page.
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Icon(Icons.drag_handle_rounded,
+                                    size: 22, color: theme.colorScheme.outline),
+                              ),
+                            ),
                         ],
                       ),
                     ),
