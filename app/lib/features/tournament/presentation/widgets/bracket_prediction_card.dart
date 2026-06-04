@@ -257,7 +257,7 @@ class BracketPredictionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'footballmojo.in',
+                    'pitch.footballmojo.in',
                     style: const TextStyle(
                       color: _goldSoft,
                       fontSize: 18,

@@ -1820,7 +1820,7 @@ class _NoLiveNowTile extends StatelessWidget {
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'No matches kicking off right now.\nResults + next fixtures below.',
+                'No matches live right now.\nResults & upcoming fixtures below.',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12.5,
