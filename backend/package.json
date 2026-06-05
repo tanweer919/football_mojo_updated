@@ -36,6 +36,7 @@
     "ingest:form": "tsx prisma/ingest-player-form.ts"
   },
   "dependencies": {
+    "@google/genai": ">=0.3.0",
     "@nestjs/cache-manager": "^2.2.2",
     "@nestjs/common": "^10.3.10",
     "@nestjs/config": "^3.2.3",
