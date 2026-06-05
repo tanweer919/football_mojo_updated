@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/network/api_error.dart';
 import '../../../../core/widgets/eyebrow.dart';
+import '../../data/ai_preview_repository.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/premium_image.dart';
@@ -96,6 +99,7 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: SizedBox(height: topInset + 6)),
         SliverToBoxAdapter(child: _Topbar(match: match)),
         SliverToBoxAdapter(child: _Hero(match: match)),
+        SliverToBoxAdapter(child: _AiPreviewBlock(matchId: match.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Stats', icon: Icons.bar_chart)),
         SliverToBoxAdapter(child: _StatsBlock(matchId: match.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Key moments', icon: Icons.timeline)),
@@ -104,6 +108,211 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: _LineupsBlock(matchId: match.id)),
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
+    );
+  }
+}
+
+// ─── AI MATCH PREVIEW (on-demand) ────────────────────────────────────────────
+
+/// Collapsed by default — only calls the AI when the user taps "Generate".
+/// The backend caches per-match, so repeat taps and other users are free.
+class _AiPreviewBlock extends ConsumerStatefulWidget {
+  const _AiPreviewBlock({required this.matchId});
+  final String matchId;
+  @override
+  ConsumerState<_AiPreviewBlock> createState() => _AiPreviewBlockState();
+}
+
+class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
+  bool _loading = false;
+  String? _error;
+  AiMatchPreview? _preview;
+
+  Future<void> _generate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final p = await ref.read(aiPreviewRepositoryProvider).matchPreview(widget.matchId);
+      if (!mounted) return;
+      setState(() {
+        _preview = p;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final code = apiErrorCode(e);
+      setState(() {
+        _loading = false;
+        _error = code.contains('ai_unavailable') || code.contains('ai_request_failed')
+            ? 'AI previews aren’t available right now.'
+            : 'Couldn’t generate the preview. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.goldHairline),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1F1814), Color(0xFF12100D)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 16, color: AppColors.gold),
+                const SizedBox(width: 8),
+                const Text(
+                  'AI match preview',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.fg,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _body(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_preview != null) return _AiPreviewContent(preview: _preview!);
+    if (_loading) {
+      return const Row(
+        children: [
+          SizedBox(
+            width: 16, height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+          ),
+          SizedBox(width: 10),
+          Text('Writing the preview…',
+              style: TextStyle(color: AppColors.muted, fontSize: 13)),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Get a quick, AI-written preview — recent form, key injuries, head-to-head and what’s at stake.',
+          style: TextStyle(color: AppColors.fgSoft, fontSize: 12.5, height: 1.4),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: const TextStyle(color: AppColors.live, fontSize: 12)),
+        ],
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: GoldButton(
+            label: _error == null ? 'Generate preview' : 'Try again',
+            icon: Icons.auto_awesome,
+            onPressed: _generate,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AiPreviewContent extends StatelessWidget {
+  const _AiPreviewContent({required this.preview});
+  final AiMatchPreview preview;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          preview.content,
+          style: const TextStyle(color: AppColors.fg, fontSize: 13.5, height: 1.5),
+        ),
+        if (preview.sources.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Eyebrow('Sources', size: 9),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [for (final s in preview.sources) _AiSourceChip(source: s)],
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const Icon(Icons.auto_awesome, size: 11, color: AppColors.muted2),
+            const SizedBox(width: 5),
+            const Expanded(
+              child: Text(
+                'AI-generated with Google Search · may contain mistakes.',
+                style: TextStyle(color: AppColors.muted2, fontSize: 10.5),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AiSourceChip extends StatelessWidget {
+  const _AiSourceChip({required this.source});
+  final AiSource source;
+
+  String _label() {
+    final uri = source.uri;
+    if (uri != null) {
+      try {
+        final host = Uri.parse(uri).host.replaceFirst('www.', '');
+        if (host.isNotEmpty) return host;
+      } catch (_) {}
+    }
+    return source.title;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: source.uri == null
+          ? null
+          : () => launchUrl(Uri.parse(source.uri!), mode: LaunchMode.externalApplication),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.link, size: 11, color: AppColors.muted),
+            const SizedBox(width: 4),
+            Text(
+              _label(),
+              style: const TextStyle(color: AppColors.fgSoft, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

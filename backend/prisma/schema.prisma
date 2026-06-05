@@ -830,3 +830,19 @@ model GlobalCupPrize {
   awardedAt      DateTime?
   @@index([tournamentId, rankFrom])
 }
+
+/// Generic cache for AI-generated content (Gemini, grounded with Google
+/// Search). One row per (type, refId) — e.g. ("match_preview", matchId).
+/// Generation is on-demand (a user taps "AI preview"); the first request
+/// fills the cache and everyone else is served from it until it goes stale.
+model AiContent {
+  id        String   @id @default(cuid())
+  type      String                  // "match_preview"
+  refId     String                  // the subject's id (e.g. match id)
+  content   String                  // the generated text
+  sources   Json                    // [{ title, uri }] grounding citations
+  model     String                  // model that produced it
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([type, refId])
+}

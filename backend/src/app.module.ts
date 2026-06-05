@@ -10,6 +10,7 @@ import { HealthController } from './common/health.controller';
 import { PrismaModule } from './common/prisma.module';
 import { RedisModule } from './common/redis.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AiModule } from './modules/ai/ai.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ApiFootballModule } from './modules/api-football/api-football.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -73,6 +74,7 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     AdminModule,
     AppConfigModule,
+    AiModule,
   ],
   controllers: [HealthController],
 })
