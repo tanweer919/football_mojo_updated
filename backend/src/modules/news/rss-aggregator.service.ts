@@ -182,7 +182,7 @@ export class RssAggregatorService implements OnModuleInit {
   }
 
   private async fetchFeed(url: string): Promise<number> {
-    const feed = await this.parser.parseURL(url);
+    const feed = await this.parseFeed(url);
     const source = feed.title ?? new URL(url).hostname;
     let added = 0;
 
@@ -251,6 +251,31 @@ export class RssAggregatorService implements OnModuleInit {
       }
     }
     return added;
+  }
+
+  /// Robust feed fetch. Some publishers serve slightly-invalid XML (bare `&`,
+  /// stray characters) that the strict SAX parser rejects ("Invalid character
+  /// in entity name"). Fetch the raw body, lightly sanitize, then parse. Falls
+  /// back to the parser's own URL fetch if our fetch fails.
+  private async parseFeed(url: string) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'FootballMojo/1.0 (+https://pitch.footballmojo.in)' },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.text();
+      return await this.parser.parseString(this.sanitizeXml(raw));
+    } catch {
+      return this.parser.parseURL(url);
+    }
+  }
+
+  /// Escape bare ampersands that aren't part of a valid XML entity — the most
+  /// common cause of feed parse failures. Leaves real entities (&amp; &#39;
+  /// &#x2014;) untouched.
+  private sanitizeXml(xml: string): string {
+    return xml.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
   }
 
   private hash(input: string): string {
