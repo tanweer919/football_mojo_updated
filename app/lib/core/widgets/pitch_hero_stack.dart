@@ -74,7 +74,10 @@ class _PitchHeroStackState extends State<PitchHeroStack>
                   name: 'MBAPPÉ',
                   position: 'ST',
                   country: 'FRA',
-                  photoUrl: 'https://media.api-sports.io/football/players/278.png',
+                  // TheSportsDB cutout (transparent PNG) — PCard auto-detects
+                  // the thesportsdb.com host and uses its alpha-clean render
+                  // path. Reliable + crisp, unlike the api-sports headshots.
+                  photoUrl: 'https://r2.thesportsdb.com/images/media/player/cutout/h9u9vz1733653583.png',
                   clubCrestUrl: 'https://media.api-sports.io/football/teams/541.png',
                 ),
               ),
@@ -98,7 +101,7 @@ class _PitchHeroStackState extends State<PitchHeroStack>
                   name: 'BELLINGHAM',
                   position: 'AM',
                   country: 'ENG',
-                  photoUrl: 'https://media.api-sports.io/football/players/762.png',
+                  photoUrl: 'https://r2.thesportsdb.com/images/media/player/cutout/trk5271750271712.png',
                   clubCrestUrl: 'https://media.api-sports.io/football/teams/541.png',
                 ),
               ),
@@ -126,7 +129,7 @@ class _PitchHeroStackState extends State<PitchHeroStack>
                     name: 'YAMAL',
                     position: 'RW',
                     country: 'ESP',
-                    photoUrl: 'https://media.api-sports.io/football/players/401324.png',
+                    photoUrl: 'https://r2.thesportsdb.com/images/media/player/cutout/m9n4ja1761512633.png',
                     clubCrestUrl: 'https://media.api-sports.io/football/teams/529.png',
                   ),
                 ),
