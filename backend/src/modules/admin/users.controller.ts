@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { IsBoolean, IsEmail, IsIn, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Request } from 'express';
 import { UserRole } from '@prisma/client';
 import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
@@ -17,6 +17,10 @@ class InviteBody {
 }
 class SetTagBody {
   @IsString() tag!: string;
+}
+class SetGemsBody {
+  @IsInt() @Min(0) balance!: number;
+  @IsOptional() @IsString() @MaxLength(140) reason?: string;
 }
 
 @Controller({ path: 'admin/users', version: '1' })
@@ -37,6 +41,19 @@ export class AdminUsersController {
       page: Math.max(1, Number.parseInt(page ?? '1', 10) || 1),
       pageSize: Math.min(100, Math.max(1, Number.parseInt(pageSize ?? '30', 10) || 30)),
     });
+  }
+
+  @Get(':id')
+  getOne(@Param('id') id: string) {
+    return this.users.getById(id);
+  }
+
+  /// Set a user's gem balance (audited via the gem ledger). ADMIN-level —
+  /// the whole panel is admin-gated; this is an economy operation, not a
+  /// privilege change.
+  @Patch(':id/gems')
+  setGems(@Req() req: Request, @Param('id') id: string, @Body() body: SetGemsBody) {
+    return this.users.adjustGems(req.user!.uid, id, body.balance, body.reason);
   }
 
   // Role mutations require SUPERADMIN — the decorator overrides the

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { apiServer } from '@/lib/api-server';
 import { Topbar } from '@/components/topbar';
 import { Table, THead, TH, TR, TD, Input, Badge, Panel, SectionHead, Empty } from '@/components/ui';
@@ -16,6 +17,7 @@ interface UserRow {
   role: 'USER' | 'ADMIN' | 'SUPERADMIN';
   photoUrl: string | null;
   createdAt: string;
+  gems: number;
 }
 
 export default async function UsersPage({
@@ -76,6 +78,7 @@ export default async function UsersPage({
               <TH>Email</TH>
               <TH>Tag</TH>
               <TH>Role</TH>
+              <TH>Gems</TH>
               <TH>Joined</TH>
               <TH />
             </THead>
@@ -85,19 +88,23 @@ export default async function UsersPage({
                 return (
                   <TR key={u.id}>
                     <TD>
-                      <div className="font-medium text-fg">{u.displayName ?? '—'}</div>
+                      <Link href={`/users/${u.id}`} className="font-medium text-fg hover:text-gold transition-colors">
+                        {u.displayName ?? '—'}
+                      </Link>
                       <div className="text-[10px] font-mono text-fg-muted2">{u.id.slice(0, 16)}…</div>
                     </TD>
                     <TD className="text-fg-soft text-sm font-mono">{u.email ?? '—'}</TD>
                     <TD className="text-gold font-mono text-sm">{u.userTag ? `@${u.userTag}` : '—'}</TD>
                     <TD><Badge tone={roleTone(u.role)}>{u.role}</Badge>{isSelf && <span className="ml-2 text-[9px] font-mono uppercase text-fg-muted2">you</span>}</TD>
+                    <TD className="font-mono text-sm text-gold tabular-nums">{u.gems.toLocaleString()}</TD>
                     <TD className="text-fg-muted text-xs font-mono">{u.createdAt.slice(0, 10)}</TD>
                     <TD>
-                      {isSuper ? (
-                        <UserRoleControls userId={u.id} currentRole={u.role} isSelf={isSelf} />
-                      ) : (
-                        <span className="text-[11px] text-fg-muted2">Read-only</span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {isSuper && <UserRoleControls userId={u.id} currentRole={u.role} isSelf={isSelf} />}
+                        <Link href={`/users/${u.id}`} className="text-gold hover:underline text-sm font-semibold whitespace-nowrap">
+                          Manage →
+                        </Link>
+                      </div>
                     </TD>
                   </TR>
                 );

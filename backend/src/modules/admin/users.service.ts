@@ -2,10 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { UserRole } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../common/prisma.service';
+import { GemsService } from '../gems/gems.service';
 
 @Injectable()
 export class AdminUsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gems: GemsService,
+  ) {}
 
   async list(input: { q?: string; role?: UserRole; page: number; pageSize: number }) {
     const q = input.q?.trim();
@@ -31,13 +35,79 @@ export class AdminUsersService {
         skip: (input.page - 1) * input.pageSize,
         select: {
           id: true, email: true, displayName: true, userTag: true, role: true,
-          photoUrl: true, createdAt: true,
+          photoUrl: true, createdAt: true, gems: true, coins: true, countryCode: true,
         },
       }),
       this.prisma.user.count({ where }),
       this.prisma.user.count({ where: { role: { in: ['ADMIN', 'SUPERADMIN'] } } }),
     ]);
     return { rows, total, adminTotal };
+  }
+
+  /// Full profile for the user-detail page: every useful field, relation
+  /// counts, and the recent gem ledger. FCM tokens are reduced to a count —
+  /// the raw device tokens are sensitive and never need surfacing.
+  async getById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true, email: true, displayName: true, userTag: true, role: true,
+        photoUrl: true, countryCode: true, supportedCountryCode: true,
+        coins: true, gems: true, proExpiresAt: true, favouriteTeams: true,
+        fcmTokens: true, lastDailyClaimAt: true, welcomeCardSeenAt: true,
+        createdAt: true, updatedAt: true,
+        _count: {
+          select: {
+            ownedCards: true, predictions: true, fantasyLineups: true,
+            achievements: true, gemTransactions: true, leagueMemberships: true,
+          },
+        },
+      },
+    });
+    if (!user) throw new NotFoundException('user_not_found');
+
+    const gemHistory = await this.prisma.gemTransaction.findMany({
+      where: { userId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: {
+        id: true, amount: true, source: true, description: true,
+        balanceAfter: true, createdAt: true,
+      },
+    });
+
+    const { fcmTokens, ...rest } = user;
+    return {
+      ...rest,
+      fcmTokenCount: fcmTokens.length,
+      proActive: !!user.proExpiresAt && user.proExpiresAt.getTime() > Date.now(),
+      gemHistory,
+    };
+  }
+
+  /// Set a user's gem balance to an exact value, routed through the gem
+  /// ledger (source ADJUSTMENT) so the change is audited like every other
+  /// gem movement. Computes the delta and credits/debits accordingly; a
+  /// unique refId means each admin edit applies (never deduped).
+  async adjustGems(callerUid: string, targetUserId: string, newBalance: number, reason?: string) {
+    if (!Number.isInteger(newBalance) || newBalance < 0) {
+      throw new BadRequestException('balance_must_be_a_non_negative_integer');
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, gems: true },
+    });
+    if (!user) throw new NotFoundException('user_not_found');
+
+    const delta = newBalance - user.gems;
+    if (delta === 0) return { balance: user.gems, changed: false };
+
+    const refId = `admin:${callerUid}:${randomUUID()}`;
+    const description = `Admin adjustment${reason?.trim() ? ` — ${reason.trim()}` : ''}`;
+    const res = delta > 0
+      ? await this.gems.credit({ userId: targetUserId, amount: delta, source: 'ADJUSTMENT', description, refType: 'admin-adjust', refId })
+      : await this.gems.debit({ userId: targetUserId, amount: -delta, source: 'ADJUSTMENT', description, refType: 'admin-adjust', refId });
+    return { balance: res.balance, changed: true };
   }
 
   /// Role change — caller's role must be SUPERADMIN (enforced via the
