@@ -67,23 +67,29 @@ class _FoilOverlayState extends State<FoilOverlay> with SingleTickerProviderStat
             widget.child,
             Positioned.fill(
               child: IgnorePointer(
-                child: ShaderMask(
-                  blendMode: BlendMode.plus,
-                  shaderCallback: (rect) {
-                    final dx = (t * 2 - 1) * rect.width;
-                    final dy = (t * 2 - 1) * rect.height;
-                    return widget.rarity.foilGradient.createShader(
-                      Rect.fromLTWH(
-                        rect.left + dx,
-                        rect.top + dy,
-                        rect.width,
-                        rect.height,
-                      ),
-                    );
-                  },
-                  child: Opacity(
-                    opacity: widget.rarity.foilOpacity * 0.55,
-                    child: Container(color: Colors.white),
+                // Translucent rainbow sheen swept across the card. Capped well
+                // below 1.0 — the old `BlendMode.plus` over an opaque gradient
+                // pushed the veil to full opacity and painted the whole card
+                // white, hiding the art/name/ribbon on Rare+ tiers. `srcIn`
+                // keeps the sheen at the layer's (low) alpha so the card always
+                // shows through.
+                child: Opacity(
+                  opacity: (widget.rarity.foilOpacity * 0.3).clamp(0.0, 0.3),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (rect) {
+                      final dx = (t * 2 - 1) * rect.width;
+                      final dy = (t * 2 - 1) * rect.height;
+                      return widget.rarity.foilGradient.createShader(
+                        Rect.fromLTWH(
+                          rect.left + dx,
+                          rect.top + dy,
+                          rect.width,
+                          rect.height,
+                        ),
+                      );
+                    },
+                    child: const ColoredBox(color: Colors.white),
                   ),
                 ),
               ),
