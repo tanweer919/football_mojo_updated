@@ -75,6 +75,15 @@ export class AiService {
       .trim();
     if (!text) throw new ServiceUnavailableException('ai_empty_response');
 
+    // Diagnostic: confirm grounding actually fired. If `grounded=0` the model
+    // answered from training data (stale / generic), not live Search — that's
+    // the "dumb response" signature. `queries` shows what it searched for.
+    const meta = cand?.groundingMetadata;
+    this.log.log(
+      `gemini model=${this.model} grounded=${meta?.groundingChunks?.length ?? 0} ` +
+        `queries=${JSON.stringify(meta?.webSearchQueries ?? [])}`,
+    );
+
     // Grounding citations (deduped, capped) — surfaced for trust.
     const chunks: any[] = cand?.groundingMetadata?.groundingChunks ?? [];
     const seen = new Set<string>();
