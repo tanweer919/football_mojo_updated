@@ -24,6 +24,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
+import { WC_TEAM_ALIASES } from '../src/modules/scores/wc-team-aliases';
 
 const prisma = new PrismaClient();
 
@@ -40,56 +41,8 @@ const SYNTHETIC_PREFIX = 'WC2026-PH-';
 
 // Teams that are publicly named in the draw (no play-off variants).
 // (Synonyms: when api-football uses a different label, list them here.)
-const TEAM_ALIASES: Record<string, string[]> = {
-  'Mexico': ['Mexico'],
-  'South Africa': ['South Africa'],
-  'Korea Republic': ['South Korea', 'Korea Republic'],
-  'Czechia': ['Czech Republic', 'Czechia'],
-  'Canada': ['Canada'],
-  'Bosnia and Herzegovina': ['Bosnia & Herzegovina', 'Bosnia and Herzegovina'],
-  'Qatar': ['Qatar'],
-  'Switzerland': ['Switzerland'],
-  'Brazil': ['Brazil'],
-  'Morocco': ['Morocco'],
-  'Haiti': ['Haiti'],
-  'Scotland': ['Scotland'],
-  'USA': ['United States', 'USA'],
-  'Paraguay': ['Paraguay'],
-  'Australia': ['Australia'],
-  'Türkiye': ['Turkey', 'Türkiye'],
-  'Germany': ['Germany'],
-  'Curaçao': ['Curacao', 'Curaçao'],
-  "Côte d'Ivoire": ['Ivory Coast', "Côte d'Ivoire"],
-  'Ecuador': ['Ecuador'],
-  'Netherlands': ['Netherlands'],
-  'Japan': ['Japan'],
-  'Sweden': ['Sweden'],
-  'Tunisia': ['Tunisia'],
-  'Saudi Arabia': ['Saudi Arabia'],
-  'Uruguay': ['Uruguay'],
-  'Spain': ['Spain'],
-  'Cabo Verde': ['Cape Verde Islands', 'Cape Verde', 'Cabo Verde'],
-  'IR Iran': ['Iran', 'IR Iran'],
-  'New Zealand': ['New Zealand'],
-  'Belgium': ['Belgium'],
-  'Egypt': ['Egypt'],
-  'France': ['France'],
-  'Senegal': ['Senegal'],
-  'Iraq': ['Iraq'],
-  'Norway': ['Norway'],
-  'Argentina': ['Argentina'],
-  'Algeria': ['Algeria'],
-  'Austria': ['Austria'],
-  'Jordan': ['Jordan'],
-  'Ghana': ['Ghana'],
-  'Panama': ['Panama'],
-  'England': ['England'],
-  'Croatia': ['Croatia'],
-  'Portugal': ['Portugal'],
-  'Congo DR': ['DR Congo', 'Congo DR'],
-  'Uzbekistan': ['Uzbekistan'],
-  'Colombia': ['Colombia'],
-};
+// Single source of truth — shared with the live ingest reconciler.
+const TEAM_ALIASES = WC_TEAM_ALIASES;
 
 async function resolveTeamId(displayName: string): Promise<string> {
   const aliases = TEAM_ALIASES[displayName] ?? [displayName];
