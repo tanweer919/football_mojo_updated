@@ -27,17 +27,32 @@ Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDa
   final days = [sel.subtract(const Duration(days: 1)), sel, sel.add(const Duration(days: 1))];
   final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
 
-  // Collapse duplicate rows for the same fixture on a source-agnostic key:
-  // both team names (normalised, order-independent) + the UTC calendar date.
-  // Keep the most "real" row — a live/finished row beats a SCHEDULED placeholder.
+  // Collapse duplicate rows for the same fixture. The WC seed inserts a row
+  // (id `WC2026-...`, hand-entered kickoff/venue) AND the api-football poller
+  // inserts its own row (numeric id, live kickoff/venue) for the same match —
+  // the seed row is never deleted, so both appear. Their kickoffs can land on
+  // different days/UTC dates, so we key on the team-pair ALONE (normalised,
+  // order-independent). Two nations never play each other twice inside this
+  // ±1-day window, so this is safe.
+  // Use the first 3 alphanumerics of each name — the SAME slice(0,3) both
+  // backends use to build shortName. This dedups even when the two sources
+  // name a nation differently (e.g. seed "Czechia" vs api "Czech Republic",
+  // both → "cze"). None of the 48 WC nations collide on their first 3 letters.
   String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-  String keyOf(MatchDto m) {
-    final t = m.kickoffAt.toUtc();
-    final date = '${t.year}-${t.month}-${t.day}';
-    final pair = [norm(m.homeTeam.name), norm(m.awayTeam.name)]..sort();
-    return '${pair[0]}|${pair[1]}|$date';
+  String token(String name) {
+    final n = norm(name);
+    return n.length <= 3 ? n : n.substring(0, 3);
   }
-  int rank(MatchDto m) => m.status == MatchStatus.SCHEDULED ? 0 : 1;
+  String keyOf(MatchDto m) {
+    final pair = [token(m.homeTeam.name), token(m.awayTeam.name)]..sort();
+    return '${pair[0]}|${pair[1]}';
+  }
+  // Keep the authoritative row: the api-football one (numeric id, live-updating
+  // scores) beats the static seed placeholder; a live/finished row beats a
+  // SCHEDULED one. Higher rank wins.
+  final numeric = RegExp(r'^\d+$');
+  int rank(MatchDto m) =>
+      (numeric.hasMatch(m.id) ? 2 : 0) + (m.status != MatchStatus.SCHEDULED ? 1 : 0);
   final byKey = <String, MatchDto>{};
   for (final m in results.expand((e) => e)) {
     final existing = byKey[keyOf(m)];
