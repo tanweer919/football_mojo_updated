@@ -14,6 +14,44 @@ import '../../../scores/data/repositories/scores_repository.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/widgets/match_card.dart';
 
+/// Fixtures for the selected LOCAL day.
+///
+/// The backend queries fixtures by UTC calendar day, but the user picks a day
+/// in their own timezone — so a kickoff near midnight lands on the wrong day
+/// (e.g. a 23:00 UTC match shows under the next day in IST). We fetch the
+/// selected day ±1 to cover any offset, dedup the same fixture appearing twice
+/// (the WC-seed placeholder row + the api-football row), then keep only matches
+/// whose LOCAL kickoff date matches the selected day.
+Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDay) async {
+  final sel = DateTime(localDay.year, localDay.month, localDay.day);
+  final days = [sel.subtract(const Duration(days: 1)), sel, sel.add(const Duration(days: 1))];
+  final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
+
+  // Collapse duplicate rows for the same fixture on a source-agnostic key:
+  // both team names (normalised, order-independent) + the UTC calendar date.
+  // Keep the most "real" row — a live/finished row beats a SCHEDULED placeholder.
+  String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  String keyOf(MatchDto m) {
+    final t = m.kickoffAt.toUtc();
+    final date = '${t.year}-${t.month}-${t.day}';
+    final pair = [norm(m.homeTeam.name), norm(m.awayTeam.name)]..sort();
+    return '${pair[0]}|${pair[1]}|$date';
+  }
+  int rank(MatchDto m) => m.status == MatchStatus.SCHEDULED ? 0 : 1;
+  final byKey = <String, MatchDto>{};
+  for (final m in results.expand((e) => e)) {
+    final existing = byKey[keyOf(m)];
+    if (existing == null || rank(m) > rank(existing)) byKey[keyOf(m)] = m;
+  }
+
+  // Keep only matches whose LOCAL kickoff falls on the selected day.
+  return byKey.values.where((m) {
+        final l = m.kickoffAt.toLocal();
+        return l.year == sel.year && l.month == sel.month && l.day == sel.day;
+      }).toList()
+    ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+}
+
 /// Fixtures by day. Horizontal day-strip header + list/grid of matches.
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -58,7 +96,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                 final selectedCompetition = ref.watch(selectedCompetitionProvider);
                 return FutureBuilder<List<MatchDto>>(
                   key: ValueKey('${_day.toIso8601String().substring(0, 10)}:${selectedCompetition ?? 'all'}'),
-                  future: repo.fetchFixtures(day: _day),
+                  future: _localDayFixtures(repo, _day),
                   builder: (context, snap) {
                     if (snap.connectionState != ConnectionState.done) {
                       return ListView.separated(
