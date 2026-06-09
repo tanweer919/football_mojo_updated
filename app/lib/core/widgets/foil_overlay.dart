@@ -13,7 +13,7 @@ class FoilOverlay extends StatefulWidget {
     super.key,
     required this.rarity,
     required this.child,
-    this.duration = const Duration(milliseconds: 3200),
+    this.duration = const Duration(milliseconds: 5200),
   });
 
   final RarityTheme rarity;
@@ -74,7 +74,9 @@ class _FoilOverlayState extends State<FoilOverlay> with SingleTickerProviderStat
                 // keeps the sheen at the layer's (low) alpha so the card always
                 // shows through.
                 child: Opacity(
-                  opacity: (widget.rarity.foilOpacity * 0.3).clamp(0.0, 0.3),
+                  // Subtle — the art must stay clearly readable. Kept low so
+                  // the sweep reads as a gentle sheen, not a washed-out card.
+                  opacity: (widget.rarity.foilOpacity * 0.14).clamp(0.0, 0.14),
                   child: ShaderMask(
                     blendMode: BlendMode.srcIn,
                     shaderCallback: (rect) {
@@ -129,7 +131,8 @@ class _HolographicStripes extends CustomPainter {
 
     for (int i = 0; i < stripes.length; i++) {
       final paint = Paint()
-        ..color = stripes[i].withValues(alpha: 0.06 * opacity)
+        // Faint — these animated stripes were too busy in the background.
+        ..color = stripes[i].withValues(alpha: 0.025 * opacity)
         ..blendMode = BlendMode.plus;
       canvas.drawRect(
         Rect.fromLTWH(0, (i * stripeHeight) - shift, size.width, stripeHeight),
