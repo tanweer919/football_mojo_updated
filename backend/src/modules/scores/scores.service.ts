@@ -7,6 +7,9 @@ import { ApiFixture } from '../api-football/api-football.client';
 import { mapApiFootballStatus } from '../api-football/status-map';
 import { competitionIdForApi } from '../competitions/leagues.config';
 import { CHANNELS, MatchUpdatePayload } from './scores.events';
+import { fixturePairKey } from './wc-team-aliases';
+
+const WC_COMPETITION_ID = 'WC2026';
 
 const REDIS_KEYS = {
   liveMatchIds: 'live:match-ids',
@@ -17,6 +20,8 @@ const REDIS_KEYS = {
 @Injectable()
 export class ScoresService {
   private readonly log = new Logger(ScoresService.name);
+  // Run the existing-duplicate sweep once per process, on the first ingest.
+  private wcSwept = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -39,6 +44,14 @@ export class ScoresService {
     let live = 0;
     const liveIds: string[] = [];
     const finishedFixtureIds: number[] = [];
+
+    // First ingest after boot: clear any pre-existing seed/api duplicates.
+    if (!this.wcSwept) {
+      this.wcSwept = true;
+      await this.reconcileWcSeedDuplicates().catch((e) =>
+        this.log.warn(`WC seed sweep failed: ${(e as Error).message}`),
+      );
+    }
 
     for (const u of upstream) {
       const id = String(u.fixture.id);
@@ -156,7 +169,7 @@ export class ScoresService {
         update: { crestUrl: u.teams.away.logo },
       });
 
-      return await this.prisma.match.create({
+      const created = await this.prisma.match.create({
         data: {
           id: String(u.fixture.id),
           competitionId,
@@ -168,10 +181,66 @@ export class ScoresService {
           venue: u.fixture.venue?.name ?? null,
         },
       });
+
+      // This is the real (numeric-id) fixture. If a hand-seeded WC placeholder
+      // exists for the same nations, drop it so the match isn't duplicated.
+      // Best-effort — never let reconciliation break ingest.
+      if (competitionId === WC_COMPETITION_ID) {
+        await this.dropSeedDuplicateFor(u.teams.home.name, u.teams.away.name, created.id)
+          .catch((e) => this.log.warn(`seed reconcile failed: ${(e as Error).message}`));
+      }
+      return created;
     } catch (err) {
       this.log.warn(`tryCreateMatch failed for fixture=${u.fixture.id}: ${(err as Error).message}`);
       return null;
     }
+  }
+
+  /**
+   * Delete any hand-seeded WC placeholder rows (`WC2026-*` ids) whose two
+   * nations match the given pair, keeping `keepId` (the real numeric fixture).
+   * Names are reconciled through the alias map, so api-football labels like
+   * "Ivory Coast" / "South Korea" still match the seed's "Côte d'Ivoire" /
+   * "Korea Republic". Cascades clean up the placeholder's events/predictions.
+   */
+  private async dropSeedDuplicateFor(homeName: string, awayName: string, keepId: string): Promise<void> {
+    const want = fixturePairKey(homeName, awayName);
+    const seeds = await this.prisma.match.findMany({
+      where: { competitionId: WC_COMPETITION_ID, id: { startsWith: 'WC2026-' } },
+      select: { id: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
+    });
+    const dupes = seeds
+      .filter((m) => m.id !== keepId && fixturePairKey(m.homeTeam.name, m.awayTeam.name) === want)
+      .map((m) => m.id);
+    if (dupes.length) {
+      await this.prisma.match.deleteMany({ where: { id: { in: dupes } } });
+      this.log.log(`reconciled WC seed placeholder(s) for ${homeName} vs ${awayName} → ${keepId}`);
+    }
+  }
+
+  /**
+   * One-time sweep to clear placeholder/api duplicates already sitting in the
+   * DB (rows created before reconciliation existed). For every nation pair that
+   * has BOTH a real numeric-id row and a `WC2026-*` seed row, drop the seed row.
+   * Idempotent and safe to run on every boot — only ~64 WC rows are scanned.
+   */
+  async reconcileWcSeedDuplicates(): Promise<number> {
+    const rows = await this.prisma.match.findMany({
+      where: { competitionId: WC_COMPETITION_ID },
+      select: { id: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
+    });
+    const realPairs = new Set<string>();
+    for (const m of rows) {
+      if (/^\d+$/.test(m.id)) realPairs.add(fixturePairKey(m.homeTeam.name, m.awayTeam.name));
+    }
+    const stale = rows
+      .filter((m) => m.id.startsWith('WC2026-') && realPairs.has(fixturePairKey(m.homeTeam.name, m.awayTeam.name)))
+      .map((m) => m.id);
+    if (stale.length) {
+      await this.prisma.match.deleteMany({ where: { id: { in: stale } } });
+      this.log.log(`reconciled ${stale.length} stale WC seed duplicate(s)`);
+    }
+    return stale.length;
   }
 
   private async publishUpdate(m: Match) {
