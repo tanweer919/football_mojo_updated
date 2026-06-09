@@ -13,7 +13,7 @@ class FoilOverlay extends StatefulWidget {
     super.key,
     required this.rarity,
     required this.child,
-    this.duration = const Duration(milliseconds: 3200),
+    this.duration = const Duration(milliseconds: 5200),
   });
 
   final RarityTheme rarity;
@@ -67,23 +67,31 @@ class _FoilOverlayState extends State<FoilOverlay> with SingleTickerProviderStat
             widget.child,
             Positioned.fill(
               child: IgnorePointer(
-                child: ShaderMask(
-                  blendMode: BlendMode.plus,
-                  shaderCallback: (rect) {
-                    final dx = (t * 2 - 1) * rect.width;
-                    final dy = (t * 2 - 1) * rect.height;
-                    return widget.rarity.foilGradient.createShader(
-                      Rect.fromLTWH(
-                        rect.left + dx,
-                        rect.top + dy,
-                        rect.width,
-                        rect.height,
-                      ),
-                    );
-                  },
-                  child: Opacity(
-                    opacity: widget.rarity.foilOpacity * 0.55,
-                    child: Container(color: Colors.white),
+                // Translucent rainbow sheen swept across the card. Capped well
+                // below 1.0 — the old `BlendMode.plus` over an opaque gradient
+                // pushed the veil to full opacity and painted the whole card
+                // white, hiding the art/name/ribbon on Rare+ tiers. `srcIn`
+                // keeps the sheen at the layer's (low) alpha so the card always
+                // shows through.
+                child: Opacity(
+                  // Subtle — the art must stay clearly readable. Kept low so
+                  // the sweep reads as a gentle sheen, not a washed-out card.
+                  opacity: (widget.rarity.foilOpacity * 0.14).clamp(0.0, 0.14),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (rect) {
+                      final dx = (t * 2 - 1) * rect.width;
+                      final dy = (t * 2 - 1) * rect.height;
+                      return widget.rarity.foilGradient.createShader(
+                        Rect.fromLTWH(
+                          rect.left + dx,
+                          rect.top + dy,
+                          rect.width,
+                          rect.height,
+                        ),
+                      );
+                    },
+                    child: const ColoredBox(color: Colors.white),
                   ),
                 ),
               ),
@@ -123,7 +131,8 @@ class _HolographicStripes extends CustomPainter {
 
     for (int i = 0; i < stripes.length; i++) {
       final paint = Paint()
-        ..color = stripes[i].withValues(alpha: 0.06 * opacity)
+        // Faint — these animated stripes were too busy in the background.
+        ..color = stripes[i].withValues(alpha: 0.025 * opacity)
         ..blendMode = BlendMode.plus;
       canvas.drawRect(
         Rect.fromLTWH(0, (i * stripeHeight) - shift, size.width, stripeHeight),

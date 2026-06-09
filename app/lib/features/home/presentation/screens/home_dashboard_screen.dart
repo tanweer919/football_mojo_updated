@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/router/route_paths.dart';
@@ -137,6 +138,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: _BracketCard(),
             ),
+
+            // Inline banner — self-hides on the ads kill-switch / Pro / no
+            // consent, so it's safe to anchor here mid-feed.
+            const SizedBox(height: 14),
+            const Center(child: PitchBannerAd(padding: EdgeInsets.symmetric(horizontal: 16))),
 
             // (Watch-ad-for-card CTA moved to the Collection + Wallet
             // screens — home stays focused.)

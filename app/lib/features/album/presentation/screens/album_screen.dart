@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/auth/sign_in_sheet.dart';
 import '../../../../core/design/app_colors.dart';
@@ -112,6 +113,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: FreeCardCta(),
                 ),
+                const SizedBox(height: 16),
+                const Center(child: PitchBannerAd(padding: EdgeInsets.symmetric(horizontal: 16))),
                 const SizedBox(height: 22),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),

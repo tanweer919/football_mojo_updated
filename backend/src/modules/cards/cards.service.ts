@@ -405,11 +405,15 @@ export class CardsService {
     // Now mint. If this throws after the debit, the user is owed gems —
     // refund through the ledger so the audit trail stays balanced.
     try {
-      return await this.minting.award({
+      const card = await this.minting.award({
         userId,
         templateId,
         source: 'DIRECT_PURCHASE',
       });
+      // Return the ENRICHED card (flattened template w/ player + art) — the
+      // bare OwnedCard from minting.award has no template, so the client's
+      // reveal rendered a blank fallback card instead of the real one.
+      return this.getOwnedCard(userId, card.id);
     } catch (err) {
       await this.gems.credit({
         userId,

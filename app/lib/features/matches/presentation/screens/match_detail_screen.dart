@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/network/api_error.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../data/ai_preview_repository.dart';
@@ -106,6 +107,9 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: _EventsBlock(matchId: match.id, homeTeamId: match.homeTeam.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Line-ups', icon: Icons.group)),
         SliverToBoxAdapter(child: _LineupsBlock(matchId: match.id)),
+        const SliverToBoxAdapter(
+          child: Center(child: PitchBannerAd(padding: EdgeInsets.fromLTRB(16, 20, 16, 0))),
+        ),
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
