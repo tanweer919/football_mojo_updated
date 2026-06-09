@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/widgets/empty_states.dart';
@@ -51,6 +52,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
               onChanged: (d) => setState(() => _day = d),
             ),
             const Divider(height: 1),
+            const PitchBannerAd(padding: EdgeInsets.fromLTRB(12, 8, 12, 0)),
             Expanded(
               child: Consumer(builder: (context, ref, _) {
                 final selectedCompetition = ref.watch(selectedCompetitionProvider);

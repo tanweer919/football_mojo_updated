@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/ads/admob_service.dart';
 import '../../../../core/auth/auth_repository.dart';
 import '../../../../core/auth/sign_in_sheet.dart';
 import '../../../../core/design/app_colors.dart';
@@ -18,6 +19,7 @@ import '../../../album/data/models/card_models.dart';
 import '../../../album/data/repositories/album_repository.dart';
 import '../../../album/presentation/screens/card_reward_reveal_screen.dart';
 import '../../../iap/data/gems_repository.dart';
+import '../../../iap/data/iap_service.dart';
 import '../../../iap/presentation/widgets/gem_chip.dart';
 
 /// Gem shop — the place gems become useful. Two halal-safe ways to spend:
@@ -142,6 +144,12 @@ class _GemShopScreenState extends ConsumerState<GemShopScreen> {
       final cards = await ref.read(albumRepositoryProvider).purchaseBundle(b.id);
       _invalidateAfterPurchase();
       if (mounted) await _revealCards(cards);
+      // Opening a pack is a natural break — show an interstitial here. The
+      // service enforces a frequency cap (min interval + every-Nth) and is a
+      // no-op under the ads kill-switch / no consent; we also skip it for Pro.
+      if (mounted && !ref.read(isProActiveProvider)) {
+        AdmobService.instance.maybeShowInterstitial();
+      }
     } catch (e) {
       _showError(e);
     } finally {
