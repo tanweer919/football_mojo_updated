@@ -53,8 +53,6 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   @override
   Widget build(BuildContext context) {
-    final dateLabel = DateFormat('EEEE · d MMM').format(DateTime.now());
-
     return RefreshIndicator(
       color: AppColors.gold,
       backgroundColor: AppColors.surface3,
@@ -91,8 +89,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           children: [
             SizedBox(height: MediaQuery.viewPaddingOf(context).top),
             const _Appbar(),
-            const SizedBox(height: 6),
-            _Greeting(dateLabel: dateLabel),
             const SizedBox(height: 6),
 
             // Match hero — the single most relevant match right now, then a
@@ -183,44 +179,71 @@ class _Appbar extends StatelessWidget {
   const _Appbar();
   @override
   Widget build(BuildContext context) {
+    final dateLabel =
+        DateFormat('EEE · d MMM').format(DateTime.now()).toUpperCase();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
       child: Row(
         children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Color(0xFFF1E4B6),
-                  Color(0xFFE5C26B),
-                  Color(0xFF8E6422),
+          // Brand + today's date stacked, so the date costs no extra row.
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Color(0xFFF1E4B6),
+                          Color(0xFFE5C26B),
+                          Color(0xFF8E6422),
+                        ],
+                        stops: [0.2, 0.6, 1.0],
+                        center: Alignment(-0.3, -0.4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ShaderMask(
+                    shaderCallback: (rect) => const LinearGradient(
+                      colors: [AppColors.goldSoft, AppColors.goldDeep],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ).createShader(rect),
+                    child: const Text(
+                      'PITCH',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.36,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ],
-                stops: [0.2, 0.6, 1.0],
-                center: Alignment(-0.3, -0.4),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          ShaderMask(
-            shaderCallback:
-                (rect) => const LinearGradient(
-                  colors: [AppColors.goldSoft, AppColors.goldDeep],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ).createShader(rect),
-            child: const Text(
-              'PITCH',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.36,
-                color: Colors.white,
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Text(
+                  dateLabel,
+                  style: const TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.muted,
+                    letterSpacing: 1.0,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
           const Spacer(),
           const _GemChip(),
@@ -295,21 +318,6 @@ class _GemChip extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // GREETING
 // ─────────────────────────────────────────────────────────────────────────────
-
-class _Greeting extends StatelessWidget {
-  const _Greeting({required this.dateLabel});
-  final String dateLabel;
-  @override
-  Widget build(BuildContext context) {
-    // Slim date line only — the appbar already carries the PITCH brand, so the
-    // old "Welcome back to PITCH" headline was redundant and pushed real
-    // content below the fold.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
-      child: Eyebrow(dateLabel),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION HEAD
