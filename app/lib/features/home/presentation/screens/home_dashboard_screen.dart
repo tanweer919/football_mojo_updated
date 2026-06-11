@@ -493,6 +493,8 @@ class _MatchFeatureCard extends StatelessWidget {
                   Expanded(child: _MatchHeroSide(team: match.awayTeam)),
                 ],
               ),
+              // Goals + red cards per side (live/finished), like match detail.
+              _MatchHeroEvents(match: match),
               const SizedBox(height: 18),
               Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 10),
@@ -768,6 +770,122 @@ class _MatchHeroStatus extends StatelessWidget {
   }
 }
 
+/// Two-column goals + red-cards strip under the hero scoreline (live/finished),
+/// mirroring the match-detail hero. Own goals are credited to the opposite
+/// side; red cards stay with the player's own team.
+class _MatchHeroEvents extends ConsumerWidget {
+  const _MatchHeroEvents({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!match.isLive && !match.isFinished) return const SizedBox.shrink();
+    final events = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) => [
+            for (final e in es)
+              if (e.kind == EventKind.goal ||
+                  e.kind == EventKind.ownGoal ||
+                  e.kind == EventKind.penalty ||
+                  e.kind == EventKind.red)
+                e
+          ],
+          orElse: () => const <MatchEventDto>[],
+        );
+    if (events.isEmpty) return const SizedBox.shrink();
+
+    final home = <MatchEventDto>[];
+    final away = <MatchEventDto>[];
+    for (final e in events) {
+      final isHome = e.kind == EventKind.ownGoal
+          ? e.teamId != match.homeTeam.id
+          : e.teamId == match.homeTeam.id;
+      (isHome ? home : away).add(e);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _HeroEventColumn(events: home, alignEnd: false)),
+          const SizedBox(width: 12),
+          Expanded(child: _HeroEventColumn(events: away, alignEnd: true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroEventColumn extends StatelessWidget {
+  const _HeroEventColumn({required this.events, required this.alignEnd});
+  final List<MatchEventDto> events;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        for (final e in events)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1.5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!alignEnd) ...[_glyph(e), const SizedBox(width: 5)],
+                Flexible(
+                  child: Text(
+                    _label(e),
+                    textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fgSoft,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                if (alignEnd) ...[const SizedBox(width: 5), _glyph(e)],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _glyph(MatchEventDto e) {
+    if (e.kind == EventKind.red) {
+      return Container(
+        width: 8,
+        height: 11,
+        decoration: BoxDecoration(
+          color: AppColors.live,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+    }
+    final icon = e.kind == EventKind.ownGoal
+        ? Icons.cancel_outlined
+        : Icons.sports_soccer;
+    final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
+    return Icon(icon, size: 11, color: color);
+  }
+
+  String _label(MatchEventDto e) {
+    final name = e.playerName ?? '—';
+    final extra = e.kind == EventKind.ownGoal
+        ? ' (OG)'
+        : e.kind == EventKind.penalty
+            ? ' (P)'
+            : '';
+    return '$name$extra ${e.displayMinute}';
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LIVE / UPCOMING RAIL — horizontal cards directly under the hero
 // ─────────────────────────────────────────────────────────────────────────────
@@ -788,7 +906,9 @@ class _HomeMatchRail extends ConsumerWidget {
           onAction: () => context.go(RoutePaths.matches),
         ),
         SizedBox(
-          height: 168,
+          // Snug to the card content (header + two team rows + divider +
+          // footer) so upcoming cards don't carry a tall empty bottom band.
+          height: 146,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
