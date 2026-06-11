@@ -93,7 +93,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const _Appbar(),
             const SizedBox(height: 6),
             _Greeting(dateLabel: dateLabel),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
 
             // Match hero — the single most relevant match right now, then a
             // rail of the remaining live / upcoming fixtures just beneath it.
@@ -301,43 +301,12 @@ class _Greeting extends StatelessWidget {
   final String dateLabel;
   @override
   Widget build(BuildContext context) {
-    const h1Style = TextStyle(
-      fontFamily: 'Inter',
-      fontSize: 26,
-      fontWeight: FontWeight.w800,
-      letterSpacing: -0.91,
-      color: AppColors.fg,
-      height: 1.1,
-    );
+    // Slim date line only — the appbar already carries the PITCH brand, so the
+    // old "Welcome back to PITCH" headline was redundant and pushed real
+    // content below the fold.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Eyebrow(dateLabel),
-          const SizedBox(height: 6),
-          RichText(
-            text: const TextSpan(
-              style: h1Style,
-              children: [
-                TextSpan(text: 'Welcome back to '),
-                TextSpan(
-                  text: 'PITCH.',
-                  style: TextStyle(
-                    fontFamily: 'IowanOldStyle',
-                    fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                    fontStyle: FontStyle.italic,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 26,
-                    color: AppColors.gold,
-                    letterSpacing: -0.91,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
+      child: Eyebrow(dateLabel),
     );
   }
 }
@@ -352,7 +321,7 @@ class _Greeting extends StatelessWidget {
 /// the head's internal padding, so they don't need this.
 class _SectionGap extends StatelessWidget {
   const _SectionGap();
-  static const double height = 18;
+  static const double height = 12;
   @override
   Widget build(BuildContext context) => const SizedBox(height: height);
 }
@@ -365,10 +334,9 @@ class _SectionHead extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      // Self-contained spacing: 18px above for separation from the
-      // previous section, 10px below to its own content. Callers never
-      // need to wrap this in a SizedBox.
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      // Self-contained spacing: top for separation from the previous section,
+      // bottom to its own content. Callers never wrap this in a SizedBox.
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -495,55 +463,15 @@ class _MatchFeatureCard extends StatelessWidget {
               ),
               // Goals + red cards per side (live/finished), like match detail.
               _MatchHeroEvents(match: match),
-              const SizedBox(height: 18),
-              Container(height: 1, color: AppColors.borderSoft),
-              const SizedBox(height: 10),
-              // Footer. For live games the badge already carries the minute/HT,
-              // so the footer is just the venue — no duplicate live indicator.
-              if (match.isLive)
-                (match.venue != null && match.venue!.isNotEmpty)
-                    ? Center(
-                        child: Text(
-                          match.venue!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: AppColors.muted,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink()
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(child: _MatchHeroStatus(match: match)),
-                    if (match.venue != null && match.venue!.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      const Text(
-                        '·',
-                        style: TextStyle(color: AppColors.muted, fontSize: 11),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          match.venue!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: AppColors.muted,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              // Footer only when NOT live: a thin divider + the kickoff / FT
+              // line. Live state is fully carried by the badge + events, and the
+              // stadium is dropped here to keep the hero short (it's on detail).
+              if (!match.isLive) ...[
+                const SizedBox(height: 16),
+                Container(height: 1, color: AppColors.borderSoft),
+                const SizedBox(height: 10),
+                Center(child: _MatchHeroStatus(match: match)),
+              ],
             ],
           ),
         ),
@@ -908,7 +836,7 @@ class _HomeMatchRail extends ConsumerWidget {
         SizedBox(
           // Snug to the card content (header + two team rows + divider +
           // footer) so upcoming cards don't carry a tall empty bottom band.
-          height: 146,
+          height: 150,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
