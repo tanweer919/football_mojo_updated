@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma.service';
 import { MintingService } from '../cards/minting.service';
 import { GemsService } from '../gems/gems.service';
+import { fixturePairKey } from '../scores/wc-team-aliases';
 
 // Skill-based prediction game. Users predict score; points awarded by accuracy.
 // No stakes, no wagers, no money in or out. This is the cleanest possible halal mechanic.
@@ -420,21 +421,36 @@ export class PredictionsService {
 
   // First knockout kickoff = lock for the bracket. Falls back to first match
   // of the competition if no knockout stage is tagged yet.
+  /**
+   * Brackets lock at the END of matchday 1 (i.e. the instant matchday 2
+   * begins). With 48 teams there are 24 matches per matchday, and the group
+   * stage is entirely chronologically before any knockout tie — so the first
+   * 24 DISTINCT fixtures by kickoff are matchday 1, and the 25th is the first
+   * matchday-2 match. We dedup by canonical team-pair because a seed
+   * placeholder and its api-football row can briefly coexist (different
+   * kickoffs) before reconciliation removes the placeholder.
+   */
   private async bracketLockTime(competitionId: string): Promise<Date | null> {
-    const knockout = await this.prisma.match.findFirst({
-      where: {
-        competitionId,
-        stage: { in: ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER', 'SEMI', 'FINAL'] },
-      },
-      orderBy: { kickoffAt: 'asc' },
-      select: { kickoffAt: true },
-    });
-    if (knockout) return knockout.kickoffAt;
-    const first = await this.prisma.match.findFirst({
+    const rows = await this.prisma.match.findMany({
       where: { competitionId },
       orderBy: { kickoffAt: 'asc' },
-      select: { kickoffAt: true },
+      select: {
+        kickoffAt: true,
+        homeTeam: { select: { name: true } },
+        awayTeam: { select: { name: true } },
+      },
     });
-    return first?.kickoffAt ?? null;
+    const seen = new Set<string>();
+    const kickoffs: Date[] = [];
+    for (const m of rows) {
+      const key = fixturePairKey(m.homeTeam.name, m.awayTeam.name);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      kickoffs.push(m.kickoffAt);
+    }
+    const MATCHDAY_SIZE = 24; // 48 teams ÷ 2
+    if (kickoffs.length > MATCHDAY_SIZE) return kickoffs[MATCHDAY_SIZE];
+    // Schedule not fully seeded yet — fall back to the last fixture we have.
+    return kickoffs.length ? kickoffs[kickoffs.length - 1] : null;
   }
 }

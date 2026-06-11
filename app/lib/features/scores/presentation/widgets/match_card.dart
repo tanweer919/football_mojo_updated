@@ -8,6 +8,7 @@ import '../../../../core/design/motion.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/score_flip.dart';
 import '../../../../core/widgets/team_crest.dart';
+import '../../../matches/presentation/widgets/match_share_card.dart';
 import '../../../predictions/presentation/widgets/predict_sheet.dart';
 import '../../data/models/match_dto.dart';
 
@@ -50,6 +51,9 @@ class MatchCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.push('/matches/${match.id}'),
+          // Long-press to share a branded graphic of this fixture
+          // (live/finished show the score, upcoming generates hype).
+          onLongPress: () => shareMatchGraphic(context, match),
           borderRadius: BorderRadius.circular(AppRadii.lg),
           child: Padding(
             padding: const EdgeInsets.symmetric(

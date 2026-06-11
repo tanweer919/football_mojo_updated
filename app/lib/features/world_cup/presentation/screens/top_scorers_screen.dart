@@ -59,8 +59,8 @@ class _TopScorersScreenState extends ConsumerState<TopScorersScreen> {
                     eyebrow: _showAssists ? 'Top assists' : 'Top scorers',
                     title: 'No leaderboard yet',
                     subtitle: _showAssists
-                        ? 'Assists rankings appear after the first round of fixtures.'
-                        : 'The Golden Boot race opens after the first matchday.',
+                        ? 'Assist leaders update as the matches are played.'
+                        : 'The Golden Boot race is underway — first goals incoming.',
                     glyph: EmptyGlyph.trophy,
                   );
                 }

@@ -1,8 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/deeplink/chottu_link_service.dart';
 import '../../../../core/design/app_colors.dart';
+import '../../../../core/share/share_service.dart';
 import '../../../scores/data/models/match_dto.dart';
+
+/// Render the [MatchShareCard] graphic off-screen and hand it to the share
+/// sheet alongside a ChottuLink deep link. Crests are warmed first so they
+/// paint on the captured frame; on any failure we still share the text+link.
+/// Shared by the match-detail share button and the match-list long-press.
+Future<void> shareMatchGraphic(BuildContext context, MatchDto match) async {
+  Future<void> warm(String? url) async {
+    if (url == null || url.isEmpty) return;
+    try {
+      await precacheImage(NetworkImage(url), context);
+    } catch (_) {/* fall back to the lettered disc */}
+  }
+
+  await Future.wait([
+    warm(match.homeTeam.crestUrl),
+    warm(match.awayTeam.crestUrl),
+  ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
+  if (!context.mounted) return;
+
+  final path = await ShareService.instance.renderArtifactToFile(
+    context: context,
+    logicalSize: MatchShareCard.logicalSize,
+    filename: 'pitch_match_${match.id}.png',
+    builder: (_) => MatchShareCard(match: match),
+  );
+
+  final showScore = match.isLive || match.isFinished;
+  await ChottuLinkService.instance.shareMatch(
+    matchId: match.id,
+    homeTeam: match.homeTeam.name,
+    awayTeam: match.awayTeam.name,
+    homeScore: showScore ? match.homeScore : null,
+    awayScore: showScore ? match.awayScore : null,
+    imagePath: path,
+  );
+}
 
 /// Shareable 1080×1350 match graphic in the PITCH gold/dark style.
 ///

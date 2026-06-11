@@ -23,8 +23,6 @@ import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/models/match_stats_dto.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
-import '../../../../core/deeplink/chottu_link_service.dart';
-import '../../../../core/share/share_service.dart';
 import '../widgets/match_share_card.dart';
 
 /// Match detail — single scrollable page with hero + stats + events + lineups
@@ -60,6 +58,8 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
   void _applyUpdate(MatchUpdate u) {
     final base = _match;
     if (!mounted || u.id != widget.matchId || base == null) return;
+    final scoreChanged =
+        u.homeScore != base.homeScore || u.awayScore != base.awayScore;
     setState(() {
       _match = base.copyWith(
         status: u.status,
@@ -70,6 +70,12 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
         awayPenalties: u.awayPenalties,
       );
     });
+    // A goal fires a score delta → refresh the key-moments + stats so the new
+    // event/possession lands without the user pulling to refresh.
+    if (scoreChanged) {
+      ref.invalidate(matchEventsProvider(widget.matchId));
+      ref.invalidate(matchStatsProvider(widget.matchId));
+    }
   }
 
   @override
@@ -381,47 +387,12 @@ class _Topbar extends StatelessWidget {
           ),
           CircleIconButton(
             icon: Icons.share_outlined,
-            onPressed: () => _shareMatchGraphic(context, match),
+            onPressed: () => shareMatchGraphic(context, match),
           ),
         ],
       ),
     );
   }
-}
-
-/// Render the [MatchShareCard] graphic off-screen and hand it to the share
-/// sheet alongside a ChottuLink deep link. Crests are warmed first so they
-/// paint on the captured frame; on any failure we still share the text+link.
-Future<void> _shareMatchGraphic(BuildContext context, MatchDto match) async {
-  Future<void> warm(String? url) async {
-    if (url == null || url.isEmpty) return;
-    try {
-      await precacheImage(NetworkImage(url), context);
-    } catch (_) {/* fall back to the lettered disc */}
-  }
-
-  await Future.wait([
-    warm(match.homeTeam.crestUrl),
-    warm(match.awayTeam.crestUrl),
-  ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
-  if (!context.mounted) return;
-
-  final path = await ShareService.instance.renderArtifactToFile(
-    context: context,
-    logicalSize: MatchShareCard.logicalSize,
-    filename: 'pitch_match_${match.id}.png',
-    builder: (_) => MatchShareCard(match: match),
-  );
-
-  final showScore = match.isLive || match.isFinished;
-  await ChottuLinkService.instance.shareMatch(
-    matchId: match.id,
-    homeTeam: match.homeTeam.name,
-    awayTeam: match.awayTeam.name,
-    homeScore: showScore ? match.homeScore : null,
-    awayScore: showScore ? match.awayScore : null,
-    imagePath: path,
-  );
 }
 
 // ─── HERO ──────────────────────────────────────────────────────────────────

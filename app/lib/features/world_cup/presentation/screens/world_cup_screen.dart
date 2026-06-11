@@ -71,7 +71,7 @@ class WorldCupScreen extends ConsumerWidget {
                   return const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'Groups will appear once the draw is complete.',
+                      'Group standings update live as matches are played.',
                       style: TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
                   );
@@ -119,7 +119,7 @@ class WorldCupScreen extends ConsumerWidget {
                   return const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'Venue list publishes after the host cities confirm.',
+                      'Host venues across the USA, Canada and Mexico.',
                       style: TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
                   );
@@ -193,9 +193,9 @@ class _Hero extends StatelessWidget {
                   height: 0.95,
                 ),
                 children: [
-                  TextSpan(text: 'North America\nopens its '),
+                  TextSpan(text: 'The world\nis '),
                   TextSpan(
-                    text: 'gates.',
+                    text: 'watching.',
                     style: TextStyle(
                       fontFamily: 'IowanOldStyle',
                       fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
