@@ -13,6 +13,7 @@ export interface MatchUpdatePayload {
   id: string;
   status: MatchStatus;
   minute: number | null;
+  minuteExtra: number | null;
   homeScore: number;
   awayScore: number;
   homePenalties: number | null;

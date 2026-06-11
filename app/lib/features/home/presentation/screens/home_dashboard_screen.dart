@@ -595,7 +595,7 @@ class _MatchHeroBadge extends StatelessWidget {
                 Text(
                   match.status == MatchStatus.HALF_TIME
                       ? 'HT'
-                      : "${match.minute ?? 0}'",
+                      : match.minuteLabel,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 10,
@@ -976,7 +976,7 @@ class _RailFooter extends ConsumerWidget {
           },
           orElse: () => null,
         );
-    final minute = "${match.minute ?? 0}'";
+    final minute = match.minuteLabel;
     final scorer = (lastGoal?.playerName != null)
         ? '  ·  ↑ ${lastGoal!.playerName} (${lastGoal.minute}\')'
         : '';

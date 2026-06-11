@@ -61,6 +61,7 @@ export class ScoresService {
       const homePenalties = u.score.penalty.home;
       const awayPenalties = u.score.penalty.away;
       const minute        = u.fixture.status.elapsed;
+      const minuteExtra   = u.fixture.status.extra;
 
       if (status === 'LIVE' || status === 'HALF_TIME') {
         live++;
@@ -87,6 +88,7 @@ export class ScoresService {
         existing.homeScore !== homeScore ||
         existing.awayScore !== awayScore ||
         existing.minute !== minute ||
+        existing.minuteExtra !== minuteExtra ||
         existing.homePenalties !== homePenalties ||
         existing.awayPenalties !== awayPenalties;
 
@@ -95,7 +97,7 @@ export class ScoresService {
 
       const updated = await this.prisma.match.update({
         where: { id },
-        data: { status, minute, homeScore, awayScore, homePenalties, awayPenalties },
+        data: { status, minute, minuteExtra, homeScore, awayScore, homePenalties, awayPenalties },
       });
 
       // Flag transitions to FT so the poller can freeze the upstream caches.
@@ -177,6 +179,7 @@ export class ScoresService {
           awayTeamId: String(u.teams.away.id),
           kickoffAt: new Date(u.fixture.date),
           status, minute, homeScore, awayScore, homePenalties, awayPenalties,
+          minuteExtra: u.fixture.status.extra,
           stage: u.league.round,
           venue: u.fixture.venue?.name ?? null,
         },
@@ -275,6 +278,7 @@ export class ScoresService {
       id: m.id,
       status: m.status,
       minute: m.minute,
+      minuteExtra: m.minuteExtra,
       homeScore: m.homeScore,
       awayScore: m.awayScore,
       homePenalties: m.homePenalties,
