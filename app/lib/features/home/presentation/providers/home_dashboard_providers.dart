@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/favourites/favourites_provider.dart';
 import '../../../news/data/models/news_article.dart';
 import '../../../news/data/repositories/news_repository.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
+import '../../../scores/presentation/providers/live_matches_provider.dart';
 
 /// Bundled fixtures for the home dashboard:
 ///   - upcoming: all upcoming matches in the query window, sorted by kickoff
@@ -14,6 +16,69 @@ class HomeFixtures {
   final List<MatchDto> recent;
   final MatchDto? next;
 }
+
+/// What the home "match" zone shows: the hero match + the rail beneath it,
+/// decided together so they never duplicate or disagree.
+class HomeMatchFeed {
+  const HomeMatchFeed({
+    required this.hero,
+    required this.railTitle,
+    required this.railItems,
+  });
+  final MatchDto? hero;
+  final String railTitle;
+  final List<MatchDto> railItems;
+}
+
+/// Hero priority: a followed team's live match → the earliest-started live
+/// match → (nothing live) the next fixture if it kicks off within 30 min →
+/// otherwise the latest result (shown until 30 min before the next kickoff).
+/// Rail: ≥2 live → "Live now" (the live matches not in the hero); otherwise
+/// "Upcoming matches" (the next 3 scheduled fixtures, hero excluded).
+final homeMatchFeedProvider = Provider<HomeMatchFeed>((ref) {
+  final live = ref.watch(liveMatchesProvider).valueOrNull ?? const <MatchDto>[];
+  final fixtures = ref.watch(homeFixturesProvider).valueOrNull;
+  final followed =
+      ref.watch(favouriteTeamsProvider).valueOrNull ?? const <String>{};
+  final now = DateTime.now();
+
+  final liveSorted = [...live]
+    ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+  // `upcoming` keeps live matches in-bundle, so filter to genuinely scheduled
+  // ones for the rail + the hero result logic.
+  final scheduled = [
+    for (final m in (fixtures?.upcoming ?? const <MatchDto>[]))
+      if (!m.isLive) m,
+  ]..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+  final recent = fixtures?.recent ?? const <MatchDto>[];
+
+  MatchDto? hero;
+  if (liveSorted.isNotEmpty) {
+    hero = liveSorted.firstWhere(
+      (m) =>
+          followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id),
+      orElse: () => liveSorted.first,
+    );
+  } else {
+    final next = scheduled.isNotEmpty ? scheduled.first : null;
+    final startsSoon =
+        next != null && next.kickoffAt.difference(now).inMinutes <= 30;
+    hero = startsSoon ? next : (recent.isNotEmpty ? recent.first : next);
+  }
+
+  final String railTitle;
+  final List<MatchDto> railItems;
+  if (liveSorted.length >= 2) {
+    railTitle = 'Live now';
+    railItems = [for (final m in liveSorted) if (m.id != hero?.id) m];
+  } else {
+    railTitle = 'Upcoming matches';
+    railItems =
+        [for (final m in scheduled) if (m.id != hero?.id) m].take(3).toList();
+  }
+
+  return HomeMatchFeed(hero: hero, railTitle: railTitle, railItems: railItems);
+});
 
 final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
   final repo = ref.read(scoresRepositoryProvider);
