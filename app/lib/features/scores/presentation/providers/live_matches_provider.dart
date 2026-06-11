@@ -23,19 +23,30 @@ class LiveMatchesNotifier extends AsyncNotifier<List<MatchDto>> {
   }
 
   Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => ref.read(scoresRepositoryProvider).fetchLive());
+    // Refetch WITHOUT blanking the rail. Setting AsyncLoading here made the
+    // home hero (which watches this) flip from the live match back to "next
+    // upcoming" on every resync. Keep the current data on screen; only swap it
+    // out on a successful fetch, and keep it on error rather than dropping to
+    // empty.
+    try {
+      final fresh = await ref.read(scoresRepositoryProvider).fetchLive();
+      state = AsyncData(fresh);
+    } catch (_) {
+      /* keep the existing live rail */
+    }
   }
 
   void _apply(MatchUpdate u) {
-    final current = state.valueOrNull;
-    if (current == null) return;
+    final current = state.valueOrNull ?? const <MatchDto>[];
 
     final idx = current.indexWhere((m) => m.id == u.id);
     if (idx == -1) {
-      // Match wasn't in the live set — likely transitioned to LIVE just now.
-      // Trigger a refetch; cheap because the API is cached server-side for 5s.
-      refresh();
+      // Unknown match — only resync when it actually went LIVE, so finished /
+      // scheduled chatter doesn't trigger a refetch storm (each of which used
+      // to blank the rail). Cheap: the API is cached server-side for ~5s.
+      if (u.status == MatchStatus.LIVE || u.status == MatchStatus.HALF_TIME) {
+        refresh();
+      }
       return;
     }
 

@@ -93,7 +93,9 @@ class WorldCupScreen extends ConsumerWidget {
             SectionHead(
               title: 'Schedule',
               action: 'Full draw →',
-              onAction: () => context.push('/matches'),
+              // `/matches` is a bottom-nav tab — switch to it with go(), not
+              // push() (pushing a shell sibling can no-op).
+              onAction: () => context.go('/matches'),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
