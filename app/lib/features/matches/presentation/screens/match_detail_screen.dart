@@ -24,6 +24,8 @@ import '../../../insights/data/models/match_stats_dto.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/data/repositories/scores_repository.dart';
 import '../../../../core/deeplink/chottu_link_service.dart';
+import '../../../../core/share/share_service.dart';
+import '../widgets/match_share_card.dart';
 
 /// Match detail — single scrollable page with hero + stats + events + lineups
 /// stacked vertically. Each section handles its own loading/error/empty
@@ -379,18 +381,47 @@ class _Topbar extends StatelessWidget {
           ),
           CircleIconButton(
             icon: Icons.share_outlined,
-            onPressed: () => ChottuLinkService.instance.shareMatch(
-              matchId: match.id,
-              homeTeam: match.homeTeam.name,
-              awayTeam: match.awayTeam.name,
-              homeScore: match.isLive || match.isFinished ? match.homeScore : null,
-              awayScore: match.isLive || match.isFinished ? match.awayScore : null,
-            ),
+            onPressed: () => _shareMatchGraphic(context, match),
           ),
         ],
       ),
     );
   }
+}
+
+/// Render the [MatchShareCard] graphic off-screen and hand it to the share
+/// sheet alongside a ChottuLink deep link. Crests are warmed first so they
+/// paint on the captured frame; on any failure we still share the text+link.
+Future<void> _shareMatchGraphic(BuildContext context, MatchDto match) async {
+  Future<void> warm(String? url) async {
+    if (url == null || url.isEmpty) return;
+    try {
+      await precacheImage(NetworkImage(url), context);
+    } catch (_) {/* fall back to the lettered disc */}
+  }
+
+  await Future.wait([
+    warm(match.homeTeam.crestUrl),
+    warm(match.awayTeam.crestUrl),
+  ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
+  if (!context.mounted) return;
+
+  final path = await ShareService.instance.renderArtifactToFile(
+    context: context,
+    logicalSize: MatchShareCard.logicalSize,
+    filename: 'pitch_match_${match.id}.png',
+    builder: (_) => MatchShareCard(match: match),
+  );
+
+  final showScore = match.isLive || match.isFinished;
+  await ChottuLinkService.instance.shareMatch(
+    matchId: match.id,
+    homeTeam: match.homeTeam.name,
+    awayTeam: match.awayTeam.name,
+    homeScore: showScore ? match.homeScore : null,
+    awayScore: showScore ? match.awayScore : null,
+    imagePath: path,
+  );
 }
 
 // ─── HERO ──────────────────────────────────────────────────────────────────
