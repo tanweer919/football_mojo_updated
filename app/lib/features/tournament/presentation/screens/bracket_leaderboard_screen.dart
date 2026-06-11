@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/router/route_paths.dart';
 import '../../../../core/share/share_service.dart';
 import '../../../predictions/data/predictions_repository.dart';
 import '../widgets/bracket_leaderboard_share_card.dart';
@@ -104,12 +106,26 @@ class BracketLeaderboardScreen extends ConsumerWidget {
                       theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
-                  trailing: Text(
-                    '${row.total} pts',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
-                    ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${row.total} pts',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded,
+                          color: theme.colorScheme.onSurfaceVariant),
+                    ],
+                  ),
+                  // Tap a row to view that manager's bracket (read-only).
+                  onTap: () => context.push(
+                    RoutePaths.bracketUser
+                        .replaceFirst(':userId', Uri.encodeComponent(row.userId)),
+                    extra: row.displayName,
                   ),
                 ).animate().fade(duration: 180.ms, delay: (15 * i).ms);
               },

@@ -24,6 +24,7 @@ class RoutePaths {
   static const settings    = '/settings';
   static const bracket            = '/tournament/bracket';
   static const bracketLeaderboard = '/tournament/bracket/leaderboard';
+  static const bracketUser        = '/tournament/bracket/user/:userId';
 
   // Fantasy / Global Cup / H2H
   static const fantasyHome        = '/fantasy';

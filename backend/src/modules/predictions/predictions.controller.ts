@@ -47,4 +47,15 @@ export class PredictionsController {
   bracketLeaderboard(@Query('competitionId') competitionId: string) {
     return this.predictions.bracketLeaderboard(competitionId);
   }
+
+  // Read-only view of ANY user's bracket (tapped from the leaderboard).
+  // Brackets are public predictions scored off public results, so there's
+  // nothing owner-private here — getMyBracket looks up purely by userId.
+  @Get('bracket/user/:userId')
+  async userBracket(
+    @Param('userId') userId: string,
+    @Query('competitionId') competitionId?: string,
+  ) {
+    return (await this.predictions.getMyBracket(userId, competitionId ?? 'WC2026')) ?? null;
+  }
 }

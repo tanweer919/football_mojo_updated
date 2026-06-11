@@ -176,13 +176,15 @@ class ChottuLinkService {
     );
   }
 
-  /// Share a match.
+  /// Share a match. Optionally attaches a pre-rendered PNG graphic (see
+  /// `MatchShareCard` + `ShareService.renderArtifactToFile`).
   Future<void> shareMatch({
     required String matchId,
     required String homeTeam,
     required String awayTeam,
     int? homeScore,
     int? awayScore,
+    String? imagePath,
   }) async {
     final hasScore = homeScore != null && awayScore != null;
     final scoreLine = hasScore ? '$homeTeam $homeScore - $awayScore $awayTeam' : '$homeTeam vs $awayTeam';
@@ -193,6 +195,7 @@ class ChottuLinkService {
       socialTitle: scoreLine,
       socialDescription: 'Follow live on FootballMojo',
       shareText: '$scoreLine\n\n',
+      imagePath: imagePath,
     );
   }
 

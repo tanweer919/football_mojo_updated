@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -51,31 +49,6 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
-  Timer? _tick;
-  Duration _wcCountdown = _initialWcCountdown();
-
-  static Duration _initialWcCountdown() {
-    final now = DateTime.now();
-    final wc = DateTime(2026, 6, 11, 16, 0);
-    final d = wc.difference(now);
-    return d.isNegative ? Duration.zero : d;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _wcCountdown = _initialWcCountdown());
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final dateLabel = DateFormat('EEEE · d MMM').format(DateTime.now());
@@ -119,7 +92,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 6),
             _Greeting(dateLabel: dateLabel),
             const SizedBox(height: 12),
-            _WcHero(remaining: _wcCountdown),
 
             // Match hero — the single most relevant match right now.
             // Live first, then the next upcoming kickoff. Bigger card
@@ -363,166 +335,6 @@ class _Greeting extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WC HERO (real countdown to 11 Jun 2026)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _WcHero extends StatelessWidget {
-  const _WcHero({required this.remaining});
-  final Duration remaining;
-  @override
-  Widget build(BuildContext context) {
-    final days = remaining.inDays;
-    final hours = remaining.inHours % 24;
-    final mins = remaining.inMinutes % 60;
-    final secs = remaining.inSeconds % 60;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF211D17), Color(0xFF110F0D)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          border: Border.all(color: AppColors.goldHairline),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Title block — eyebrow + small CTA
-            Expanded(
-              flex: 5,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: const [
-                      Text(
-                        '★ ',
-                        style: TextStyle(
-                          color: AppColors.goldDeep,
-                          fontSize: 10,
-                          height: 1,
-                        ),
-                      ),
-                      Flexible(
-                        child: Eyebrow('WORLD CUP 2026', gold: true, size: 10),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Kicks off 11 Jun',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.fg,
-                      letterSpacing: -0.3,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => context.push(RoutePaths.bracket),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'Make bracket',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.gold,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          Icons.arrow_forward,
-                          color: AppColors.gold,
-                          size: 12,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Compact countdown cells — half the previous height
-            Expanded(
-              flex: 7,
-              child: Row(
-                children: [
-                  Expanded(child: _CountdownCell(n: days, l: 'D')),
-                  const SizedBox(width: 4),
-                  Expanded(child: _CountdownCell(n: hours, l: 'H')),
-                  const SizedBox(width: 4),
-                  Expanded(child: _CountdownCell(n: mins, l: 'M')),
-                  const SizedBox(width: 4),
-                  Expanded(child: _CountdownCell(n: secs, l: 'S')),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CountdownCell extends StatelessWidget {
-  const _CountdownCell({required this.n, required this.l});
-  final int n;
-  final String l;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-      decoration: BoxDecoration(
-        color: const Color(0x8C0F0E0D),
-        borderRadius: BorderRadius.circular(AppRadii.r2),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            n.toString().padLeft(2, '0'),
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
-              color: AppColors.gold,
-              height: 1.0,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            l,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
-              color: AppColors.muted,
-              letterSpacing: 0.8,
-              height: 1.0,
             ),
           ),
         ],
