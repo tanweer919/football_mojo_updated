@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/favourites/favourites_provider.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
@@ -419,6 +420,8 @@ class _NextMatchHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final live = ref.watch(liveMatchesProvider);
     final fixtures = ref.watch(homeFixturesProvider);
+    final followed =
+        ref.watch(favouriteTeamsProvider).valueOrNull ?? const <String>{};
 
     if (live.isLoading && fixtures.isLoading) {
       return const _HeroSkeleton();
@@ -426,12 +429,20 @@ class _NextMatchHero extends ConsumerWidget {
 
     final liveList = live.valueOrNull;
     final fixtureBundle = fixtures.valueOrNull;
-    final MatchDto? selected =
-        liveList != null && liveList.isNotEmpty
-            ? liveList.first
-            : (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty
-                ? fixtureBundle.upcoming.first
-                : null);
+    MatchDto? selected;
+    if (liveList != null && liveList.isNotEmpty) {
+      // Hero priority among live games: a team the user follows, otherwise the
+      // match that kicked off first (furthest into play).
+      final byKickoff = [...liveList]
+        ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+      selected = byKickoff.firstWhere(
+        (m) =>
+            followed.contains(m.homeTeam.id) || followed.contains(m.awayTeam.id),
+        orElse: () => byKickoff.first,
+      );
+    } else if (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty) {
+      selected = fixtureBundle.upcoming.first;
+    }
 
     if (selected == null) {
       return const Padding(
@@ -504,33 +515,52 @@ class _MatchFeatureCard extends StatelessWidget {
               const SizedBox(height: 18),
               Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(child: _MatchHeroStatus(match: match)),
-                  if (match.venue != null && match.venue!.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    const Text(
-                      '·',
-                      style: TextStyle(color: AppColors.muted, fontSize: 11),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        match.venue!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11,
-                          color: AppColors.muted,
-                          letterSpacing: -0.1,
+              // Footer. For live games the badge already carries the minute/HT,
+              // so the footer is just the venue — no duplicate live indicator.
+              if (match.isLive)
+                (match.venue != null && match.venue!.isNotEmpty)
+                    ? Center(
+                        child: Text(
+                          match.venue!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink()
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(child: _MatchHeroStatus(match: match)),
+                    if (match.venue != null && match.venue!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      const Text(
+                        '·',
+                        style: TextStyle(color: AppColors.muted, fontSize: 11),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          match.venue!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            letterSpacing: -0.1,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -567,20 +597,35 @@ class _MatchHeroBadge extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        if (match.isLive) ...[
-          const LiveDot(),
-          const SizedBox(width: 6),
-          const Text(
-            'LIVE',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppColors.live,
-              letterSpacing: 1.0,
+        // Same live badge as the all-matches list: a red pill with the dot and
+        // the minute, or HT at half-time (isLive includes HALF_TIME).
+        if (match.isLive)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.live.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const LiveDot(size: 7),
+                const SizedBox(width: 6),
+                Text(
+                  match.status == MatchStatus.HALF_TIME
+                      ? 'HT'
+                      : "${match.minute ?? 0}'",
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.live,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
       ],
     );
   }
