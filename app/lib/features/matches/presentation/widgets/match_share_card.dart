@@ -35,6 +35,9 @@ Future<void> shareMatchGraphic(BuildContext context, MatchDto match) async {
       context: context,
       logicalSize: MatchShareCard.logicalSize,
       filename: 'pitch_match_${match.id}.png',
+      // 2x keeps it crisp (2160×2700) while avoiding the ~52MB bitmap a 3x
+      // capture of this 1080×1350 card needs — that OOM'd the render on-device.
+      pixelRatio: 2.0,
       builder: (_) => MatchShareCard(match: match),
     );
   } catch (_) {

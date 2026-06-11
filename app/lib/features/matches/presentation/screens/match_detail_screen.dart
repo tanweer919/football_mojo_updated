@@ -411,6 +411,10 @@ class _Hero extends ConsumerWidget {
           orElse: () => const <MatchEventDto>[],
         );
     final showScore = match.isLive || match.isFinished;
+    // State-aware ambient glow behind the scoreline — red while live, champagne
+    // otherwise — so a live match reads as "live" the instant you open it.
+    final Color heroGlow =
+        match.isLive ? AppColors.live.withValues(alpha: 0.22) : AppColors.goldGlow;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
       child: Container(
@@ -428,12 +432,12 @@ class _Hero extends ConsumerWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadii.r5),
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
-                      colors: [Color(0x33A0E1B5), Colors.transparent],
-                      center: Alignment(0, -1),
-                      radius: 0.8,
+                      colors: [heroGlow, Colors.transparent],
+                      center: const Alignment(0, -1),
+                      radius: 0.85,
                     ),
                   ),
                 ),
@@ -442,23 +446,51 @@ class _Hero extends ConsumerWidget {
             Column(
               children: [
                 if (match.isLive)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const LiveDot(),
-                      const SizedBox(width: 6),
-                      Text(
-                        match.status == MatchStatus.HALF_TIME ? 'HT' : "${match.minute ?? 0}'",
-                        style: const TextStyle(
-                          fontFamily: 'JetBrainsMono',
-                          fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.live,
-                          letterSpacing: 1.65,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.live.withValues(alpha: 0.13),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(color: AppColors.live.withValues(alpha: 0.40)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const LiveDot(),
+                        const SizedBox(width: 7),
+                        const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.live,
+                            letterSpacing: 1.6,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 1,
+                          height: 11,
+                          color: AppColors.live.withValues(alpha: 0.35),
+                        ),
+                        const SizedBox(width: 8),
+                        // Minute ticks via setState on each socket update.
+                        Text(
+                          match.status == MatchStatus.HALF_TIME
+                              ? 'HT'
+                              : "${match.minute ?? 0}'",
+                          style: const TextStyle(
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.fg,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 else
                   Eyebrow(

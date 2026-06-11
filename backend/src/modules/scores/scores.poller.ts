@@ -61,8 +61,11 @@ export class ScoresPoller implements OnModuleInit {
 
     try {
       // Step 1: Are we even in a live window across ANY tracked league? If
-      // not, skip the upstream call entirely and reschedule.
-      const inWindow = await this.cache.isLiveWindow(15);
+      // not, skip the upstream call entirely and reschedule. We OR the
+      // kickoff-proximity window with a DB check for matches actually in play,
+      // so the poller can't idle mid-match (and self-heals a frozen one).
+      const inWindow =
+        (await this.cache.isLiveWindow(15)) || (await this.scores.hasActiveMatches());
       if (!inWindow) {
         const next = await this.cache.getNextKickoff();
         if (next) {
