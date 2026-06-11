@@ -123,6 +123,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const BracketLeaderboardScreen(),
       ),
       GoRoute(
+        path: RoutePaths.bracketUser,
+        builder: (_, s) => BracketScreen(
+          userId: s.pathParameters['userId'],
+          displayName: s.extra is String ? s.extra as String : null,
+        ),
+      ),
+      GoRoute(
         path: RoutePaths.awardPicks,
         builder: (_, __) => const AwardPicksScreen(),
       ),

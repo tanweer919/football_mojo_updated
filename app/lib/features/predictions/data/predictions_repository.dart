@@ -92,6 +92,16 @@ class PredictionsRepository {
     return BracketDto.fromJson(res.data as Map<String, dynamic>);
   }
 
+  /// Read-only fetch of another user's bracket (tapped from the leaderboard).
+  Future<BracketDto?> userBracket(String userId, String competitionId) async {
+    final res = await _dio.get<dynamic>(
+      '/v1/predictions/bracket/user/$userId',
+      queryParameters: {'competitionId': competitionId},
+    );
+    if (res.data == null) return null;
+    return BracketDto.fromJson(res.data as Map<String, dynamic>);
+  }
+
   Future<List<BracketLeaderRow>> bracketLeaderboard(String competitionId) async {
     final res = await _dio.get<List<dynamic>>(
       '/v1/predictions/bracket/leaderboard',
@@ -205,6 +215,11 @@ final predictionsLeaderboardProvider =
 
 final myBracketProvider = FutureProvider.family<BracketDto?, String>(
   (ref, competitionId) => ref.read(predictionsRepositoryProvider).myBracket(competitionId),
+);
+
+/// Another user's bracket, read-only. Param = (userId, competitionId).
+final userBracketProvider = FutureProvider.family<BracketDto?, (String, String)>(
+  (ref, p) => ref.read(predictionsRepositoryProvider).userBracket(p.$1, p.$2),
 );
 final bracketLeaderboardProvider = FutureProvider.family<List<BracketLeaderRow>, String>(
   (ref, competitionId) => ref.read(predictionsRepositoryProvider).bracketLeaderboard(competitionId),

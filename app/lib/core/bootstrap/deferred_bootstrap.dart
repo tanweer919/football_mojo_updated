@@ -99,15 +99,17 @@ class _DeferredBootstrap {
     });
 
     // ChottuLink — deep linking + shareable links.
-    Future.microtask(() async {
-      await ChottuLinkService.instance.init();
-      ChottuLinkService.instance.listenForLinks((rawUrl) {
-        final route = ChottuLinkService.instance.parseDeepLink(rawUrl);
-        if (route != null) {
-          container.read(appRouterProvider).go(route);
-        }
-      });
+    // Attach the link listener FIRST, synchronously: the SDK delivers incoming
+    // links on a broadcast stream, so any link emitted during launch before a
+    // listener exists is dropped (you'd land on home instead of the shared
+    // screen). init() can run after — it only authorises link *creation*.
+    ChottuLinkService.instance.listenForLinks((rawUrl) {
+      final route = ChottuLinkService.instance.parseDeepLink(rawUrl);
+      if (route != null) {
+        container.read(appRouterProvider).go(route);
+      }
     });
+    Future.microtask(() => ChottuLinkService.instance.init());
   }
 
   Future<void> _initClarity(BuildContext context) async {

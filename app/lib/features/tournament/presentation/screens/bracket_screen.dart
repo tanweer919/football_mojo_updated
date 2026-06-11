@@ -28,8 +28,21 @@ import '../widgets/bracket_prediction_card.dart';
 ///   BEST_THIRDS              → List<letter>  (max 8)
 ///   MATCH_<num>_WINNER       → teamId  (one entry per knockout match)
 class BracketScreen extends ConsumerStatefulWidget {
-  const BracketScreen({super.key, this.competitionId = 'WC2026'});
+  const BracketScreen({
+    super.key,
+    this.competitionId = 'WC2026',
+    this.userId,
+    this.displayName,
+  });
   final String competitionId;
+
+  /// When non-null, the screen shows ANOTHER user's bracket read-only
+  /// (tapped from the leaderboard). Null = the current user's editable bracket.
+  final String? userId;
+  final String? displayName;
+
+  bool get isReadOnly => userId != null;
+
   @override
   ConsumerState<BracketScreen> createState() => _BracketScreenState();
 }
@@ -344,29 +357,39 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
   @override
   Widget build(BuildContext context) {
     final groupsAsync = ref.watch(wcGroupsProvider(widget.competitionId));
-    final mineAsync = ref.watch(myBracketProvider(widget.competitionId));
+    // Viewing someone else's bracket → fetch it read-only; otherwise mine.
+    final mineAsync = widget.isReadOnly
+        ? ref.watch(userBracketProvider((widget.userId!, widget.competitionId)))
+        : ref.watch(myBracketProvider(widget.competitionId));
 
     mineAsync.whenData((b) {
       if (b != null) _hydrate(b);
     });
 
+    final title = widget.isReadOnly
+        ? ((widget.displayName?.isNotEmpty ?? false)
+            ? '${widget.displayName}’s bracket'
+            : 'Bracket')
+        : 'My bracket';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My bracket'),
+        title: Text(title),
         actions: [
-          // Save-to-gallery — only meaningful once the bracket is complete
-          // (a champion is picked), so it's shown then.
-          if (_isComplete())
+          // Share / save-to-gallery act on the picks as "my prediction", so
+          // only offer them on the user's own bracket.
+          if (!widget.isReadOnly && _isComplete())
             IconButton(
               tooltip: 'Save to gallery',
               icon: const Icon(Icons.download_rounded),
               onPressed: () => _savePredictionToGallery(groupsAsync.valueOrNull),
             ),
-          IconButton(
-            tooltip: 'Share',
-            icon: const Icon(Icons.ios_share_rounded),
-            onPressed: () => _sharePrediction(groupsAsync.valueOrNull),
-          ),
+          if (!widget.isReadOnly)
+            IconButton(
+              tooltip: 'Share',
+              icon: const Icon(Icons.ios_share_rounded),
+              onPressed: () => _sharePrediction(groupsAsync.valueOrNull),
+            ),
           IconButton(
             tooltip: 'Leaderboard',
             icon: const Icon(Icons.emoji_events_outlined),
@@ -386,10 +409,13 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
               for (final s in g.standings) s.team.id: s.team,
           };
           final thirdAssign = _bestThirdAssignment();
-          final locked = mineAsync.maybeWhen(
-            data: (b) => b?.isLocked ?? false,
-            orElse: () => false,
-          );
+          // Another user's bracket is always read-only (drives the same
+          // `locked` gate every edit callback already respects).
+          final locked = widget.isReadOnly ||
+              mineAsync.maybeWhen(
+                data: (b) => b?.isLocked ?? false,
+                orElse: () => false,
+              );
           final lockAt = mineAsync.maybeWhen(
             data: (b) => b?.lockedAt,
             orElse: () => null,
@@ -404,6 +430,7 @@ class _BracketScreenState extends ConsumerState<BracketScreen> {
             picks: _picks,
             filled: _filled(),
             locked: locked,
+            showSave: !widget.isReadOnly,
             lockAt: lockAt,
             points: pts,
             saving: _saving,
@@ -670,6 +697,7 @@ class _BracketBody extends StatelessWidget {
     required this.picks,
     required this.filled,
     required this.locked,
+    required this.showSave,
     required this.lockAt,
     required this.points,
     required this.saving,
@@ -685,6 +713,7 @@ class _BracketBody extends StatelessWidget {
   final Map<String, dynamic> picks;
   final int filled;
   final bool locked;
+  final bool showSave;
   final DateTime? lockAt;
   final int points;
   final bool saving;
@@ -763,31 +792,33 @@ class _BracketBody extends StatelessWidget {
           ],
         ),
 
-        // Sticky save button.
-        Positioned(
-          left: 16, right: 16, bottom: 16,
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+        // Sticky save button — hidden entirely when viewing someone else's
+        // bracket (nothing to save).
+        if (showSave)
+          Positioned(
+            left: 16, right: 16, bottom: 16,
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  icon: Icon(locked ? Icons.lock_outline : Icons.check_rounded),
+                  label: Text(
+                    locked
+                        ? 'Bracket locked'
+                        : (saving
+                            ? 'Saving…'
+                            : 'Save bracket  ·  $filled / $wc2026TotalPicks picks'),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onPressed: locked || saving ? null : onSave,
                 ),
-                icon: Icon(locked ? Icons.lock_outline : Icons.check_rounded),
-                label: Text(
-                  locked
-                      ? 'Bracket locked'
-                      : (saving
-                          ? 'Saving…'
-                          : 'Save bracket  ·  $filled / $wc2026TotalPicks picks'),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                onPressed: locked || saving ? null : onSave,
               ),
             ),
           ),
-        ),
       ],
     );
   }
