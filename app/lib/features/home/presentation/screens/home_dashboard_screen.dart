@@ -89,7 +89,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           children: [
             SizedBox(height: MediaQuery.viewPaddingOf(context).top),
             const _Appbar(),
-            const SizedBox(height: 6),
 
             // Match hero — the single most relevant match right now, then a
             // rail of the remaining live / upcoming fixtures just beneath it.
@@ -182,65 +181,58 @@ class _Appbar extends StatelessWidget {
     final dateLabel =
         DateFormat('EEE · d MMM').format(DateTime.now()).toUpperCase();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
       child: Row(
         children: [
-          // Brand + today's date stacked, so the date costs no extra row.
+          // Dot centred against the whole PITCH + date block.
+          Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Color(0xFFF1E4B6),
+                  Color(0xFFE5C26B),
+                  Color(0xFF8E6422),
+                ],
+                stops: [0.2, 0.6, 1.0],
+                center: Alignment(-0.3, -0.4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Color(0xFFF1E4B6),
-                          Color(0xFFE5C26B),
-                          Color(0xFF8E6422),
-                        ],
-                        stops: [0.2, 0.6, 1.0],
-                        center: Alignment(-0.3, -0.4),
-                      ),
-                    ),
+              ShaderMask(
+                shaderCallback: (rect) => const LinearGradient(
+                  colors: [AppColors.goldSoft, AppColors.goldDeep],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ).createShader(rect),
+                child: const Text(
+                  'PITCH',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.36,
+                    color: Colors.white,
                   ),
-                  const SizedBox(width: 8),
-                  ShaderMask(
-                    shaderCallback: (rect) => const LinearGradient(
-                      colors: [AppColors.goldSoft, AppColors.goldDeep],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ).createShader(rect),
-                    child: const Text(
-                      'PITCH',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.36,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.only(left: 30),
-                child: Text(
-                  dateLabel,
-                  style: const TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.muted,
-                    letterSpacing: 1.0,
-                  ),
+              const SizedBox(height: 1),
+              Text(
+                dateLabel,
+                style: const TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.muted,
+                  letterSpacing: 1.0,
                 ),
               ),
             ],
