@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/deeplink/chottu_link_service.dart';
@@ -8,9 +9,13 @@ import '../../../scores/data/models/match_dto.dart';
 
 /// Render the [MatchShareCard] graphic off-screen and hand it to the share
 /// sheet alongside a ChottuLink deep link. Crests are warmed first so they
-/// paint on the captured frame; on any failure we still share the text+link.
+/// paint on the captured frame. If the render fails we surface a snackbar and
+/// still share the link, so it never silently dead-ends.
 /// Shared by the match-detail share button and the match-list long-press.
 Future<void> shareMatchGraphic(BuildContext context, MatchDto match) async {
+  HapticFeedback.selectionClick();
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
   Future<void> warm(String? url) async {
     if (url == null || url.isEmpty) return;
     try {
@@ -24,12 +29,22 @@ Future<void> shareMatchGraphic(BuildContext context, MatchDto match) async {
   ]).timeout(const Duration(seconds: 5), onTimeout: () => const []);
   if (!context.mounted) return;
 
-  final path = await ShareService.instance.renderArtifactToFile(
-    context: context,
-    logicalSize: MatchShareCard.logicalSize,
-    filename: 'pitch_match_${match.id}.png',
-    builder: (_) => MatchShareCard(match: match),
-  );
+  String? path;
+  try {
+    path = await ShareService.instance.renderArtifactToFile(
+      context: context,
+      logicalSize: MatchShareCard.logicalSize,
+      filename: 'pitch_match_${match.id}.png',
+      builder: (_) => MatchShareCard(match: match),
+    );
+  } catch (_) {
+    path = null;
+  }
+  if (path == null) {
+    messenger?.showSnackBar(const SnackBar(
+      content: Text('Couldn’t build the match graphic — sharing a link instead.'),
+    ));
+  }
 
   final showScore = match.isLive || match.isFinished;
   await ChottuLinkService.instance.shareMatch(

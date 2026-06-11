@@ -328,9 +328,20 @@ export class ApiFootballCacheService {
   /** Returns true if there's a fixture either live now or within ±[bufferMin]
    *  minutes of a scheduled kickoff. Off-window callers can skip upstream. */
   async isLiveWindow(bufferMin = 15): Promise<boolean> {
+    const now = Date.now();
+    // Stay in the fast cadence while a match is ACTUALLY in play — not just
+    // when we're near a kickoff. markLive() stamps LAST_LIVE_AT on every tick
+    // that saw a live fixture; if that was within the last ~10 min a match is
+    // still running, so keep polling. Without this the poller idled mid-match
+    // whenever the NEXT kickoff was hours away (WC fixtures are spread out),
+    // freezing the live score until the next match's window opened.
+    const lastLiveRaw = await this.redis.get(ApiFootballCacheService.LAST_LIVE_AT_KEY);
+    if (lastLiveRaw) {
+      const lastLive = Number(lastLiveRaw);
+      if (!Number.isNaN(lastLive) && now - lastLive < 10 * 60_000) return true;
+    }
     const next = await this.getNextKickoff();
     if (!next) return false;
-    const now = Date.now();
     const window = bufferMin * 60_000;
     return next.getTime() <= now + window && next.getTime() >= now - 4 * 60 * 60_000;
   }

@@ -60,8 +60,13 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
 
   final upcoming = all
       .where((m) =>
-          !m.isFinished &&
-          m.kickoffAt.isAfter(now.subtract(const Duration(minutes: 5))))
+          // A live match must stay in the list no matter how long ago it
+          // kicked off — the old `kickoffAt > now-5min` guard dropped any
+          // fixture more than 5 minutes into play, so it vanished from both
+          // this bundle and the World Cup schedule mid-match.
+          m.isLive ||
+          (!m.isFinished &&
+              m.kickoffAt.isAfter(now.subtract(const Duration(minutes: 5)))))
       .toList()
     ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
 
