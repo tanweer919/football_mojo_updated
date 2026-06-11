@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -36,17 +38,41 @@ class MatchDetailScreen extends ConsumerStatefulWidget {
 
 class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
   late final Future<MatchDto?> _matchFuture;
+  // Mutable, live-patched copy of the match. Seeded from the initial fetch,
+  // then folded forward by WebSocket deltas so the hero score ticks live.
+  MatchDto? _match;
+  StreamSubscription<MatchUpdate>? _sub;
 
   @override
   void initState() {
     super.initState();
     final repo = ref.read(scoresRepositoryProvider);
-    _matchFuture = repo.fetchMatch(widget.matchId);
+    _matchFuture = repo.fetchMatch(widget.matchId).then((m) {
+      if (mounted && m != null) setState(() => _match ??= m);
+      return m;
+    });
     repo.subscribeMatch(widget.matchId);
+    _sub = repo.updates().listen(_applyUpdate);
+  }
+
+  void _applyUpdate(MatchUpdate u) {
+    final base = _match;
+    if (!mounted || u.id != widget.matchId || base == null) return;
+    setState(() {
+      _match = base.copyWith(
+        status: u.status,
+        minute: u.minute,
+        homeScore: u.homeScore,
+        awayScore: u.awayScore,
+        homePenalties: u.homePenalties,
+        awayPenalties: u.awayPenalties,
+      );
+    });
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     ref.read(scoresRepositoryProvider).unsubscribeMatch(widget.matchId);
     super.dispose();
   }
@@ -69,7 +95,8 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
               detail: '${snap.error}',
             );
           }
-          final match = snap.data;
+          // Prefer the live-patched copy so socket score deltas show.
+          final match = _match ?? snap.data;
           if (match == null) {
             return _NotFound(
               topInset: topInset,
