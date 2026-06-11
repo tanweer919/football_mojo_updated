@@ -197,6 +197,33 @@ export class ScoresService {
   }
 
   /**
+   * Authoritative "should we be polling?" signal, straight from the DB: any
+   * match currently LIVE/HALF_TIME, OR any non-finished match that kicked off
+   * in the last ~3.5h (so a fixture in play but not yet flipped still counts).
+   * The poller ORs this with the kickoff-proximity window so it can never idle
+   * mid-match — and recovers a frozen match on the very next tick regardless of
+   * the Redis live heartbeat.
+   */
+  async hasActiveMatches(): Promise<boolean> {
+    const now = Date.now();
+    const n = await this.prisma.match.count({
+      where: {
+        OR: [
+          { status: { in: ['LIVE', 'HALF_TIME'] } },
+          {
+            status: { notIn: ['FINISHED', 'CANCELLED', 'POSTPONED'] },
+            kickoffAt: {
+              gte: new Date(now - 3.5 * 60 * 60_000),
+              lte: new Date(now),
+            },
+          },
+        ],
+      },
+    });
+    return n > 0;
+  }
+
+  /**
    * Delete any hand-seeded WC placeholder rows (`WC2026-*` ids) whose two
    * nations match the given pair, keeping `keepId` (the real numeric fixture).
    * Names are reconciled through the alias map, so api-football labels like
