@@ -43,17 +43,6 @@ class WorldCupScreen extends ConsumerWidget {
               data: (o) => _Hero(overview: o),
             ),
             const SizedBox(height: 24),
-            // Opening match
-            overview.when(
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-              data: (o) => o.openingMatch == null
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _OpeningMatchCard(opening: o.openingMatch!),
-                    ),
-            ),
             // Groups — tap header to open the full standings page.
             SectionHead(
               title: 'Groups',
@@ -246,95 +235,6 @@ class _MetaPip extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Eyebrow(text, size: 10),
-      ],
-    );
-  }
-}
-
-// ─── OPENING MATCH ─────────────────────────────────────────────────────────
-
-class _OpeningMatchCard extends StatelessWidget {
-  const _OpeningMatchCard({required this.opening});
-  final WcOpeningMatch opening;
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('EEE d MMM · HH:mm');
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.r5),
-        border: Border.all(color: AppColors.border),
-        color: AppColors.surface,
-      ),
-      child: Column(
-        children: [
-          Eyebrow('Opening match · ${opening.stage ?? "Group A"}'),
-          const SizedBox(height: 4),
-          Eyebrow(df.format(opening.kickoffAt.toLocal())),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(child: _OpenSide(team: opening.homeTeam, alignEnd: false)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'vs',
-                  style: TextStyle(
-                    fontFamily: 'IowanOldStyle',
-                    fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                    fontStyle: FontStyle.italic,
-                    fontSize: 18,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ),
-              Expanded(child: _OpenSide(team: opening.awayTeam, alignEnd: true)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(height: 1, color: AppColors.borderSoft),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: Eyebrow(opening.venue ?? '—', size: 10)),
-              if (opening.stage != null) Eyebrow(opening.stage!, size: 10, gold: true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OpenSide extends StatelessWidget {
-  const _OpenSide({required this.team, required this.alignEnd});
-  final WcTeamRef team;
-  final bool alignEnd;
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 56, height: 40,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          team.name,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w800,
-            fontSize: 16,
-            letterSpacing: -0.24,
-            color: AppColors.fg,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Eyebrow(team.shortName, size: 9),
       ],
     );
   }
