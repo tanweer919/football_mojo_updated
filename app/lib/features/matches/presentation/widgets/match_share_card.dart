@@ -239,21 +239,17 @@ class MatchShareCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        ShaderMask(
-          shaderCallback: (rect) => const LinearGradient(
-            colors: [Color(0xFFEBD9A8), Color(0xFFB78A2E)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ).createShader(rect),
-          child: const Text(
-            'PITCH',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.6,
-              color: Colors.white,
-            ),
+        // Solid champagne fill rather than a ShaderMask — off-screen toImage
+        // capture of a ShaderMask is unreliable under Impeller (release), which
+        // produced a blank/failed graphic in the Play Store build.
+        const Text(
+          'PITCH',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.6,
+            color: Color(0xFFEBD9A8),
           ),
         ),
         const Spacer(),

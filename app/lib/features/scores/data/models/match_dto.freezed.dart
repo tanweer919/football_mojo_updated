@@ -287,7 +287,7 @@ as String?,
 /// @nodoc
 mixin _$MatchDto {
 
- String get id; String get competitionId; TeamDto get homeTeam; TeamDto get awayTeam; DateTime get kickoffAt; MatchStatus get status; int? get minute; int get homeScore; int get awayScore; int? get homePenalties; int? get awayPenalties; String? get stage; String? get venue;
+ String get id; String get competitionId; TeamDto get homeTeam; TeamDto get awayTeam; DateTime get kickoffAt; MatchStatus get status; int? get minute; int? get minuteExtra; int get homeScore; int get awayScore; int? get homePenalties; int? get awayPenalties; String? get stage; String? get venue;
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -300,16 +300,16 @@ $MatchDtoCopyWith<MatchDto> get copyWith => _$MatchDtoCopyWithImpl<MatchDto>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchDto&&(identical(other.id, id) || other.id == id)&&(identical(other.competitionId, competitionId) || other.competitionId == competitionId)&&(identical(other.homeTeam, homeTeam) || other.homeTeam == homeTeam)&&(identical(other.awayTeam, awayTeam) || other.awayTeam == awayTeam)&&(identical(other.kickoffAt, kickoffAt) || other.kickoffAt == kickoffAt)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.stage, stage) || other.stage == stage)&&(identical(other.venue, venue) || other.venue == venue));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchDto&&(identical(other.id, id) || other.id == id)&&(identical(other.competitionId, competitionId) || other.competitionId == competitionId)&&(identical(other.homeTeam, homeTeam) || other.homeTeam == homeTeam)&&(identical(other.awayTeam, awayTeam) || other.awayTeam == awayTeam)&&(identical(other.kickoffAt, kickoffAt) || other.kickoffAt == kickoffAt)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.minuteExtra, minuteExtra) || other.minuteExtra == minuteExtra)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.stage, stage) || other.stage == stage)&&(identical(other.venue, venue) || other.venue == venue));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,competitionId,homeTeam,awayTeam,kickoffAt,status,minute,homeScore,awayScore,homePenalties,awayPenalties,stage,venue);
+int get hashCode => Object.hash(runtimeType,id,competitionId,homeTeam,awayTeam,kickoffAt,status,minute,minuteExtra,homeScore,awayScore,homePenalties,awayPenalties,stage,venue);
 
 @override
 String toString() {
-  return 'MatchDto(id: $id, competitionId: $competitionId, homeTeam: $homeTeam, awayTeam: $awayTeam, kickoffAt: $kickoffAt, status: $status, minute: $minute, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, stage: $stage, venue: $venue)';
+  return 'MatchDto(id: $id, competitionId: $competitionId, homeTeam: $homeTeam, awayTeam: $awayTeam, kickoffAt: $kickoffAt, status: $status, minute: $minute, minuteExtra: $minuteExtra, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, stage: $stage, venue: $venue)';
 }
 
 
@@ -320,7 +320,7 @@ abstract mixin class $MatchDtoCopyWith<$Res>  {
   factory $MatchDtoCopyWith(MatchDto value, $Res Function(MatchDto) _then) = _$MatchDtoCopyWithImpl;
 @useResult
 $Res call({
- String id, String competitionId, TeamDto homeTeam, TeamDto awayTeam, DateTime kickoffAt, MatchStatus status, int? minute, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, String? stage, String? venue
+ String id, String competitionId, TeamDto homeTeam, TeamDto awayTeam, DateTime kickoffAt, MatchStatus status, int? minute, int? minuteExtra, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, String? stage, String? venue
 });
 
 
@@ -337,7 +337,7 @@ class _$MatchDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? competitionId = null,Object? homeTeam = null,Object? awayTeam = null,Object? kickoffAt = null,Object? status = null,Object? minute = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? stage = freezed,Object? venue = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? competitionId = null,Object? homeTeam = null,Object? awayTeam = null,Object? kickoffAt = null,Object? status = null,Object? minute = freezed,Object? minuteExtra = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? stage = freezed,Object? venue = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,competitionId: null == competitionId ? _self.competitionId : competitionId // ignore: cast_nullable_to_non_nullable
@@ -346,6 +346,7 @@ as TeamDto,awayTeam: null == awayTeam ? _self.awayTeam : awayTeam // ignore: cas
 as TeamDto,kickoffAt: null == kickoffAt ? _self.kickoffAt : kickoffAt // ignore: cast_nullable_to_non_nullable
 as DateTime,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as MatchStatus,minute: freezed == minute ? _self.minute : minute // ignore: cast_nullable_to_non_nullable
+as int?,minuteExtra: freezed == minuteExtra ? _self.minuteExtra : minuteExtra // ignore: cast_nullable_to_non_nullable
 as int?,homeScore: null == homeScore ? _self.homeScore : homeScore // ignore: cast_nullable_to_non_nullable
 as int,awayScore: null == awayScore ? _self.awayScore : awayScore // ignore: cast_nullable_to_non_nullable
 as int,homePenalties: freezed == homePenalties ? _self.homePenalties : homePenalties // ignore: cast_nullable_to_non_nullable
@@ -455,10 +456,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchDto() when $default != null:
-return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
+return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
   return orElse();
 
 }
@@ -476,10 +477,10 @@ return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)  $default,) {final _that = this;
 switch (_that) {
 case _MatchDto():
-return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
+return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -496,10 +497,10 @@ return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String competitionId,  TeamDto homeTeam,  TeamDto awayTeam,  DateTime kickoffAt,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  String? stage,  String? venue)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchDto() when $default != null:
-return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
+return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that.kickoffAt,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.stage,_that.venue);case _:
   return null;
 
 }
@@ -511,7 +512,7 @@ return $default(_that.id,_that.competitionId,_that.homeTeam,_that.awayTeam,_that
 @JsonSerializable()
 
 class _MatchDto extends MatchDto {
-  const _MatchDto({required this.id, required this.competitionId, required this.homeTeam, required this.awayTeam, required this.kickoffAt, required this.status, this.minute, this.homeScore = 0, this.awayScore = 0, this.homePenalties, this.awayPenalties, this.stage, this.venue}): super._();
+  const _MatchDto({required this.id, required this.competitionId, required this.homeTeam, required this.awayTeam, required this.kickoffAt, required this.status, this.minute, this.minuteExtra, this.homeScore = 0, this.awayScore = 0, this.homePenalties, this.awayPenalties, this.stage, this.venue}): super._();
   factory _MatchDto.fromJson(Map<String, dynamic> json) => _$MatchDtoFromJson(json);
 
 @override final  String id;
@@ -521,6 +522,7 @@ class _MatchDto extends MatchDto {
 @override final  DateTime kickoffAt;
 @override final  MatchStatus status;
 @override final  int? minute;
+@override final  int? minuteExtra;
 @override@JsonKey() final  int homeScore;
 @override@JsonKey() final  int awayScore;
 @override final  int? homePenalties;
@@ -541,16 +543,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchDto&&(identical(other.id, id) || other.id == id)&&(identical(other.competitionId, competitionId) || other.competitionId == competitionId)&&(identical(other.homeTeam, homeTeam) || other.homeTeam == homeTeam)&&(identical(other.awayTeam, awayTeam) || other.awayTeam == awayTeam)&&(identical(other.kickoffAt, kickoffAt) || other.kickoffAt == kickoffAt)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.stage, stage) || other.stage == stage)&&(identical(other.venue, venue) || other.venue == venue));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchDto&&(identical(other.id, id) || other.id == id)&&(identical(other.competitionId, competitionId) || other.competitionId == competitionId)&&(identical(other.homeTeam, homeTeam) || other.homeTeam == homeTeam)&&(identical(other.awayTeam, awayTeam) || other.awayTeam == awayTeam)&&(identical(other.kickoffAt, kickoffAt) || other.kickoffAt == kickoffAt)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.minuteExtra, minuteExtra) || other.minuteExtra == minuteExtra)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.stage, stage) || other.stage == stage)&&(identical(other.venue, venue) || other.venue == venue));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,competitionId,homeTeam,awayTeam,kickoffAt,status,minute,homeScore,awayScore,homePenalties,awayPenalties,stage,venue);
+int get hashCode => Object.hash(runtimeType,id,competitionId,homeTeam,awayTeam,kickoffAt,status,minute,minuteExtra,homeScore,awayScore,homePenalties,awayPenalties,stage,venue);
 
 @override
 String toString() {
-  return 'MatchDto(id: $id, competitionId: $competitionId, homeTeam: $homeTeam, awayTeam: $awayTeam, kickoffAt: $kickoffAt, status: $status, minute: $minute, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, stage: $stage, venue: $venue)';
+  return 'MatchDto(id: $id, competitionId: $competitionId, homeTeam: $homeTeam, awayTeam: $awayTeam, kickoffAt: $kickoffAt, status: $status, minute: $minute, minuteExtra: $minuteExtra, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, stage: $stage, venue: $venue)';
 }
 
 
@@ -561,7 +563,7 @@ abstract mixin class _$MatchDtoCopyWith<$Res> implements $MatchDtoCopyWith<$Res>
   factory _$MatchDtoCopyWith(_MatchDto value, $Res Function(_MatchDto) _then) = __$MatchDtoCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String competitionId, TeamDto homeTeam, TeamDto awayTeam, DateTime kickoffAt, MatchStatus status, int? minute, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, String? stage, String? venue
+ String id, String competitionId, TeamDto homeTeam, TeamDto awayTeam, DateTime kickoffAt, MatchStatus status, int? minute, int? minuteExtra, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, String? stage, String? venue
 });
 
 
@@ -578,7 +580,7 @@ class __$MatchDtoCopyWithImpl<$Res>
 
 /// Create a copy of MatchDto
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? competitionId = null,Object? homeTeam = null,Object? awayTeam = null,Object? kickoffAt = null,Object? status = null,Object? minute = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? stage = freezed,Object? venue = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? competitionId = null,Object? homeTeam = null,Object? awayTeam = null,Object? kickoffAt = null,Object? status = null,Object? minute = freezed,Object? minuteExtra = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? stage = freezed,Object? venue = freezed,}) {
   return _then(_MatchDto(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,competitionId: null == competitionId ? _self.competitionId : competitionId // ignore: cast_nullable_to_non_nullable
@@ -587,6 +589,7 @@ as TeamDto,awayTeam: null == awayTeam ? _self.awayTeam : awayTeam // ignore: cas
 as TeamDto,kickoffAt: null == kickoffAt ? _self.kickoffAt : kickoffAt // ignore: cast_nullable_to_non_nullable
 as DateTime,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as MatchStatus,minute: freezed == minute ? _self.minute : minute // ignore: cast_nullable_to_non_nullable
+as int?,minuteExtra: freezed == minuteExtra ? _self.minuteExtra : minuteExtra // ignore: cast_nullable_to_non_nullable
 as int?,homeScore: null == homeScore ? _self.homeScore : homeScore // ignore: cast_nullable_to_non_nullable
 as int,awayScore: null == awayScore ? _self.awayScore : awayScore // ignore: cast_nullable_to_non_nullable
 as int,homePenalties: freezed == homePenalties ? _self.homePenalties : homePenalties // ignore: cast_nullable_to_non_nullable
@@ -622,7 +625,7 @@ $TeamDtoCopyWith<$Res> get awayTeam {
 /// @nodoc
 mixin _$MatchUpdate {
 
- String get id; MatchStatus get status; int? get minute; int get homeScore; int get awayScore; int? get homePenalties; int? get awayPenalties; DateTime get updatedAt;
+ String get id; MatchStatus get status; int? get minute; int? get minuteExtra; int get homeScore; int get awayScore; int? get homePenalties; int? get awayPenalties; DateTime get updatedAt;
 /// Create a copy of MatchUpdate
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -635,16 +638,16 @@ $MatchUpdateCopyWith<MatchUpdate> get copyWith => _$MatchUpdateCopyWithImpl<Matc
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchUpdate&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MatchUpdate&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.minuteExtra, minuteExtra) || other.minuteExtra == minuteExtra)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,status,minute,homeScore,awayScore,homePenalties,awayPenalties,updatedAt);
+int get hashCode => Object.hash(runtimeType,id,status,minute,minuteExtra,homeScore,awayScore,homePenalties,awayPenalties,updatedAt);
 
 @override
 String toString() {
-  return 'MatchUpdate(id: $id, status: $status, minute: $minute, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, updatedAt: $updatedAt)';
+  return 'MatchUpdate(id: $id, status: $status, minute: $minute, minuteExtra: $minuteExtra, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, updatedAt: $updatedAt)';
 }
 
 
@@ -655,7 +658,7 @@ abstract mixin class $MatchUpdateCopyWith<$Res>  {
   factory $MatchUpdateCopyWith(MatchUpdate value, $Res Function(MatchUpdate) _then) = _$MatchUpdateCopyWithImpl;
 @useResult
 $Res call({
- String id, MatchStatus status, int? minute, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, DateTime updatedAt
+ String id, MatchStatus status, int? minute, int? minuteExtra, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, DateTime updatedAt
 });
 
 
@@ -672,11 +675,12 @@ class _$MatchUpdateCopyWithImpl<$Res>
 
 /// Create a copy of MatchUpdate
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? status = null,Object? minute = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? status = null,Object? minute = freezed,Object? minuteExtra = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as MatchStatus,minute: freezed == minute ? _self.minute : minute // ignore: cast_nullable_to_non_nullable
+as int?,minuteExtra: freezed == minuteExtra ? _self.minuteExtra : minuteExtra // ignore: cast_nullable_to_non_nullable
 as int?,homeScore: null == homeScore ? _self.homeScore : homeScore // ignore: cast_nullable_to_non_nullable
 as int,awayScore: null == awayScore ? _self.awayScore : awayScore // ignore: cast_nullable_to_non_nullable
 as int,homePenalties: freezed == homePenalties ? _self.homePenalties : homePenalties // ignore: cast_nullable_to_non_nullable
@@ -767,10 +771,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchUpdate() when $default != null:
-return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
+return $default(_that.id,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -788,10 +792,10 @@ return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awaySco
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _MatchUpdate():
-return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
+return $default(_that.id,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -808,10 +812,10 @@ return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awaySco
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  MatchStatus status,  int? minute,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  MatchStatus status,  int? minute,  int? minuteExtra,  int homeScore,  int awayScore,  int? homePenalties,  int? awayPenalties,  DateTime updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchUpdate() when $default != null:
-return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
+return $default(_that.id,_that.status,_that.minute,_that.minuteExtra,_that.homeScore,_that.awayScore,_that.homePenalties,_that.awayPenalties,_that.updatedAt);case _:
   return null;
 
 }
@@ -823,12 +827,13 @@ return $default(_that.id,_that.status,_that.minute,_that.homeScore,_that.awaySco
 @JsonSerializable()
 
 class _MatchUpdate implements MatchUpdate {
-  const _MatchUpdate({required this.id, required this.status, this.minute, required this.homeScore, required this.awayScore, this.homePenalties, this.awayPenalties, required this.updatedAt});
+  const _MatchUpdate({required this.id, required this.status, this.minute, this.minuteExtra, required this.homeScore, required this.awayScore, this.homePenalties, this.awayPenalties, required this.updatedAt});
   factory _MatchUpdate.fromJson(Map<String, dynamic> json) => _$MatchUpdateFromJson(json);
 
 @override final  String id;
 @override final  MatchStatus status;
 @override final  int? minute;
+@override final  int? minuteExtra;
 @override final  int homeScore;
 @override final  int awayScore;
 @override final  int? homePenalties;
@@ -848,16 +853,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchUpdate&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MatchUpdate&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.minute, minute) || other.minute == minute)&&(identical(other.minuteExtra, minuteExtra) || other.minuteExtra == minuteExtra)&&(identical(other.homeScore, homeScore) || other.homeScore == homeScore)&&(identical(other.awayScore, awayScore) || other.awayScore == awayScore)&&(identical(other.homePenalties, homePenalties) || other.homePenalties == homePenalties)&&(identical(other.awayPenalties, awayPenalties) || other.awayPenalties == awayPenalties)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,status,minute,homeScore,awayScore,homePenalties,awayPenalties,updatedAt);
+int get hashCode => Object.hash(runtimeType,id,status,minute,minuteExtra,homeScore,awayScore,homePenalties,awayPenalties,updatedAt);
 
 @override
 String toString() {
-  return 'MatchUpdate(id: $id, status: $status, minute: $minute, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, updatedAt: $updatedAt)';
+  return 'MatchUpdate(id: $id, status: $status, minute: $minute, minuteExtra: $minuteExtra, homeScore: $homeScore, awayScore: $awayScore, homePenalties: $homePenalties, awayPenalties: $awayPenalties, updatedAt: $updatedAt)';
 }
 
 
@@ -868,7 +873,7 @@ abstract mixin class _$MatchUpdateCopyWith<$Res> implements $MatchUpdateCopyWith
   factory _$MatchUpdateCopyWith(_MatchUpdate value, $Res Function(_MatchUpdate) _then) = __$MatchUpdateCopyWithImpl;
 @override @useResult
 $Res call({
- String id, MatchStatus status, int? minute, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, DateTime updatedAt
+ String id, MatchStatus status, int? minute, int? minuteExtra, int homeScore, int awayScore, int? homePenalties, int? awayPenalties, DateTime updatedAt
 });
 
 
@@ -885,11 +890,12 @@ class __$MatchUpdateCopyWithImpl<$Res>
 
 /// Create a copy of MatchUpdate
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? status = null,Object? minute = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? status = null,Object? minute = freezed,Object? minuteExtra = freezed,Object? homeScore = null,Object? awayScore = null,Object? homePenalties = freezed,Object? awayPenalties = freezed,Object? updatedAt = null,}) {
   return _then(_MatchUpdate(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as MatchStatus,minute: freezed == minute ? _self.minute : minute // ignore: cast_nullable_to_non_nullable
+as int?,minuteExtra: freezed == minuteExtra ? _self.minuteExtra : minuteExtra // ignore: cast_nullable_to_non_nullable
 as int?,homeScore: null == homeScore ? _self.homeScore : homeScore // ignore: cast_nullable_to_non_nullable
 as int,awayScore: null == awayScore ? _self.awayScore : awayScore // ignore: cast_nullable_to_non_nullable
 as int,homePenalties: freezed == homePenalties ? _self.homePenalties : homePenalties // ignore: cast_nullable_to_non_nullable

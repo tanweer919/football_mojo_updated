@@ -64,6 +64,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
       _match = base.copyWith(
         status: u.status,
         minute: u.minute,
+        minuteExtra: u.minuteExtra,
         homeScore: u.homeScore,
         awayScore: u.awayScore,
         homePenalties: u.homePenalties,
@@ -479,7 +480,7 @@ class _Hero extends ConsumerWidget {
                         Text(
                           match.status == MatchStatus.HALF_TIME
                               ? 'HT'
-                              : "${match.minute ?? 0}'",
+                              : match.minuteLabel,
                           style: const TextStyle(
                             fontFamily: 'JetBrainsMono',
                             fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
@@ -522,9 +523,18 @@ class _Hero extends ConsumerWidget {
                                 height: 1.0,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.muted2, shape: BoxShape.circle)),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 14),
+                            Text(
+                              '–',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 40,
+                                fontWeight: FontWeight.w300,
+                                color: AppColors.muted.withValues(alpha: 0.7),
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
                             ScoreFlip(
                               value: match.awayScore,
                               style: const TextStyle(

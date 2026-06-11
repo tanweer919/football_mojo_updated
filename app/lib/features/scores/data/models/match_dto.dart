@@ -36,6 +36,7 @@ abstract class MatchDto with _$MatchDto {
     required DateTime kickoffAt,
     required MatchStatus status,
     int? minute,
+    int? minuteExtra,
     @Default(0) int homeScore,
     @Default(0) int awayScore,
     int? homePenalties,
@@ -49,6 +50,14 @@ abstract class MatchDto with _$MatchDto {
   bool get isLive => status == MatchStatus.LIVE || status == MatchStatus.HALF_TIME;
   bool get isFinished => status == MatchStatus.FINISHED;
   String get scoreLabel => '$homeScore - $awayScore';
+
+  /// Clock label with stoppage time, e.g. `45+4'` (or `45'`). Callers render
+  /// HALF_TIME as "HT" separately.
+  String get minuteLabel {
+    final m = minute ?? 0;
+    final x = minuteExtra;
+    return (x != null && x > 0) ? "$m+$x'" : "$m'";
+  }
 }
 
 // Partial WebSocket payload from CHANNELS.matchUpdate — applies a delta to an existing MatchDto.
@@ -58,6 +67,7 @@ abstract class MatchUpdate with _$MatchUpdate {
     required String id,
     required MatchStatus status,
     int? minute,
+    int? minuteExtra,
     required int homeScore,
     required int awayScore,
     int? homePenalties,

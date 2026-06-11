@@ -101,6 +101,7 @@ model Match {
   kickoffAt     DateTime
   status        MatchStatus @default(SCHEDULED)
   minute        Int?
+  minuteExtra   Int?                       // stoppage time, e.g. 4 in "45+4"
   homeScore     Int        @default(0)
   awayScore     Int        @default(0)
   homePenalties Int?

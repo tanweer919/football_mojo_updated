@@ -51,7 +51,7 @@ export interface ApiFixture {
     date: string;
     timestamp: number;
     venue: { id: number | null; name: string | null; city: string | null };
-    status: { long: string; short: string; elapsed: number | null };
+    status: { long: string; short: string; elapsed: number | null; extra: number | null };
   };
   league: { id: number; name: string; season: number; round: string };
   teams: { home: { id: number; name: string; logo: string }; away: { id: number; name: string; logo: string } };

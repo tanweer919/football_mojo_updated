@@ -53,6 +53,7 @@ class LiveMatchesNotifier extends AsyncNotifier<List<MatchDto>> {
     final updated = current[idx].copyWith(
       status: u.status,
       minute: u.minute,
+      minuteExtra: u.minuteExtra,
       homeScore: u.homeScore,
       awayScore: u.awayScore,
       homePenalties: u.homePenalties,

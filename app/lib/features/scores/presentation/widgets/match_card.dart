@@ -156,7 +156,7 @@ class _StatusPill extends StatelessWidget {
     final finished = match.isFinished;
 
     final label = live
-        ? (match.status == MatchStatus.HALF_TIME ? 'HT' : "${match.minute ?? 0}'")
+        ? (match.status == MatchStatus.HALF_TIME ? 'HT' : match.minuteLabel)
         : finished
             ? 'FT'
             : DateFormat('EEE • h:mm a').format(match.kickoffAt.toLocal());

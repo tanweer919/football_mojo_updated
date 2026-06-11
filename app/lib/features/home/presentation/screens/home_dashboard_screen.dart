@@ -19,6 +19,8 @@ import '../../../album/data/models/card_models.dart' show CardRarity;
 import '../../../competitions/data/competitions_repository.dart';
 import '../../../fantasy/data/models/fantasy_models.dart';
 import '../../../fantasy/presentation/providers/fantasy_providers.dart';
+import '../../../insights/data/insights_repository.dart';
+import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/standings_repository.dart';
 import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
@@ -93,15 +95,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             _Greeting(dateLabel: dateLabel),
             const SizedBox(height: 12),
 
-            // Match hero — the single most relevant match right now.
-            // Live first, then the next upcoming kickoff. Bigger card
-            // with kickoff time in the user's tz + competition badge.
-            _SectionHead(
-              title: 'Match',
-              action: 'All matches →',
-              onAction: () => context.push(RoutePaths.matches),
-            ),
+            // Match hero — the single most relevant match right now, then a
+            // rail of the remaining live / upcoming fixtures just beneath it.
+            const _SectionHead(title: 'Match'),
             const _NextMatchHero(),
+            const SizedBox(height: 14),
+            const _HomeMatchRail(),
 
             // Bracket card — user's WC2026 bracket: champion + progress,
             // or a CTA when they haven't started.
@@ -424,15 +423,8 @@ class _NextMatchHero extends ConsumerWidget {
       return const _HeroSkeleton();
     }
 
-    final liveList = live.valueOrNull;
-    final fixtureBundle = fixtures.valueOrNull;
-    final MatchDto? selected =
-        liveList != null && liveList.isNotEmpty
-            ? liveList.first
-            : (fixtureBundle != null && fixtureBundle.upcoming.isNotEmpty
-                ? fixtureBundle.upcoming.first
-                : null);
-
+    // Hero + rail are decided together (see homeMatchFeedProvider).
+    final selected = ref.watch(homeMatchFeedProvider).hero;
     if (selected == null) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -504,33 +496,52 @@ class _MatchFeatureCard extends StatelessWidget {
               const SizedBox(height: 18),
               Container(height: 1, color: AppColors.borderSoft),
               const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(child: _MatchHeroStatus(match: match)),
-                  if (match.venue != null && match.venue!.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    const Text(
-                      '·',
-                      style: TextStyle(color: AppColors.muted, fontSize: 11),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        match.venue!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11,
-                          color: AppColors.muted,
-                          letterSpacing: -0.1,
+              // Footer. For live games the badge already carries the minute/HT,
+              // so the footer is just the venue — no duplicate live indicator.
+              if (match.isLive)
+                (match.venue != null && match.venue!.isNotEmpty)
+                    ? Center(
+                        child: Text(
+                          match.venue!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink()
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(child: _MatchHeroStatus(match: match)),
+                    if (match.venue != null && match.venue!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      const Text(
+                        '·',
+                        style: TextStyle(color: AppColors.muted, fontSize: 11),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          match.venue!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            letterSpacing: -0.1,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -567,20 +578,35 @@ class _MatchHeroBadge extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        if (match.isLive) ...[
-          const LiveDot(),
-          const SizedBox(width: 6),
-          const Text(
-            'LIVE',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppColors.live,
-              letterSpacing: 1.0,
+        // Same live badge as the all-matches list: a red pill with the dot and
+        // the minute, or HT at half-time (isLive includes HALF_TIME).
+        if (match.isLive)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.live.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const LiveDot(size: 7),
+                const SizedBox(width: 6),
+                Text(
+                  match.status == MatchStatus.HALF_TIME
+                      ? 'HT'
+                      : match.minuteLabel,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.live,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
       ],
     );
   }
@@ -740,6 +766,245 @@ class _MatchHeroStatus extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE / UPCOMING RAIL — horizontal cards directly under the hero
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HomeMatchRail extends ConsumerWidget {
+  const _HomeMatchRail();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feed = ref.watch(homeMatchFeedProvider);
+    if (feed.railItems.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHead(
+          title: feed.railTitle,
+          action: 'All matches →',
+          // Bottom-nav tab → go(), not push() (a shell sibling push can no-op).
+          onAction: () => context.go(RoutePaths.matches),
+        ),
+        SizedBox(
+          height: 168,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: feed.railItems.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => _RailMatchCard(match: feed.railItems[i]),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RailMatchCard extends StatelessWidget {
+  const _RailMatchCard({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context) {
+    final live = match.isLive;
+    final showScore = live || match.isFinished;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push('/matches/${match.id}'),
+      child: Container(
+        width: 286,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A1714), Color(0xFF0F0D0B)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(
+            color: live
+                ? AppColors.live.withValues(alpha: 0.4)
+                : AppColors.borderSoft,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _railHeader(match),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.muted,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (live) ...[
+                  const LiveDot(size: 6),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'LIVE',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.live,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            _RailTeamRow(
+              team: match.homeTeam,
+              score: showScore ? match.homeScore : null,
+            ),
+            const SizedBox(height: 9),
+            _RailTeamRow(
+              team: match.awayTeam,
+              score: showScore ? match.awayScore : null,
+            ),
+            const SizedBox(height: 11),
+            Container(height: 1, color: AppColors.borderSoft),
+            const SizedBox(height: 8),
+            _RailFooter(match: match),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _railHeader(MatchDto m) {
+    final comp = _MatchHeroBadge._competitionLabel(m.competitionId);
+    final stage = m.stage;
+    return (stage != null && stage.isNotEmpty)
+        ? '$comp · ${stage.toUpperCase()}'
+        : comp;
+  }
+}
+
+class _RailTeamRow extends StatelessWidget {
+  const _RailTeamRow({required this.team, required this.score});
+  final TeamDto team;
+  final int? score;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            team.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.fg,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+        if (score != null)
+          Text(
+            '$score',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppColors.gold,
+              height: 1.0,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Footer line. Live → `73' · ↑ Last scorer` (or `HT`); finished → `FT`;
+/// upcoming → the local kickoff. Mirrors the live-now card in the design.
+class _RailFooter extends ConsumerWidget {
+  const _RailFooter({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const live = AppColors.pitch; // green mono, as in the design
+    if (match.isFinished) {
+      return Text('FT', style: _style(AppColors.muted));
+    }
+    if (!match.isLive) {
+      return Text(_kickoffLabel(match), style: _style(AppColors.gold));
+    }
+    if (match.status == MatchStatus.HALF_TIME) {
+      return Text('HT', style: _style(live));
+    }
+    final lastGoal = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) {
+            for (final e in es.reversed) {
+              if (e.kind == EventKind.goal ||
+                  e.kind == EventKind.ownGoal ||
+                  e.kind == EventKind.penalty) {
+                return e;
+              }
+            }
+            return null;
+          },
+          orElse: () => null,
+        );
+    final minute = match.minuteLabel;
+    final scorer = (lastGoal?.playerName != null)
+        ? '  ·  ↑ ${lastGoal!.playerName} (${lastGoal.minute}\')'
+        : '';
+    return Text('$minute$scorer', maxLines: 1, overflow: TextOverflow.ellipsis, style: _style(live));
+  }
+
+  static String _kickoffLabel(MatchDto m) {
+    final local = m.kickoffAt.toLocal();
+    final now = DateTime.now();
+    final days = DateTime(local.year, local.month, local.day)
+        .difference(DateTime(now.year, now.month, now.day))
+        .inDays;
+    final day = days == 0
+        ? 'TODAY'
+        : days == 1
+            ? 'TOMORROW'
+            : DateFormat('EEE d MMM').format(local).toUpperCase();
+    return '$day · ${DateFormat('HH:mm').format(local)}';
+  }
+
+  static TextStyle _style(Color c) => TextStyle(
+        fontFamily: 'JetBrainsMono',
+        fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: c,
+        letterSpacing: 0.2,
+      );
 }
 
 class _StripEmpty extends StatelessWidget {
