@@ -463,10 +463,10 @@ class _MatchFeatureCard extends StatelessWidget {
               ),
               // Goals + red cards per side (live/finished), like match detail.
               _MatchHeroEvents(match: match),
-              // Footer only when NOT live: a thin divider + the kickoff / FT
-              // line. Live state is fully carried by the badge + events, and the
-              // stadium is dropped here to keep the hero short (it's on detail).
-              if (!match.isLive) ...[
+              // Footer only for UPCOMING matches: a thin divider + the kickoff
+              // line. Live + finished are fully carried by the badge (LIVE/min,
+              // FT) + events, and the stadium is dropped to keep the hero short.
+              if (!match.isLive && !match.isFinished) ...[
                 const SizedBox(height: 16),
                 Container(height: 1, color: AppColors.borderSoft),
                 const SizedBox(height: 10),
@@ -535,6 +535,24 @@ class _MatchHeroBadge extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          )
+        else if (match.isFinished)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.muted.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: const Text(
+              'FT',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.muted,
+                letterSpacing: 0.8,
+              ),
             ),
           ),
       ],

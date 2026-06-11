@@ -10,14 +10,24 @@ import '../../data/repositories/scores_repository.dart';
 /// the initial snapshot, stream for live deltas.
 class LiveMatchesNotifier extends AsyncNotifier<List<MatchDto>> {
   StreamSubscription<MatchUpdate>? _sub;
+  StreamSubscription<MatchUpdate>? _fixturesSub;
 
   @override
   Future<List<MatchDto>> build() async {
     final repo = ref.read(scoresRepositoryProvider);
 
     repo.subscribeFixtures();
+    // We're in the `fixtures` room, which receives `fixtures.update` for EVERY
+    // match — that's the stream to fold here. (`updates()` carries
+    // `match.update`, which only reaches per-match rooms we never join from
+    // home, so on its own the hero/rail never updated live.) Listen to both so
+    // a finished match is dropped and scores tick wherever the event arrives.
+    _fixturesSub = repo.fixturesUpdates().listen(_apply);
     _sub = repo.updates().listen(_apply);
-    ref.onDispose(() => _sub?.cancel());
+    ref.onDispose(() {
+      _sub?.cancel();
+      _fixturesSub?.cancel();
+    });
 
     return repo.fetchLive();
   }
