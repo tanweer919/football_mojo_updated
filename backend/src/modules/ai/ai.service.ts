@@ -41,9 +41,18 @@ export class AiService {
       `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      // Google Search grounding — keeps form/injury/result lines current.
-      tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 900 },
+      // Grounding tool MUST be camelCase `googleSearch` for gemini 2.5/3.x — the
+      // snake_case form is silently ignored, so nothing was actually grounded.
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 1200,
+        // gemini-3.5-flash has "thinking" on by default. Its reasoning tokens
+        // ate the whole output budget (truncating the answer) and leaked into
+        // the text ("Total so far: 144 words…"). Turn it off — we want the
+        // finished answer directly, not the scratchpad.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     };
 
     let data: any;
@@ -68,6 +77,7 @@ export class AiService {
 
     const cand = data?.candidates?.[0];
     const text: string = (cand?.content?.parts ?? [])
+      .filter((p: any) => !p?.thought) // never surface reasoning/thought parts
       .map((p: any) => p?.text ?? '')
       .join('')
       .trim();
