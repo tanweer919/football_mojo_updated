@@ -44,6 +44,12 @@ export class ApiFootballCacheService {
 
   // ─── Generic helpers ──────────────────────────────────────────────────────
 
+  // Single-flight: in-progress computes keyed by cache key. A burst of users
+  // opening the same live match within the (short) TTL would otherwise each
+  // miss the cache at the same instant and fire a duplicate upstream call;
+  // instead they all await the one in-flight request.
+  private readonly inflight = new Map<string, Promise<unknown>>();
+
   /** Read JSON from Redis, or compute + cache on miss. ttl=0 means no expiry. */
   private async cached<T>(key: string, ttlSeconds: number, compute: () => Promise<T>): Promise<T> {
     try {
@@ -54,18 +60,32 @@ export class ApiFootballCacheService {
     } catch (e) {
       this.log.warn(`cache read failed for ${key}: ${(e as Error).message}`);
     }
-    const value = await compute();
-    try {
-      const payload = JSON.stringify(value);
-      if (ttlSeconds > 0) {
-        await this.redis.set(key, payload, 'EX', ttlSeconds);
-      } else {
-        await this.redis.set(key, payload);
+
+    // Coalesce concurrent misses for the same key into one upstream call.
+    const existing = this.inflight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+
+    const flight = (async () => {
+      const value = await compute();
+      try {
+        const payload = JSON.stringify(value);
+        if (ttlSeconds > 0) {
+          await this.redis.set(key, payload, 'EX', ttlSeconds);
+        } else {
+          await this.redis.set(key, payload);
+        }
+      } catch (e) {
+        this.log.warn(`cache write failed for ${key}: ${(e as Error).message}`);
       }
-    } catch (e) {
-      this.log.warn(`cache write failed for ${key}: ${(e as Error).message}`);
+      return value;
+    })();
+
+    this.inflight.set(key, flight);
+    try {
+      return await flight;
+    } finally {
+      this.inflight.delete(key);
     }
-    return value;
   }
 
   /** Invalidate one key. */

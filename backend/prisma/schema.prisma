@@ -843,6 +843,8 @@ model AiContent {
   content   String                  // the generated text
   sources   Json                    // [{ title, uri }] grounding citations
   model     String                  // model that produced it
+  phase     String?                 // preview | preview_imminent | live | final | final_provisional
+  scoreKey  String?                 // "home-away" scoreline the summary was generated for
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([type, refId])

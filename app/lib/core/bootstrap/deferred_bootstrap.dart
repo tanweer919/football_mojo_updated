@@ -11,6 +11,7 @@ import '../ads/admob_service.dart';
 import '../analytics/analytics_service.dart';
 import '../analytics/clarity_service.dart';
 import '../config/remote_app_config.dart';
+import '../../features/profile/data/profile_repository.dart';
 import '../deeplink/chottu_link_service.dart';
 import '../network/dio_provider.dart';
 import '../notifications/fcm_service.dart';
@@ -75,9 +76,20 @@ class _DeferredBootstrap {
     // Also fires when the user already-signed-in app cold-starts, since
     // authStateChanges emits the cached user on first listen.
     Future.microtask(() {
-      FirebaseAuth.instance.authStateChanges().listen((user) {
+      FirebaseAuth.instance.authStateChanges().listen((user) async {
         if (user == null) return;
-        FcmBootstrap.ensureRegistered(container.read(dioProvider), force: true);
+        await FcmBootstrap.ensureRegistered(container.read(dioProvider), force: true);
+        // Subscribe to the followed teams' topics so the backend's already-live
+        // goal / kickoff / full-time (and lineup/news) pushes actually reach
+        // this device. Driven off the authoritative backend follow list.
+        try {
+          final profile = await container.read(myProfileProvider.future);
+          if (profile != null) {
+            await FcmBootstrap.syncTeams(
+              profile.followedTeams.map((t) => t.id).toSet(),
+            );
+          }
+        } catch (_) {/* best-effort; re-synced whenever follows change */}
       });
     });
     Future.microtask(() => _initClarity(context));

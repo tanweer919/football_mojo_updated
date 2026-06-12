@@ -53,8 +53,6 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   @override
   Widget build(BuildContext context) {
-    final dateLabel = DateFormat('EEEE · d MMM').format(DateTime.now());
-
     return RefreshIndicator(
       color: AppColors.gold,
       backgroundColor: AppColors.surface3,
@@ -91,9 +89,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           children: [
             SizedBox(height: MediaQuery.viewPaddingOf(context).top),
             const _Appbar(),
-            const SizedBox(height: 6),
-            _Greeting(dateLabel: dateLabel),
-            const SizedBox(height: 12),
 
             // Match hero — the single most relevant match right now, then a
             // rail of the remaining live / upcoming fixtures just beneath it.
@@ -183,10 +178,13 @@ class _Appbar extends StatelessWidget {
   const _Appbar();
   @override
   Widget build(BuildContext context) {
+    final dateLabel =
+        DateFormat('EEE · d MMM').format(DateTime.now()).toUpperCase();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
       child: Row(
         children: [
+          // Dot centred against the whole PITCH + date block.
           Container(
             width: 22,
             height: 22,
@@ -204,23 +202,40 @@ class _Appbar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          ShaderMask(
-            shaderCallback:
-                (rect) => const LinearGradient(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                shaderCallback: (rect) => const LinearGradient(
                   colors: [AppColors.goldSoft, AppColors.goldDeep],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ).createShader(rect),
-            child: const Text(
-              'PITCH',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.36,
-                color: Colors.white,
+                child: const Text(
+                  'PITCH',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.36,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 1),
+              Text(
+                dateLabel,
+                style: const TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.muted,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
           ),
           const Spacer(),
           const _GemChip(),
@@ -296,52 +311,6 @@ class _GemChip extends ConsumerWidget {
 // GREETING
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Greeting extends StatelessWidget {
-  const _Greeting({required this.dateLabel});
-  final String dateLabel;
-  @override
-  Widget build(BuildContext context) {
-    const h1Style = TextStyle(
-      fontFamily: 'Inter',
-      fontSize: 26,
-      fontWeight: FontWeight.w800,
-      letterSpacing: -0.91,
-      color: AppColors.fg,
-      height: 1.1,
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Eyebrow(dateLabel),
-          const SizedBox(height: 6),
-          RichText(
-            text: const TextSpan(
-              style: h1Style,
-              children: [
-                TextSpan(text: 'Welcome back to '),
-                TextSpan(
-                  text: 'PITCH.',
-                  style: TextStyle(
-                    fontFamily: 'IowanOldStyle',
-                    fontFamilyFallback: ['Charter', 'Georgia', 'serif'],
-                    fontStyle: FontStyle.italic,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 26,
-                    color: AppColors.gold,
-                    letterSpacing: -0.91,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION HEAD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -352,7 +321,7 @@ class _Greeting extends StatelessWidget {
 /// the head's internal padding, so they don't need this.
 class _SectionGap extends StatelessWidget {
   const _SectionGap();
-  static const double height = 18;
+  static const double height = 12;
   @override
   Widget build(BuildContext context) => const SizedBox(height: height);
 }
@@ -365,10 +334,9 @@ class _SectionHead extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      // Self-contained spacing: 18px above for separation from the
-      // previous section, 10px below to its own content. Callers never
-      // need to wrap this in a SizedBox.
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      // Self-contained spacing: top for separation from the previous section,
+      // bottom to its own content. Callers never wrap this in a SizedBox.
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -493,55 +461,17 @@ class _MatchFeatureCard extends StatelessWidget {
                   Expanded(child: _MatchHeroSide(team: match.awayTeam)),
                 ],
               ),
-              const SizedBox(height: 18),
-              Container(height: 1, color: AppColors.borderSoft),
-              const SizedBox(height: 10),
-              // Footer. For live games the badge already carries the minute/HT,
-              // so the footer is just the venue — no duplicate live indicator.
-              if (match.isLive)
-                (match.venue != null && match.venue!.isNotEmpty)
-                    ? Center(
-                        child: Text(
-                          match.venue!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: AppColors.muted,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink()
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(child: _MatchHeroStatus(match: match)),
-                    if (match.venue != null && match.venue!.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      const Text(
-                        '·',
-                        style: TextStyle(color: AppColors.muted, fontSize: 11),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          match.venue!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: AppColors.muted,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              // Goals + red cards per side (live/finished), like match detail.
+              _MatchHeroEvents(match: match),
+              // Footer only for UPCOMING matches: a thin divider + the kickoff
+              // line. Live + finished are fully carried by the badge (LIVE/min,
+              // FT) + events, and the stadium is dropped to keep the hero short.
+              if (!match.isLive && !match.isFinished) ...[
+                const SizedBox(height: 16),
+                Container(height: 1, color: AppColors.borderSoft),
+                const SizedBox(height: 10),
+                Center(child: _MatchHeroStatus(match: match)),
+              ],
             ],
           ),
         ),
@@ -605,6 +535,24 @@ class _MatchHeroBadge extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          )
+        else if (match.isFinished)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.muted.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: const Text(
+              'FT',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.muted,
+                letterSpacing: 0.8,
+              ),
             ),
           ),
       ],
@@ -768,6 +716,122 @@ class _MatchHeroStatus extends StatelessWidget {
   }
 }
 
+/// Two-column goals + red-cards strip under the hero scoreline (live/finished),
+/// mirroring the match-detail hero. Own goals are credited to the opposite
+/// side; red cards stay with the player's own team.
+class _MatchHeroEvents extends ConsumerWidget {
+  const _MatchHeroEvents({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!match.isLive && !match.isFinished) return const SizedBox.shrink();
+    final events = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) => [
+            for (final e in es)
+              if (e.kind == EventKind.goal ||
+                  e.kind == EventKind.ownGoal ||
+                  e.kind == EventKind.penalty ||
+                  e.kind == EventKind.red)
+                e
+          ],
+          orElse: () => const <MatchEventDto>[],
+        );
+    if (events.isEmpty) return const SizedBox.shrink();
+
+    final home = <MatchEventDto>[];
+    final away = <MatchEventDto>[];
+    for (final e in events) {
+      final isHome = e.kind == EventKind.ownGoal
+          ? e.teamId != match.homeTeam.id
+          : e.teamId == match.homeTeam.id;
+      (isHome ? home : away).add(e);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _HeroEventColumn(events: home, alignEnd: false)),
+          const SizedBox(width: 12),
+          Expanded(child: _HeroEventColumn(events: away, alignEnd: true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroEventColumn extends StatelessWidget {
+  const _HeroEventColumn({required this.events, required this.alignEnd});
+  final List<MatchEventDto> events;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        for (final e in events)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1.5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!alignEnd) ...[_glyph(e), const SizedBox(width: 5)],
+                Flexible(
+                  child: Text(
+                    _label(e),
+                    textAlign: alignEnd ? TextAlign.right : TextAlign.left,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.fgSoft,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                if (alignEnd) ...[const SizedBox(width: 5), _glyph(e)],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _glyph(MatchEventDto e) {
+    if (e.kind == EventKind.red) {
+      return Container(
+        width: 8,
+        height: 11,
+        decoration: BoxDecoration(
+          color: AppColors.live,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+    }
+    final icon = e.kind == EventKind.ownGoal
+        ? Icons.cancel_outlined
+        : Icons.sports_soccer;
+    final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
+    return Icon(icon, size: 11, color: color);
+  }
+
+  String _label(MatchEventDto e) {
+    final name = e.playerName ?? '—';
+    final extra = e.kind == EventKind.ownGoal
+        ? ' (OG)'
+        : e.kind == EventKind.penalty
+            ? ' (P)'
+            : '';
+    return '$name$extra ${e.displayMinute}';
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LIVE / UPCOMING RAIL — horizontal cards directly under the hero
 // ─────────────────────────────────────────────────────────────────────────────
@@ -788,7 +852,9 @@ class _HomeMatchRail extends ConsumerWidget {
           onAction: () => context.go(RoutePaths.matches),
         ),
         SizedBox(
-          height: 168,
+          // Snug to the card content (header + two team rows + divider +
+          // footer) so upcoming cards don't carry a tall empty bottom band.
+          height: 150,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),

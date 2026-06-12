@@ -191,8 +191,16 @@ class FcmBootstrap {
     final toAdd = teamIds.difference(previous);
     final toRemove = previous.difference(teamIds);
 
-    for (final id in toAdd)    await FirebaseMessaging.instance.subscribeToTopic('team_$id');
-    for (final id in toRemove) await FirebaseMessaging.instance.unsubscribeFromTopic('team_$id');
+    // `team_{id}` carries goals / kickoff / FT (+ team news); `team_{id}_lineup`
+    // carries the confirmed-XI announcement an hour before kickoff.
+    for (final id in toAdd) {
+      await FirebaseMessaging.instance.subscribeToTopic('team_$id');
+      await FirebaseMessaging.instance.subscribeToTopic('team_${id}_lineup');
+    }
+    for (final id in toRemove) {
+      await FirebaseMessaging.instance.unsubscribeFromTopic('team_$id');
+      await FirebaseMessaging.instance.unsubscribeFromTopic('team_${id}_lineup');
+    }
 
     await prefs.setStringList('fcm.subscribed.teams', teamIds.toList());
     if (kDebugMode) debugPrint('FCM teams synced: +$toAdd  -$toRemove');

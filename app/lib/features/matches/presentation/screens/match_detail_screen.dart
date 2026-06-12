@@ -136,7 +136,7 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: SizedBox(height: topInset + 6)),
         SliverToBoxAdapter(child: _Topbar(match: match)),
         SliverToBoxAdapter(child: _Hero(match: match)),
-        SliverToBoxAdapter(child: _AiPreviewBlock(matchId: match.id)),
+        SliverToBoxAdapter(child: _AiPreviewBlock(match: match)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Stats', icon: Icons.bar_chart)),
         SliverToBoxAdapter(child: _StatsBlock(matchId: match.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Key moments', icon: Icons.timeline)),
@@ -157,8 +157,8 @@ class _MatchBody extends StatelessWidget {
 /// Collapsed by default — only calls the AI when the user taps "Generate".
 /// The backend caches per-match, so repeat taps and other users are free.
 class _AiPreviewBlock extends ConsumerStatefulWidget {
-  const _AiPreviewBlock({required this.matchId});
-  final String matchId;
+  const _AiPreviewBlock({required this.match});
+  final MatchDto match;
   @override
   ConsumerState<_AiPreviewBlock> createState() => _AiPreviewBlockState();
 }
@@ -168,13 +168,19 @@ class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
   String? _error;
   AiMatchPreview? _preview;
 
+  // Before kickoff it's a preview; once live/finished it's a summary. The
+  // response's `kind` confirms it, but we label up-front from the match state.
+  bool get _isSummary =>
+      _preview?.isSummary ?? (widget.match.isLive || widget.match.isFinished);
+  String get _noun => _isSummary ? 'summary' : 'preview';
+
   Future<void> _generate() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final p = await ref.read(aiPreviewRepositoryProvider).matchPreview(widget.matchId);
+      final p = await ref.read(aiPreviewRepositoryProvider).matchPreview(widget.match.id);
       if (!mounted) return;
       setState(() {
         _preview = p;
@@ -186,8 +192,8 @@ class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
       setState(() {
         _loading = false;
         _error = code.contains('ai_unavailable') || code.contains('ai_request_failed')
-            ? 'AI previews aren’t available right now.'
-            : 'Couldn’t generate the preview. Please try again.';
+            ? 'AI $_noun isn’t available right now.'
+            : 'Couldn’t generate the $_noun. Please try again.';
       });
     }
   }
@@ -214,9 +220,9 @@ class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
               children: [
                 const Icon(Icons.auto_awesome, size: 16, color: AppColors.gold),
                 const SizedBox(width: 8),
-                const Text(
-                  'AI match preview',
-                  style: TextStyle(
+                Text(
+                  'AI match $_noun',
+                  style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -236,24 +242,26 @@ class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
   Widget _body() {
     if (_preview != null) return _AiPreviewContent(preview: _preview!);
     if (_loading) {
-      return const Row(
+      return Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 16, height: 16,
             child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
           ),
-          SizedBox(width: 10),
-          Text('Writing the preview…',
-              style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          const SizedBox(width: 10),
+          Text('Writing the $_noun…',
+              style: const TextStyle(color: AppColors.muted, fontSize: 13)),
         ],
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Get a quick, AI-written preview — recent form, key injuries, head-to-head and what’s at stake.',
-          style: TextStyle(color: AppColors.fgSoft, fontSize: 12.5, height: 1.4),
+        Text(
+          _isSummary
+              ? 'Get an AI-written summary — the scoreline, key moments, stats and what it means, grounded in live reports.'
+              : 'Get a quick, AI-written preview — recent form, key injuries, head-to-head and what’s at stake.',
+          style: const TextStyle(color: AppColors.fgSoft, fontSize: 12.5, height: 1.4),
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
@@ -263,7 +271,7 @@ class _AiPreviewBlockState extends ConsumerState<_AiPreviewBlock> {
         SizedBox(
           width: double.infinity,
           child: GoldButton(
-            label: _error == null ? 'Generate preview' : 'Try again',
+            label: _error == null ? 'Generate $_noun' : 'Try again',
             icon: Icons.auto_awesome,
             onPressed: _generate,
           ),

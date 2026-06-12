@@ -17,7 +17,12 @@ class AiSource {
 
 /// On-demand, AI-written match preview (Gemini grounded with Google Search).
 class AiMatchPreview {
-  AiMatchPreview({required this.content, required this.sources, this.generatedAt});
+  AiMatchPreview({
+    required this.content,
+    required this.sources,
+    this.generatedAt,
+    this.kind = 'preview',
+  });
   factory AiMatchPreview.fromJson(Map<String, dynamic> j) => AiMatchPreview(
         content: (j['content'] as String? ?? '').trim(),
         sources: ((j['sources'] as List?) ?? const [])
@@ -27,10 +32,15 @@ class AiMatchPreview {
         generatedAt: j['generatedAt'] == null
             ? null
             : DateTime.tryParse(j['generatedAt'] as String),
+        kind: (j['kind'] as String?) ?? 'preview',
       );
   final String content;
   final List<AiSource> sources;
   final DateTime? generatedAt;
+
+  /// 'preview' before kickoff, 'summary' once the match is live or finished.
+  final String kind;
+  bool get isSummary => kind == 'summary';
 }
 
 class AiPreviewRepository {
