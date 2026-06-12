@@ -243,10 +243,32 @@ export class RssAggregatorService implements OnModuleInit {
             },
             {
               type: 'news_breaking',
+              category: 'breakingNews',
               articleId: id,
               deepLink: `footballmojo://news/${id}`,
             },
           );
+        }
+
+        // Per-team news: a fresh story about a followed team → push to each
+        // tagged team's topic (followers subscribe to `team_{id}` on follow).
+        // Gated on freshness so a newly-discovered-but-old article from a feed
+        // backfill doesn't notify. `category: breakingNews` only routes it to
+        // the news channel client-side.
+        if (teamIds.length && publishedRecently) {
+          for (const teamId of teamIds) {
+            void this.push.pushToTopic(
+              `team_${teamId}`,
+              { title: `📰 ${source}`, body: title.slice(0, 140) },
+              {
+                type: 'team_news',
+                category: 'breakingNews',
+                teamId,
+                articleId: id,
+                deepLink: `footballmojo://news/${id}`,
+              },
+            );
+          }
         }
       }
     }
