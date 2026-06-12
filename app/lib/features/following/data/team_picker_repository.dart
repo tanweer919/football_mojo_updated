@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_provider.dart';
+import '../../../core/notifications/fcm_service.dart';
 import '../../profile/data/profile_repository.dart';
 
 /// Search-result row from `GET /v1/competitions/teams/search`.
@@ -59,11 +60,26 @@ class TeamPickerRepository {
   Future<void> follow(String teamId) async {
     await _dio.post<void>('/v1/users/me/follow/$teamId');
     _ref.invalidate(myProfileProvider);
+    await _syncTeamTopics();
   }
 
   Future<void> unfollow(String teamId) async {
     await _dio.delete<void>('/v1/users/me/follow/$teamId');
     _ref.invalidate(myProfileProvider);
+    await _syncTeamTopics();
+  }
+
+  /// Reconcile FCM team topics with the freshly-updated follow list so push
+  /// (goals/kickoff/FT/lineup/news) starts or stops immediately on a change.
+  Future<void> _syncTeamTopics() async {
+    try {
+      final profile = await _ref.read(myProfileProvider.future);
+      if (profile != null) {
+        await FcmBootstrap.syncTeams(
+          profile.followedTeams.map((t) => t.id).toSet(),
+        );
+      }
+    } catch (_) {/* best-effort; also re-synced on next app start */}
   }
 }
 
