@@ -24,10 +24,10 @@ export class AiService {
 
   constructor(cfg: ConfigService) {
     this.apiKey = cfg.get<string>('GEMINI_API_KEY');
-    // gemini-2.0-flash was the original, well-grounded model that produced the
-    // accurate previews; 3.5-flash regressed quality here. Override with
-    // GEMINI_MODEL if you want a different one.
-    this.model = cfg.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
+    // Current grounded flash model. gemini-2.0-flash was retired (404 → every
+    // preview failed); 2.5-flash supports Google Search grounding and is fast
+    // + cheap. Override with GEMINI_MODEL if Google moves it again.
+    this.model = cfg.get<string>('GEMINI_MODEL') ?? 'gemini-2.5-flash';
   }
 
   get enabled(): boolean {
