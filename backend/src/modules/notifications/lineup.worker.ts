@@ -5,6 +5,7 @@ import Redis from 'ioredis';
 import { PrismaService } from '../../common/prisma.service';
 import { REDIS_PUB } from '../../common/redis.module';
 import { ApiFootballCacheService } from '../api-football/api-football-cache.service';
+import { ApiFootballClient } from '../api-football/api-football.client';
 import { PushService } from './push.service';
 
 /**
@@ -28,6 +29,7 @@ export class LineupWorker {
     private readonly prisma: PrismaService,
     private readonly push: PushService,
     private readonly apiCache: ApiFootballCacheService,
+    private readonly api: ApiFootballClient,
     @Inject(REDIS_PUB) private readonly redis: Redis,
   ) {
     this.isWorker =
@@ -35,17 +37,34 @@ export class LineupWorker {
       cfg.get<string>('NODE_ENV') !== 'production';
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'lineup-announce' })
+  // Every 10 min is plenty — a "confirmed XI" alert a few minutes late is fine,
+  // and it halves the upstream calls vs a 5-min cadence.
+  @Cron(CronExpression.EVERY_10_MINUTES, { name: 'lineup-announce' })
   async tick(): Promise<void> {
     if (!this.isWorker) return;
+
+    // Never let lineup polling eat into the live-score budget — if api-football
+    // headroom is low, skip this tick (it retries in 10 min). Quota starts at
+    // Infinity, so this is a no-op until we've actually seen a rate-limit header.
+    const quota = this.api.getQuota();
+    if (quota.dailyRemaining < 50 || quota.minuteRemaining < 8) {
+      this.log.warn(
+        `lineup tick skipped — low api quota (min ${quota.minuteRemaining}, day ${quota.dailyRemaining})`,
+      );
+      return;
+    }
+
     const now = Date.now();
+    // Lineups land ~1h before kickoff, so only poll fixtures inside that window
+    // (and not ones already under way) — never the wider schedule.
     const upcoming = await this.prisma.match.findMany({
       where: {
         status: 'SCHEDULED',
-        kickoffAt: { gte: new Date(now), lte: new Date(now + 75 * 60_000) },
+        kickoffAt: { gte: new Date(now), lte: new Date(now + 70 * 60_000) },
       },
       include: { homeTeam: true, awayTeam: true },
     });
+    if (upcoming.length === 0) return; // nothing imminent → zero upstream calls
 
     for (const m of upcoming) {
       // Lineups need the numeric api-football fixture id; seed placeholders
