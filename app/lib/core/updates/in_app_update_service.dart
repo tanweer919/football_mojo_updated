@@ -21,12 +21,25 @@ class InAppUpdateService {
   AppUpdateInfo? _lastInfo;
   AppUpdateInfo? get lastInfo => _lastInfo;
 
+  // `check()` runs on every app resume. The native update UI is its own
+  // activity, so dismissing it (or tapping Update) resumes our app and fires
+  // check() again. Without these guards that re-launches the flow on a loop —
+  // the dialog "reappears" and you have to tap Update several times.
+  //   _running  — a check/flow is in flight; don't start a second one.
+  //   _offered  — we've already surfaced the update prompt this session; don't
+  //               nag again on every resume (Settings has a manual re-check,
+  //               and truly-forced updates use the remote-config ForceGate).
+  bool _running = false;
+  bool _offered = false;
+
   Future<void> check() async {
     if (!Platform.isAndroid) return;
     if (kDebugMode) {
       debugPrint('InAppUpdate: skipping in debug mode');
       return;
     }
+    if (_running) return;
+    _running = true;
     try {
       _lastInfo = await InAppUpdate.checkForUpdate();
       final info = _lastInfo;
@@ -34,6 +47,8 @@ class InAppUpdateService {
 
       switch (info.updateAvailability) {
         case UpdateAvailability.updateAvailable:
+          if (_offered) return; // already prompted this session
+          _offered = true;
           await _handle(info);
           break;
         case UpdateAvailability.developerTriggeredUpdateInProgress:
@@ -48,6 +63,8 @@ class InAppUpdateService {
     } catch (e) {
       // Updates must never crash the app.
       debugPrint('InAppUpdate: check failed: $e');
+    } finally {
+      _running = false;
     }
   }
 
@@ -89,16 +106,22 @@ class InAppUpdateService {
   }
 
   /// Manual entry point — e.g. from a Settings "Check for updates" tile.
+  /// User-initiated, so it bypasses the once-per-session limit, but still won't
+  /// stack on top of an in-flight flow.
   Future<bool> checkAndPromptManually() async {
-    if (!Platform.isAndroid) return false;
+    if (!Platform.isAndroid || _running) return false;
+    _running = true;
     try {
       _lastInfo = await InAppUpdate.checkForUpdate();
       if (_lastInfo?.updateAvailability == UpdateAvailability.updateAvailable) {
+        _offered = true;
         await _handle(_lastInfo!);
         return true;
       }
     } catch (e) {
       debugPrint('InAppUpdate: manual check failed: $e');
+    } finally {
+      _running = false;
     }
     return false;
   }
