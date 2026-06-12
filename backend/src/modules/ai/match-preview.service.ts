@@ -9,7 +9,8 @@ const TYPE = 'match_preview';
 // Lifecycle timings.
 const PRE_REFRESH_MS = 30 * 60 * 1000; // regenerate the preview this long before KO
 const EARLY_TTL_MS = 12 * 60 * 60 * 1000; // safety refresh for a preview made very early
-const LIVE_TTL_MS = 10 * 60 * 1000; // live summary cache window
+const LIVE_TTL_MS = 10 * 60 * 1000; // live summary refresh for non-goal developments
+const SCORE_DEBOUNCE_MS = 2 * 60 * 1000; // min gap between goal-triggered regenerations
 const FINAL_DELAY_MS = 8 * 60 * 1000; // wait after FT for match reports to surface
 
 type Phase = 'preview' | 'preview_imminent' | 'live' | 'final' | 'final_provisional';
@@ -56,8 +57,14 @@ export class MatchPreviewService {
 
     // ── LIVE ────────────────────────────────────────────────────────────────
     if (st === 'LIVE' || st === 'HALF_TIME') {
-      if (cached?.phase === 'live' && now - cached.updatedAt.getTime() < LIVE_TTL_MS) {
-        return this.shape(cached);
+      const score = `${match.homeScore}-${match.awayScore}`;
+      if (cached?.phase === 'live') {
+        const age = now - cached.updatedAt.getTime();
+        const scoreChanged = cached.scoreKey !== score;
+        // Refresh on a goal (debounced so a flurry only regenerates once), and
+        // periodically for non-goal developments (cards, momentum) at the TTL.
+        const fresh = age < LIVE_TTL_MS && (!scoreChanged || age < SCORE_DEBOUNCE_MS);
+        if (fresh) return this.shape(cached);
       }
       return this.generate(match, 'live');
     }
@@ -85,7 +92,22 @@ export class MatchPreviewService {
     return this.generate(match, 'preview_imminent');
   }
 
-  private async generate(match: MatchRow, phase: Phase) {
+  // Single-flight: coalesce concurrent generations for the same match into one
+  // Gemini call. After a goal, dozens of users may tap "generate" at once — this
+  // makes that one upstream call (and one credit), not N.
+  private readonly inflight = new Map<string, Promise<ReturnType<MatchPreviewService['shape']>>>();
+
+  private generate(match: MatchRow, phase: Phase) {
+    const existing = this.inflight.get(match.id);
+    if (existing) return existing;
+    const flight = this.doGenerate(match, phase).finally(() =>
+      this.inflight.delete(match.id),
+    );
+    this.inflight.set(match.id, flight);
+    return flight;
+  }
+
+  private async doGenerate(match: MatchRow, phase: Phase) {
     const prompt =
       phase === 'live' || phase === 'final' || phase === 'final_provisional'
         ? await this.buildSummaryPrompt(match, phase)
@@ -93,10 +115,11 @@ export class MatchPreviewService {
 
     const { text, sources, model } = await this.ai.generateGrounded(prompt);
     const sourcesJson = sources as unknown as Prisma.InputJsonValue;
+    const scoreKey = `${match.homeScore}-${match.awayScore}`;
     const saved = await this.prisma.aiContent.upsert({
       where: { type_refId: { type: TYPE, refId: match.id } },
-      create: { type: TYPE, refId: match.id, content: text, sources: sourcesJson, model, phase },
-      update: { content: text, sources: sourcesJson, model, phase },
+      create: { type: TYPE, refId: match.id, content: text, sources: sourcesJson, model, phase, scoreKey },
+      update: { content: text, sources: sourcesJson, model, phase, scoreKey },
     });
     return this.shape(saved);
   }
