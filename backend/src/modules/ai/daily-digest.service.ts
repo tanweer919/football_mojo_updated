@@ -28,6 +28,14 @@ export class DailyDigestService {
   private readonly log = new Logger(DailyDigestService.name);
   private readonly inflight = new Map<string, Promise<Digest | null>>();
 
+  // WC 2026 is hosted across US time zones, so a "matchday" is a US calendar
+  // day, not a UTC one — a late Pacific kickoff (9pm PT) is ~04:00 UTC the next
+  // day, which a UTC boundary would split off. The whole tournament
+  // (Jun 11 – Jul 19 2026) is in Pacific Daylight Time (UTC-7); midnight PT
+  // (~07:00 UTC) lands in the gap between matchdays, so anchoring today/
+  // yesterday to UTC-7 keeps a full slate inside one day.
+  private static readonly US_OFFSET_MS = 7 * 60 * 60 * 1000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
@@ -35,8 +43,8 @@ export class DailyDigestService {
 
   async getDaily(): Promise<{ preview: Digest | null; recap: Digest | null }> {
     const now = Date.now();
-    const today = this.dateStr(new Date(now));
-    const yesterday = this.dateStr(new Date(now - 24 * 60 * 60 * 1000));
+    const today = this.matchday(new Date(now));
+    const yesterday = this.matchday(new Date(now - 24 * 60 * 60 * 1000));
     const [preview, recap] = await Promise.all([
       this.build('daily_preview', today).catch((e) => {
         this.log.warn(`preview failed: ${(e as Error).message}`);
@@ -50,8 +58,11 @@ export class DailyDigestService {
     return { preview, recap };
   }
 
-  private dateStr(d: Date): string {
-    return d.toISOString().slice(0, 10);
+  /// US (Pacific) calendar date for an instant — the matchday key.
+  private matchday(at: Date): string {
+    return new Date(at.getTime() - DailyDigestService.US_OFFSET_MS)
+        .toISOString()
+        .slice(0, 10);
   }
 
   private build(type: 'daily_preview' | 'daily_recap', date: string): Promise<Digest | null> {
@@ -116,8 +127,12 @@ export class DailyDigestService {
 
   /// Same-fixture rows (WC seed + api-football) deduped by canonical team-pair.
   private async matchesOn(date: string): Promise<MatchRow[]> {
-    const start = new Date(`${date}T00:00:00Z`);
-    const end = new Date(`${date}T23:59:59Z`);
+    // `date` is a Pacific calendar date → its UTC window is [00:00 PT, 24:00 PT)
+    // i.e. midnight UTC for that date + 7h, spanning 24h.
+    const startMs =
+        new Date(`${date}T00:00:00Z`).getTime() + DailyDigestService.US_OFFSET_MS;
+    const start = new Date(startMs);
+    const end = new Date(startMs + 24 * 60 * 60 * 1000 - 1000);
     const rows = await this.prisma.match.findMany({
       where: { kickoffAt: { gte: start, lte: end } },
       include: { homeTeam: true, awayTeam: true, competition: true },
