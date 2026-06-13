@@ -609,11 +609,14 @@ class _Hero extends ConsumerWidget {
   }
 }
 
-/// Goal events only — own-goals and penalties count, missed penalties don't.
+/// Hero events: goals (incl. own-goals + penalties, but not missed penalties)
+/// and red cards. Red cards render as a red card glyph on the sent-off
+/// player's own side.
 bool _isGoalEvent(MatchEventDto e) =>
     e.kind == EventKind.goal ||
     e.kind == EventKind.ownGoal ||
-    e.kind == EventKind.penalty;
+    e.kind == EventKind.penalty ||
+    e.kind == EventKind.red;
 
 /// Two-column scorer strip rendered under the score in the hero. Each side
 /// lists the team's scorers with minute marks (`Mbappé 23'`, `Yamal 67'`).
