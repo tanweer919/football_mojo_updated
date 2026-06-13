@@ -4,6 +4,7 @@ import { AwardsModule } from '../awards/awards.module';
 import { BroadcastsModule } from '../broadcasts/broadcasts.module';
 import { GemsModule } from '../gems/gems.module';
 import { AdminAwardsController } from './awards.controller';
+import { AdminChannelsController } from './channels.controller';
 import { AdminFixturesController } from './fixtures.controller';
 import { AdminRoleGuard } from './admin-role.guard';
 import { AdminDashboardController } from './dashboard.controller';
@@ -45,6 +46,7 @@ import { PhotoBatchController } from './photo-batch.controller';
     AdminTeamsController,
     AdminAwardsController,
     AdminFixturesController,
+    AdminChannelsController,
     PhotoBatchController,
   ],
 })

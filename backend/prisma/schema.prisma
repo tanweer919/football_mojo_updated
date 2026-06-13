@@ -141,6 +141,18 @@ enum WatchLinkSource {
   SCRAPER
 }
 
+/// Global per-channel watch-link override, keyed by broadcaster name. Applied
+/// at serve time to every WatchLink with a matching name, so an admin can fix a
+/// channel's link once (e.g. "Fox Sports 1") instead of per fixture. Curated in
+/// the admin panel's Channels page.
+model ChannelOverride {
+  id        String   @id @default(cuid())
+  name      String   @unique           // broadcaster name as shown, e.g. "Fox Sports 1"
+  url       String                      // watch link applied wherever this channel appears
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum MatchStatus {
   SCHEDULED
   LIVE

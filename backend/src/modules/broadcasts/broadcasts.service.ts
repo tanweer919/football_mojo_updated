@@ -40,6 +40,10 @@ export class BroadcastsService {
       links = await this.templateLinks(matchId);
     }
 
+    // Global per-channel link overrides win over the stored url, so an admin
+    // can fix "Fox Sports 1" everywhere in one place.
+    const overrides = await this.channelOverrideMap();
+
     const groups = new Map<string, GroupedBroadcast>();
     for (const l of links) {
       const code = (l.countryCode ?? '').toUpperCase();
@@ -51,7 +55,11 @@ export class BroadcastsService {
           broadcasters: [],
         });
       }
-      groups.get(key)!.broadcasters.push({ name: l.name, url: l.url ?? null, logo: l.logoUrl ?? null });
+      groups.get(key)!.broadcasters.push({
+        name: l.name,
+        url: overrides.get(l.name.trim().toLowerCase()) ?? l.url ?? null,
+        logo: l.logoUrl ?? null,
+      });
     }
 
     return [...groups.values()].sort((a, b) => {
@@ -89,6 +97,63 @@ export class BroadcastsService {
       where: { matchId: templateId },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
+  }
+
+  // ── Channel overrides (global, name-keyed) ─────────────────────────────────
+  /** name(lowercased) → url, applied to every matching WatchLink at serve time. */
+  private async channelOverrideMap(): Promise<Map<string, string>> {
+    const rows = await this.prisma.channelOverride.findMany();
+    return new Map(rows.map((r) => [r.name.trim().toLowerCase(), r.url]));
+  }
+
+  listChannelOverrides() {
+    return this.prisma.channelOverride.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  /**
+   * Distinct broadcaster names that currently have NO link anywhere and no
+   * override yet — i.e. the channels worth fixing. Sorted by how many fixtures
+   * they appear in. Helps the admin know what to add.
+   */
+  async missingChannels(limit = 100) {
+    const [grouped, overrides] = await Promise.all([
+      this.prisma.watchLink.groupBy({
+        by: ['name'],
+        where: { url: null },
+        _count: { name: true },
+        orderBy: { _count: { name: 'desc' } },
+      }),
+      this.prisma.channelOverride.findMany({ select: { name: true } }),
+    ]);
+    const overridden = new Set(overrides.map((o) => o.name.trim().toLowerCase()));
+    return grouped
+      .filter((g) => !overridden.has(g.name.trim().toLowerCase()))
+      .slice(0, limit)
+      .map((g) => ({ name: g.name, fixtures: g._count.name }));
+  }
+
+  createChannelOverride(input: { name: string; url: string }) {
+    return this.prisma.channelOverride.create({
+      data: { name: input.name.trim(), url: input.url.trim() },
+    });
+  }
+
+  async updateChannelOverride(id: string, input: { name: string; url: string }) {
+    await this.assertChannelOverride(id);
+    return this.prisma.channelOverride.update({
+      where: { id },
+      data: { name: input.name.trim(), url: input.url.trim() },
+    });
+  }
+
+  async deleteChannelOverride(id: string) {
+    await this.assertChannelOverride(id);
+    await this.prisma.channelOverride.delete({ where: { id } });
+  }
+
+  private async assertChannelOverride(id: string) {
+    const n = await this.prisma.channelOverride.count({ where: { id } });
+    if (!n) throw new NotFoundException('channel_override_not_found');
   }
 
   // ── Admin: fixtures browsing ───────────────────────────────────────────────

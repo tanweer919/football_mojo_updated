@@ -4,15 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/network/api_error.dart';
-import '../../../../core/network/dio_provider.dart';
 import '../../../../core/util/region.dart';
+import '../../../../core/util/watch_country.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../data/ai_preview_repository.dart';
 import '../../../../core/widgets/live_dot.dart';
@@ -787,58 +786,6 @@ class _SectionHead extends StatelessWidget {
 /// highlighted; every other country sits behind a collapsible "More countries"
 /// row. Renders nothing until the backend's broadcast source returns data, so
 /// the section stays invisible rather than showing a broken empty card.
-const _kWatchCountryKey = 'whereToWatch.country';
-
-/// Viewer's "Where to watch" country. Defaults to the device region (no
-/// permission) but is **user-overridable + persisted** — device locale is
-/// often wrong (e.g. an en-US phone used in India reports US).
-class _WatchCountryNotifier extends Notifier<String?> {
-  bool _userPicked = false;
-
-  @override
-  String? build() {
-    _init();
-    return deviceCountryCode(); // instant placeholder while detection resolves
-  }
-
-  Future<void> _init() async {
-    // 1. A country the user explicitly chose always wins — skip detection.
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_kWatchCountryKey);
-    if (saved != null && saved.isNotEmpty) {
-      _userPicked = true;
-      state = saved;
-      return;
-    }
-    // 2. Our backend resolves country from the request IP (no third-party
-    //    rate limits); fall back to public IP providers, then device locale.
-    var code = await _countryFromBackend();
-    code ??= await countryByIp();
-    if (code != null && !_userPicked) state = code;
-  }
-
-  Future<String?> _countryFromBackend() async {
-    try {
-      final res = await ref.read(dioProvider).get<dynamic>('/v1/geo/country');
-      final data = res.data;
-      final code = (data is Map ? data['country'] : null)?.toString().trim();
-      return (code != null && code.length == 2) ? code.toUpperCase() : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> set(String code) async {
-    _userPicked = true;
-    state = code;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kWatchCountryKey, code);
-  }
-}
-
-final _watchCountryProvider =
-    NotifierProvider<_WatchCountryNotifier, String?>(_WatchCountryNotifier.new);
-
 class _WhereToWatchBlock extends ConsumerWidget {
   const _WhereToWatchBlock({required this.matchId});
   final String matchId;
@@ -851,7 +798,7 @@ class _WhereToWatchBlock extends ConsumerWidget {
         );
     if (entries.isEmpty) return const SizedBox.shrink();
 
-    final cc = ref.watch(_watchCountryProvider);
+    final cc = ref.watch(watchCountryProvider);
     MatchBroadcastDto? mine;
     if (cc != null) {
       for (final e in entries) {
@@ -901,7 +848,7 @@ class _WhereToWatchBlock extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => _CountryBrowserSheet(entries: entries, pick: true),
     );
-    if (code != null) ref.read(_watchCountryProvider.notifier).set(code);
+    if (code != null) ref.read(watchCountryProvider.notifier).set(code);
   }
 
   void _browseAll(BuildContext context, List<MatchBroadcastDto> entries) {
