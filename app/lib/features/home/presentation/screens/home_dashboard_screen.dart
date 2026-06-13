@@ -98,6 +98,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 14),
             const _HomeMatchRail(),
 
+            // Small banner above the matchday brief.
+            const PitchBannerAd(padding: EdgeInsets.fromLTRB(16, 14, 16, 0)),
+
             // AI matchday brief — today's preview / yesterday's results.
             const _MatchdayBrief(),
 
@@ -109,10 +112,15 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               child: _BracketCard(),
             ),
 
-            // Inline banner — self-hides on the ads kill-switch / Pro / no
-            // consent, so it's safe to anchor here mid-feed.
+            // Large MREC below the fold — self-hides on the ads kill-switch /
+            // Pro / no consent, so it's safe to anchor here mid-feed.
             const SizedBox(height: 14),
-            const Center(child: PitchBannerAd(padding: EdgeInsets.symmetric(horizontal: 16))),
+            const Center(
+              child: PitchBannerAd(
+                large: true,
+                padding: EdgeInsets.symmetric(horizontal: 16),
+              ),
+            ),
 
             // (Watch-ad-for-card CTA moved to the Collection + Wallet
             // screens — home stays focused.)
