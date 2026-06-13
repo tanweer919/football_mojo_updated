@@ -27,6 +27,12 @@ Usage:
   python scraper.py --date 2026-06-13                 # a single day
   python scraper.py --days 7 --fixtures fixtures.json # also map to api-football fixture IDs
   python scraper.py --days 3 --no-cache               # bypass the on-disk HTML cache
+  python scraper.py --days 7 --concurrency 12         # more parallel fetches
+
+SPEED: match pages and channel-website resolution run in parallel
+(`--concurrency`). The slug→website map persists to a committed `channels.json`
+(global + stable), so each channel is resolved once ever and reused by every
+fixture/run — warm runs finish fast.
 
 fixtures.json (export from your backend / api-football) is a list of:
   [ { "id": "1390531", "date": "2026-06-13", "home": "USA", "away": "Paraguay" }, ... ]
@@ -39,8 +45,10 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
@@ -82,9 +90,33 @@ COUNTRY_OVERRIDES = {
 SKIP_COUNTRIES = {"international"}  # pseudo-rows with no ISO code
 
 
+# ───────────────────────────────── rate limiting ──────────────────────────────────
+# The Jina free tier rate-limits hard (HTTP 429). When any thread is told to back
+# off, ALL threads honor a shared cooldown so we don't thunder-herd straight into
+# more 429s. A JINA_API_KEY raises the limit dramatically — strongly recommended.
+_rate_lock = threading.Lock()
+_cooldown_until = 0.0  # monotonic time before which no request should start
+
+
+def _wait_for_cooldown() -> None:
+    while True:
+        with _rate_lock:
+            remaining = _cooldown_until - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(remaining, 3))
+
+
+def _set_cooldown(seconds: float) -> None:
+    global _cooldown_until
+    with _rate_lock:
+        _cooldown_until = max(_cooldown_until, time.monotonic() + seconds)
+
+
 # ───────────────────────────────────── fetch ──────────────────────────────────────
-def fetch(url: str, cache: Path | None, api_key: str | None, delay: float) -> str:
-    """GET a livesoccertv URL's rendered HTML via the Jina reader proxy, cached."""
+def fetch(url: str, cache: Path | None, api_key: str | None, delay: float, attempts: int = 6) -> str:
+    """GET a livesoccertv URL's rendered HTML via the Jina reader proxy, cached.
+    Retries with exponential backoff, honoring Retry-After and a shared cooldown."""
     if cache:
         key = re.sub(r"[^a-z0-9]+", "_", url.lower()).strip("_") + ".html"
         cached = cache / key
@@ -96,7 +128,8 @@ def fetch(url: str, cache: Path | None, api_key: str | None, delay: float) -> st
         headers["Authorization"] = f"Bearer {api_key}"
 
     last_err = None
-    for attempt in range(3):
+    for attempt in range(attempts):
+        _wait_for_cooldown()
         try:
             r = requests.get(READER + url, headers=headers, timeout=60)
             if r.status_code == 200 and r.text:
@@ -105,10 +138,17 @@ def fetch(url: str, cache: Path | None, api_key: str | None, delay: float) -> st
                     cache.mkdir(parents=True, exist_ok=True)
                     cached.write_text(r.text, encoding="utf-8")
                 return r.text
+            if r.status_code == 429:
+                ra = r.headers.get("Retry-After", "")
+                backoff = float(ra) if ra.isdigit() else min(90, 5 * (2 ** attempt))
+                # Spread the resume time a little so threads don't all fire at once.
+                _set_cooldown(backoff + (attempt % 4))
+                last_err = "HTTP 429 (rate limited)"
+                continue  # cooldown above handles the wait
             last_err = f"HTTP {r.status_code}"
         except requests.RequestException as e:
             last_err = str(e)
-        time.sleep(2 * (attempt + 1))  # backoff
+        time.sleep(min(30, 2 * (attempt + 1)))  # backoff for non-429 errors
     raise RuntimeError(f"fetch failed for {url}: {last_err}")
 
 
@@ -156,19 +196,25 @@ def parse_match(html: str) -> list[dict]:
             continue
         seen.add(country_name.lower())
         broadcasters = []
+        seen_ch: set[str] = set()  # dedupe within a country (livesoccertv repeats some)
         for a in links:
             name = a.get_text(strip=True)
             if not name or "…" in name:
                 continue
             href = a.get("href", "")
             m = re.search(r"/channels/([^/]+)/?", href)
+            slug = m.group(1) if m else None
+            dedupe_key = slug or name.lower()
+            if dedupe_key in seen_ch:
+                continue
+            seen_ch.add(dedupe_key)
             broadcasters.append({
                 "name": name,
                 # Real watch URL is filled in later from the channel page's
                 # "Channel Website" button (see ChannelResolver); null if none.
                 "url": None,
                 "logo": None,
-                "_slug": m.group(1) if m else None,
+                "_slug": slug,
             })
         if broadcasters:
             out.append({
@@ -179,51 +225,71 @@ def parse_match(html: str) -> list[dict]:
     return out
 
 
-# ─────────────────────────── channel → watch-link resolver ────────────────────────
+# ─────────────────────────── channel → watch-link directory ───────────────────────
+# Persisted next to the script (NOT in .cache) and committed, so the slug→website
+# map is a shared, reusable asset — every fixture and every run reuses it, and a
+# cold machine starts warm. This is the key to speed: broadcaster sites are global
+# and stable, so each channel is resolved at most once, ever.
+DIRECTORY_PATH = Path(__file__).resolve().parent / "channels.json"
+
+
 class ChannelResolver:
-    """Resolves a livesoccertv channel slug to the broadcaster's real "Channel
-    Website" watch URL (the `a.watch-button` on /channels/{slug}/). Results are
-    cached on disk and reused across runs, so each channel is fetched at most
-    once ever — the slug→site map is stable and shared by every fixture.
+    """Resolves livesoccertv channel slugs to the broadcaster's real "Channel
+    Website" watch URL (the `a.watch-button` on /channels/{slug}/), in parallel.
     """
 
-    def __init__(self, cache: Path | None, api_key: str | None, delay: float):
+    def __init__(self, cache: Path | None, api_key: str | None, delay: float, concurrency: int):
         self.cache = cache
         self.api_key = api_key
         self.delay = delay
-        self.store_path = (cache / "channels.json") if cache else None
+        self.concurrency = max(1, concurrency)
         self.map: dict[str, str | None] = {}
-        if self.store_path and self.store_path.exists():
+        self._lock = threading.Lock()
+        if DIRECTORY_PATH.exists():
             try:
-                self.map = json.loads(self.store_path.read_text(encoding="utf-8"))
+                self.map = json.loads(DIRECTORY_PATH.read_text(encoding="utf-8"))
             except (ValueError, OSError):
                 self.map = {}
 
     def website(self, slug: str | None) -> str | None:
-        if not slug:
-            return None
-        if slug in self.map:
-            return self.map[slug]
-        url = f"{LSTV}/channels/{slug}/"
+        return self.map.get(slug) if slug else None
+
+    def _resolve_one(self, slug: str) -> tuple[str, str | None]:
         site = None
         try:
-            soup = BeautifulSoup(fetch(url, self.cache, self.api_key, self.delay), "html.parser")
+            soup = BeautifulSoup(
+                fetch(f"{LSTV}/channels/{slug}/", self.cache, self.api_key, self.delay),
+                "html.parser",
+            )
             for a in soup.select("a.watch-button[href], a.watch-btn[href]"):
                 href = a.get("href", "")
-                if href.startswith("http") and "livesoccertv.com" not in href \
-                        and "r.jina.ai" not in href:
+                if href.startswith("http") and "livesoccertv.com" not in href and "r.jina.ai" not in href:
                     site = href
                     break
         except RuntimeError:
             site = None
-        self.map[slug] = site
-        self._flush()
-        return site
+        return slug, site
 
-    def _flush(self):
-        if self.store_path:
-            self.store_path.parent.mkdir(parents=True, exist_ok=True)
-            self.store_path.write_text(json.dumps(self.map, ensure_ascii=False, indent=0), encoding="utf-8")
+    def resolve_all(self, slugs: set[str | None]) -> None:
+        """Resolve every not-yet-known slug concurrently, then persist once."""
+        todo = sorted(s for s in slugs if s and s not in self.map)
+        if not todo:
+            return
+        print(f"resolving {len(todo)} new channel websites ({self.concurrency}-way parallel)…", file=sys.stderr)
+        done = 0
+        with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+            futures = {pool.submit(self._resolve_one, s): s for s in todo}
+            for fut in as_completed(futures):
+                slug, site = fut.result()
+                with self._lock:
+                    self.map[slug] = site
+                done += 1
+                if done % 25 == 0 or done == len(todo):
+                    print(f"  …{done}/{len(todo)}", file=sys.stderr)
+        self.flush()
+
+    def flush(self) -> None:
+        DIRECTORY_PATH.write_text(json.dumps(self.map, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
 
 
 # ─────────────────────────────── normalisation helpers ────────────────────────────
@@ -303,20 +369,63 @@ def _date_close(d1: str, d2: str) -> bool:
         return d1 == d2
 
 
+def fixtures_from_api(base_url: str, from_day: str, to_day: str) -> list[dict]:
+    """Build the fixture list straight from the backend's public scores range
+    endpoint, so no hand-made fixtures.json is needed. Returns id/date/home/away."""
+    base = base_url.rstrip("/")
+    url = f"{base}/scores/fixtures/range?from={from_day}&to={to_day}"
+    rows = requests.get(url, timeout=30).json()
+    out = []
+    for r in rows:
+        ko = r.get("kickoffAt") or ""
+        out.append({
+            "id": str(r.get("id")),
+            "date": ko[:10],
+            "home": (r.get("homeTeam") or {}).get("name", ""),
+            "away": (r.get("awayTeam") or {}).get("name", ""),
+        })
+    return out
+
+
+def load_fixtures(args, dates: list[str]) -> list[dict] | None:
+    """Fixtures from --fixtures-api (preferred) or a --fixtures file. None if neither."""
+    if args.fixtures_api:
+        try:
+            fx = fixtures_from_api(args.fixtures_api, dates[0], dates[-1])
+            print(f"fetched {len(fx)} fixtures from {args.fixtures_api}", file=sys.stderr)
+            return fx
+        except (requests.RequestException, ValueError) as e:
+            print(f"! could not fetch fixtures from API: {e}", file=sys.stderr)
+            return None
+    if args.fixtures:
+        p = Path(args.fixtures)
+        if not p.exists():
+            print(f"! --fixtures file not found: {p} — skipping fixture mapping. "
+                  f"(Tip: use --fixtures-api <backend-url> to fetch them automatically.)", file=sys.stderr)
+            return None
+        return json.loads(p.read_text(encoding="utf-8"))
+    return None
+
+
 # ─────────────────────────────────────── main ─────────────────────────────────────
 def main() -> int:
     ap = argparse.ArgumentParser(description="Scrape livesoccertv where-to-watch data.")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--date", help="single day YYYY-MM-DD (default: today)")
     g.add_argument("--days", type=int, help="scrape today .. today+N days")
-    ap.add_argument("--fixtures", help="fixtures.json to map onto api-football IDs")
+    ap.add_argument("--fixtures", help="fixtures.json (id/date/home/away) to map onto fixture IDs")
+    ap.add_argument("--fixtures-api",
+                    help="backend base URL to auto-fetch fixtures from instead of a file, "
+                         "e.g. https://api.footballmojo.in/api/v1")
     ap.add_argument("--out", default="broadcasts_raw.json")
     ap.add_argument("--mapped-out", default="broadcasts_by_fixture.json")
     ap.add_argument("--no-cache", action="store_true", help="ignore on-disk HTML cache")
-    ap.add_argument("--delay", type=float, default=1.5, help="seconds between requests")
+    ap.add_argument("--delay", type=float, default=1.0, help="seconds between requests (per thread)")
     ap.add_argument("--limit", type=int, default=0, help="cap matches per day (debug)")
     ap.add_argument("--no-watch-links", action="store_true",
                     help="skip resolving each channel's real watch URL (faster, fewer fetches)")
+    ap.add_argument("--concurrency", type=int, default=6,
+                    help="parallel fetches (keep low on the free Jina tier; raise with a key)")
     ap.add_argument("--ingest-url", help="POST broadcasts_by_fixture to this backend ingest endpoint")
     ap.add_argument("--ingest-key", default=os.environ.get("SCRAPER_INGEST_KEY"),
                     help="x-ingest-key header for --ingest-url (or SCRAPER_INGEST_KEY env)")
@@ -331,10 +440,17 @@ def main() -> int:
     api_key = os.environ.get("JINA_API_KEY")
     cache = None if args.no_cache else Path(".cache")
     if not api_key:
-        print("note: no JINA_API_KEY set — using the free tier (lower rate limits).", file=sys.stderr)
+        print("note: no JINA_API_KEY set — the free tier rate-limits hard (expect HTTP 429s "
+              "and slow retries). Grab a free key at jina.ai and `export JINA_API_KEY=…` to "
+              "go much faster.", file=sys.stderr)
+        if args.concurrency > 4:
+            print(f"note: lowering --concurrency {args.concurrency} → 3 (no key). "
+                  "Re-runs reuse the cache + channels.json, so failed pages recover.", file=sys.stderr)
+            args.concurrency = 3
 
-    resolver = None if args.no_watch_links else ChannelResolver(cache, api_key, args.delay)
+    resolver = None if args.no_watch_links else ChannelResolver(cache, api_key, args.delay, args.concurrency)
 
+    # ── Pass 1: collect matches per day, fetching match pages in parallel. ──────
     scraped: list[dict] = []
     for d in dates:
         sched_url = f"{LSTV}/schedules/{d}/"
@@ -347,35 +463,42 @@ def main() -> int:
         matches = [m for m in matches if m["has_tv"]]
         if args.limit:
             matches = matches[: args.limit]
-        print(f"  {len(matches)} matches with TV", file=sys.stderr)
-        for m in matches:
+        print(f"  {len(matches)} matches with TV — fetching ({args.concurrency}-way)…", file=sys.stderr)
+
+        def scrape_match(m: dict) -> dict | None:
             try:
                 broadcasts = parse_match(fetch(m["url"], cache, api_key, args.delay))
             except RuntimeError as e:
                 print(f"  ! {m['home']} v {m['away']}: {e}", file=sys.stderr)
-                continue
-            # Resolve each broadcaster's real watch URL from its channel page,
-            # then drop the internal slug before output.
-            for entry in broadcasts:
-                for b in entry["broadcasters"]:
-                    slug = b.pop("_slug", None)
-                    if resolver:
-                        b["url"] = resolver.website(slug)
-            print(f"    {m['home']} v {m['away']}: {len(broadcasts)} countries", file=sys.stderr)
-            scraped.append({
-                "date": d,
-                "home": m["home"],
-                "away": m["away"],
-                "timeText": m["time_text"],
-                "sourceUrl": m["url"],
-                "broadcasts": broadcasts,
-            })
+                return None
+            return {
+                "date": d, "home": m["home"], "away": m["away"],
+                "timeText": m["time_text"], "sourceUrl": m["url"], "broadcasts": broadcasts,
+            }
+
+        with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
+            for res in pool.map(scrape_match, matches):
+                if res:
+                    scraped.append(res)
+        print(f"  {sum(1 for s in scraped if s['date'] == d)} matches scraped", file=sys.stderr)
+
+    # ── Pass 2: resolve every unique channel's watch URL once, in parallel, ─────
+    # then attach to each broadcaster and drop the internal slug.
+    if resolver:
+        slugs = {b.get("_slug") for s in scraped for e in s["broadcasts"] for b in e["broadcasters"]}
+        resolver.resolve_all(slugs)
+    for s in scraped:
+        for e in s["broadcasts"]:
+            for b in e["broadcasters"]:
+                slug = b.pop("_slug", None)
+                if resolver:
+                    b["url"] = resolver.website(slug)
 
     Path(args.out).write_text(json.dumps(scraped, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nwrote {len(scraped)} matches → {args.out}", file=sys.stderr)
 
-    if args.fixtures:
-        fixtures = json.loads(Path(args.fixtures).read_text(encoding="utf-8"))
+    fixtures = load_fixtures(args, dates)
+    if fixtures is not None:
         mapped = match_fixtures(scraped, fixtures)
         Path(args.mapped_out).write_text(json.dumps(mapped, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"matched {len(mapped)}/{len(fixtures)} fixtures → {args.mapped_out}", file=sys.stderr)
@@ -383,6 +506,9 @@ def main() -> int:
         if args.ingest_url:
             if not args.ingest_key:
                 print("! --ingest-url given but no --ingest-key / SCRAPER_INGEST_KEY", file=sys.stderr)
+                return 1
+            if not mapped:
+                print("! nothing matched — skipping ingest.", file=sys.stderr)
                 return 1
             r = requests.post(
                 args.ingest_url,
@@ -392,6 +518,8 @@ def main() -> int:
             )
             print(f"ingest → {args.ingest_url}: HTTP {r.status_code} {r.text[:200]}", file=sys.stderr)
             return 0 if r.ok else 1
+    elif args.ingest_url:
+        print("! --ingest-url needs fixtures (--fixtures-api or --fixtures) to map IDs; skipped.", file=sys.stderr)
 
     return 0
 

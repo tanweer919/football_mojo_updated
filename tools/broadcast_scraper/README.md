@@ -25,20 +25,58 @@ export JINA_API_KEY=...        # optional but recommended
 ```bash
 python scraper.py --days 7                            # next 7 days → broadcasts_raw.json
 python scraper.py --date 2026-06-13                   # one day
-python scraper.py --days 7 --fixtures fixtures.json   # also map to api-football IDs
 python scraper.py --days 2 --limit 3                  # quick smoke test
 python scraper.py --days 7 --no-watch-links           # skip watch-URL resolution (faster)
+
+# Map onto your fixtures + push to the backend — fixtures fetched automatically:
+python scraper.py --days 7 \
+  --fixtures-api https://api.footballmojo.in/api/v1 \
+  --ingest-url   https://api.footballmojo.in/api/v1/admin/broadcasts/ingest
 ```
 
 HTML is cached under `.cache/` so re-runs are instant; pass `--no-cache` to refetch.
 
-### Watch links
+### Fixtures: no file needed
 
-For each broadcaster the scraper also resolves the real **"Channel Website"** watch
-URL from its livesoccertv channel page (e.g. ZEE5 → `zee5.com`, ITV → `itv.com`),
-and leaves `url: null` for TV-only channels that have none. Channel → website is
-cached persistently in `.cache/channels.json` and reused across every run, so each
-channel is fetched at most once ever. Pass `--no-watch-links` to skip this pass.
+Pass **`--fixtures-api <backend-base-url>`** and the scraper pulls the fixture list
+(id/date/home/away) straight from the public `/scores/fixtures/range` endpoint for
+the same date window — no hand-made `fixtures.json`. (A `--fixtures file.json` still
+works if you prefer; a missing file is now a warning, not a crash.)
+
+### Rate limits (HTTP 429) — get a Jina key
+
+The **free Jina tier rate-limits hard**. Without a key you'll see `HTTP 429` and slow
+retries, and `--concurrency` is auto-capped to 3. Fix it in 30 seconds:
+
+```bash
+export JINA_API_KEY=...   # free at jina.ai → then --concurrency 12 is fine
+```
+
+On 429 the scraper honors `Retry-After`, backs off exponentially, and makes **all
+threads** pause together. Failed pages/days recover on retry, and re-running reuses
+`.cache/` + `channels.json`, so nothing is re-fetched needlessly.
+
+### Watch links & the channel directory (speed)
+
+For each broadcaster the scraper resolves the real **"Channel Website"** watch URL
+from its livesoccertv channel page (e.g. ZEE5 → `zee5.com`, ITV → `itv.com`), and
+leaves `url: null` for TV-only channels that have none.
+
+This is the only slow part, so it's built to be done **once and reused everywhere**:
+
+- Resolution runs **in parallel** (`--concurrency`, default 8) in a single pass
+  over *all* unique channels across every fetched fixture — not per-match.
+- The slug → website map is persisted to **`channels.json` at the scraper root and
+  committed to git** (not in `.cache/`). It's a global, stable directory: broadcaster
+  sites don't change per match, so every fixture, every run, and a fresh machine all
+  reuse it. After the first warm-up, runs resolve ~0 new channels and finish fast.
+
+Pass `--no-watch-links` to skip resolution entirely. Match pages are also fetched
+`--concurrency`-way in parallel.
+
+> **Coverage is ~identical across World Cup fixtures** (India is always ZEE5, USA
+> always FOX, …). The committed `channels.json` captures that shared directory, and
+> the per-fixture scrape is then a single fast page fetch each.
 
 ### Push straight to the backend (cron)
 
