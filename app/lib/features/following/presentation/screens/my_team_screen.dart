@@ -237,45 +237,83 @@ class _NextMatchCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final matches = _teamMatches(ref, teamId);
-    // Next = the live one if any, else the earliest upcoming.
+    final now = DateTime.now();
+
+    // Priority: a live match → a result for ~24h after the final whistle →
+    // the countdown to the next fixture.
     final live = matches.where((m) => m.isLive).toList()
       ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+    // ~26h after kickoff ≈ 24h after a 2h match. Most recent first.
+    final recent = matches
+        .where((m) =>
+            m.isFinished &&
+            now.difference(m.kickoffAt) < const Duration(hours: 26))
+        .toList()
+      ..sort((a, b) => b.kickoffAt.compareTo(a.kickoffAt));
     final upcoming = matches.where((m) => !m.isLive && !m.isFinished).toList()
       ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
-    final next = live.isNotEmpty ? live.first : (upcoming.isNotEmpty ? upcoming.first : null);
-    if (next == null) {
+
+    final String mode;
+    final MatchDto? feature;
+    if (live.isNotEmpty) {
+      mode = 'live';
+      feature = live.first;
+    } else if (recent.isNotEmpty) {
+      mode = 'result';
+      feature = recent.first;
+    } else if (upcoming.isNotEmpty) {
+      mode = 'upcoming';
+      feature = upcoming.first;
+    } else {
+      mode = 'none';
+      feature = null;
+    }
+
+    if (feature == null) {
       return _box(
         const Text('No upcoming match scheduled.',
             style: TextStyle(color: AppColors.muted, fontSize: 13)),
       );
     }
+
+    final eyebrow = switch (mode) {
+      'live' => 'LIVE NOW',
+      'result' => 'FULL TIME',
+      _ => 'UNTIL NEXT MATCH',
+    };
+
     return _box(
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Eyebrow(next.isLive ? 'LIVE NOW' : 'UNTIL NEXT MATCH', gold: !next.isLive),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: next.isLive
-                ? const Text("It's on — tap below to follow live.",
-                    style: TextStyle(color: AppColors.live, fontWeight: FontWeight.w800))
-                : CountdownText(
-                    target: next.kickoffAt,
-                    expiredLabel: 'Kicking off',
-                    style: const TextStyle(
-                      fontFamily: 'JetBrainsMono',
-                      fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.gold,
-                      letterSpacing: 1,
-                    ),
-                  ),
-          ),
+          Center(child: Eyebrow(eyebrow, gold: mode == 'upcoming')),
+          // Live → a prompt; upcoming → the (seconds-precise) countdown.
+          // Result → nothing extra; the card below carries the final score.
+          if (mode == 'live') ...[
+            const SizedBox(height: 8),
+            const Center(
+              child: Text("It's on — tap below to follow live.",
+                  style: TextStyle(color: AppColors.live, fontWeight: FontWeight.w800)),
+            ),
+          ] else if (mode == 'upcoming') ...[
+            const SizedBox(height: 8),
+            Center(
+              child: CountdownText(
+                target: feature.kickoffAt,
+                expiredLabel: 'Kicking off',
+                style: const TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.gold,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
-          MatchCard(match: next),
+          MatchCard(match: feature),
         ],
       ),
     );
