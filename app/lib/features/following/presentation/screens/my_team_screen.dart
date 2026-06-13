@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/router/route_paths.dart';
@@ -82,14 +83,17 @@ class _MyTeamScreenState extends ConsumerState<MyTeamScreen> {
               const SizedBox(height: 16),
               _NextMatchCard(teamId: selected.id),
               const SizedBox(height: 20),
-              _TeamStories(teamId: selected.id),
               _SectionLabel('Group standings'),
               const SizedBox(height: 8),
               _TeamGroup(teamId: selected.id),
+              const SizedBox(height: 16),
+              const Center(child: PitchBannerAd(large: true)),
               const SizedBox(height: 20),
               _SectionLabel('Fixtures'),
               const SizedBox(height: 8),
               _TeamFixtures(teamId: selected.id),
+              const SizedBox(height: 20),
+              _TeamStories(teamId: selected.id),
             ],
           );
         },
@@ -146,6 +150,16 @@ class _TeamChips extends StatelessWidget {
           return ChoiceChip(
             selected: sel,
             onSelected: (_) => onSelect(t.id),
+            avatar: t.crestUrl != null
+                ? ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: t.crestUrl!,
+                      width: 20,
+                      height: 20,
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                : null,
             label: Text(t.shortName),
             labelStyle: TextStyle(
               fontWeight: FontWeight.w700,

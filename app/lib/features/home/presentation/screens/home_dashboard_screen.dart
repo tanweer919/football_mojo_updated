@@ -403,7 +403,10 @@ class _NextMatchHero extends ConsumerWidget {
     final live = ref.watch(liveMatchesProvider);
     final fixtures = ref.watch(homeFixturesProvider);
 
-    if (live.isLoading && fixtures.isLoading) {
+    // Wait for BOTH to resolve before deciding — otherwise the live list (which
+    // resolves fast, often empty) makes the hero flash "no matches live" before
+    // the slower fixtures load and the real upcoming match appears.
+    if (live.isLoading || fixtures.isLoading) {
       return const _HeroSkeleton();
     }
 
@@ -1010,6 +1013,25 @@ class _HomeMatchRail extends ConsumerWidget {
   const _HomeMatchRail();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // While the underlying data loads, reserve the rail's height with skeleton
+    // cards so content below doesn't jump when it resolves.
+    final loading = ref.watch(liveMatchesProvider).isLoading ||
+        ref.watch(homeFixturesProvider).isLoading;
+    if (loading) {
+      return SizedBox(
+        height: 150,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, __) => const SizedBox(
+            width: 286,
+            child: Skeleton(height: 150, radius: 14),
+          ),
+        ),
+      );
+    }
     final feed = ref.watch(homeMatchFeedProvider);
     if (feed.railItems.isEmpty) return const SizedBox.shrink();
     return Column(
