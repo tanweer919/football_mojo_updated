@@ -2828,12 +2828,27 @@ class _MockCrest extends StatelessWidget {
 /// Followed-team digest. Crest rail → recent results + upcoming fixtures
 /// → team news headlines. This is the primary personalised section on the
 /// home page and needs to feel worth coming back to.
-class _FollowedTeamsRail extends ConsumerWidget {
+class _FollowedTeamsRail extends StatefulWidget {
   const _FollowedTeamsRail({required this.teams});
   final List<ProfileTeam> teams;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<_FollowedTeamsRail> createState() => _FollowedTeamsRailState();
+}
+
+class _FollowedTeamsRailState extends State<_FollowedTeamsRail> {
+  int _selected = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = widget.teams;
+    // Followed set can shrink (via Manage) between builds — keep the index valid.
+    final sel = _selected.clamp(0, teams.length - 1);
+    // One team → no tabs, just that team's digest. More than one → the crests
+    // act as tabs and only the selected team's news + fixtures show, so we
+    // never dump every team's content on top of each other.
+    final multi = teams.length > 1;
+    final active = teams[sel];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
@@ -2878,24 +2893,26 @@ class _FollowedTeamsRail extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 10),
-            // Crest scroller
+            // Crest scroller — doubles as the team tab-bar when >1 team.
             SizedBox(
               height: 54,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: teams.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _CrestPill(team: teams[i]),
+                itemBuilder: (_, i) => _CrestPill(
+                  team: teams[i],
+                  selected: multi && i == sel,
+                  onTap: multi ? () => setState(() => _selected = i) : null,
+                ),
               ),
             ),
             const SizedBox(height: 8),
-            // Team news — headlines from ALL followed teams.
-            for (final team in teams)
-              _FollowedTeamNews(teamId: team.id),
+            // News + fixtures for the selected team only.
+            _FollowedTeamNews(teamId: active.id),
             Container(height: 1, color: AppColors.borderSoft),
             const SizedBox(height: 8),
-            // Fixtures — results + upcoming
-            _FollowedTeamFixtures(teamIds: teams.map((t) => t.id).toSet()),
+            _FollowedTeamFixtures(teamIds: {active.id}),
           ],
         ),
       ),
@@ -2990,41 +3007,52 @@ class _TeamNewsRow extends StatelessWidget {
 }
 
 class _CrestPill extends StatelessWidget {
-  const _CrestPill({required this.team});
+  const _CrestPill({required this.team, this.selected = false, this.onTap});
   final ProfileTeam team;
+  final bool selected;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.borderSoft),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: selected
+                  ? AppColors.gold.withValues(alpha: 0.14)
+                  : AppColors.surface2,
+              border: Border.all(
+                color: selected ? AppColors.gold : AppColors.borderSoft,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
           ),
-          child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 50,
-          child: Text(
-            team.shortName,
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: AppColors.fgSoft,
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 50,
+            child: Text(
+              team.shortName,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.gold : AppColors.fgSoft,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
