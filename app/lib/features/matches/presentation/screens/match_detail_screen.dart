@@ -10,6 +10,7 @@ import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/network/api_error.dart';
+import '../../../../core/util/region.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../data/ai_preview_repository.dart';
 import '../../../../core/widgets/live_dot.dart';
@@ -18,6 +19,7 @@ import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/score_flip.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../insights/data/insights_repository.dart';
+import '../../../insights/data/models/broadcast_dto.dart';
 import '../../../insights/data/models/lineup_dto.dart';
 import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/models/match_stats_dto.dart';
@@ -137,6 +139,8 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: _Topbar(match: match)),
         SliverToBoxAdapter(child: _Hero(match: match)),
         SliverToBoxAdapter(child: _AiPreviewBlock(match: match)),
+        // Self-hiding: renders nothing until the backend serves broadcast data.
+        SliverToBoxAdapter(child: _WhereToWatchBlock(matchId: match.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Stats', icon: Icons.bar_chart)),
         SliverToBoxAdapter(child: _StatsBlock(matchId: match.id)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Key moments', icon: Icons.timeline)),
@@ -415,8 +419,10 @@ class _Hero extends ConsumerWidget {
     // pre-match / 0-0 heroes don't grow an empty band. Pulled from the
     // same events provider the Events tab uses — Riverpod dedupes, so we
     // pay one fetch even though it's referenced twice on the page.
-    final goalscorers = ref.watch(matchEventsProvider(match.id)).maybeWhen(
-          data: (es) => es.where(_isGoalEvent).toList(),
+    final heroEvents = ref.watch(matchEventsProvider(match.id)).maybeWhen(
+          data: (es) => es
+              .where((e) => _isGoalEvent(e) || e.kind == EventKind.red)
+              .toList(),
           orElse: () => const <MatchEventDto>[],
         );
     final showScore = match.isLive || match.isFinished;
@@ -574,10 +580,10 @@ class _Hero extends ConsumerWidget {
                     Expanded(child: _Side(team: match.awayTeam, alignEnd: true)),
                   ],
                 ),
-                if (goalscorers.isNotEmpty) ...[
+                if (heroEvents.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _HeroGoalscorers(
-                    events: goalscorers,
+                    events: heroEvents,
                     homeTeamId: match.homeTeam.id,
                   ),
                 ],
@@ -680,13 +686,19 @@ class _ScorerColumn extends StatelessWidget {
   }
 
   Widget _ballIcon(MatchEventDto e) {
-    // Different glyphs so own-goals stand out from regular tallies — the
-    // user can scan the row and immediately see which were unfortunate.
-    final icon = e.kind == EventKind.ownGoal
-        ? Icons.cancel_outlined
-        : e.kind == EventKind.penalty
-            ? Icons.adjust
-            : Icons.sports_soccer;
+    if (e.kind == EventKind.red) {
+      return Container(
+        width: 9,
+        height: 12,
+        decoration: BoxDecoration(
+          color: AppColors.live,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+    }
+    // Own-goals reuse the ball glyph but in red so they read as goals while
+    // still standing out from a side's regular tallies.
+    final icon = e.kind == EventKind.penalty ? Icons.adjust : Icons.sports_soccer;
     final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
     return Icon(icon, size: 12, color: color);
   }
@@ -761,6 +773,216 @@ class _SectionHead extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── WHERE TO WATCH ──────────────────────────────────────────────────────────
+
+/// Broadcasters grouped by country. The viewer's own country (detected from
+/// the device region — no location permission) is pinned to the top and
+/// highlighted; every other country sits behind a collapsible "More countries"
+/// row. Renders nothing until the backend's broadcast source returns data, so
+/// the section stays invisible rather than showing a broken empty card.
+class _WhereToWatchBlock extends ConsumerWidget {
+  const _WhereToWatchBlock({required this.matchId});
+  final String matchId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = ref.watch(matchBroadcastsProvider(matchId)).maybeWhen(
+          data: (b) => b.where((e) => e.broadcasters.isNotEmpty).toList(),
+          orElse: () => const <MatchBroadcastDto>[],
+        );
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final cc = deviceCountryCode();
+    final mine = <MatchBroadcastDto>[];
+    final others = <MatchBroadcastDto>[];
+    for (final e in entries) {
+      (cc != null && e.countryCode == cc ? mine : others).add(e);
+    }
+    others.sort((a, b) => a.countryName.compareTo(b.countryName));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionHead(title: 'Where to watch', icon: Icons.live_tv),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              for (final e in mine)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _CountryBroadcast(entry: e, highlighted: true),
+                ),
+              if (others.isNotEmpty)
+                // When the viewer's country isn't covered, there's nothing
+                // pinned on top — so show the rest expanded instead of hidden.
+                _OtherCountries(entries: others, startExpanded: mine.isEmpty),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Collapsible list of the remaining countries' broadcasters.
+class _OtherCountries extends StatefulWidget {
+  const _OtherCountries({required this.entries, required this.startExpanded});
+  final List<MatchBroadcastDto> entries;
+  final bool startExpanded;
+
+  @override
+  State<_OtherCountries> createState() => _OtherCountriesState();
+}
+
+class _OtherCountriesState extends State<_OtherCountries> {
+  late bool _open = widget.startExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  _open ? 'Other countries' : 'More countries (${widget.entries.length})',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+                const Spacer(),
+                Icon(_open ? Icons.expand_less : Icons.expand_more,
+                    size: 20, color: AppColors.muted),
+              ],
+            ),
+          ),
+        ),
+        if (_open)
+          for (final e in widget.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _CountryBroadcast(entry: e, highlighted: false),
+            ),
+      ],
+    );
+  }
+}
+
+/// One country card: flag + name header, then a row per broadcaster.
+class _CountryBroadcast extends StatelessWidget {
+  const _CountryBroadcast({required this.entry, required this.highlighted});
+  final MatchBroadcastDto entry;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final flag = countryFlagEmoji(entry.countryCode);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r4),
+        color: AppColors.surface,
+        border: Border.all(
+          color: highlighted ? AppColors.gold : AppColors.borderSoft,
+          width: highlighted ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (flag.isNotEmpty) ...[
+                Text(flag, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  entry.countryName.isNotEmpty ? entry.countryName : entry.countryCode,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: highlighted ? AppColors.gold : AppColors.fg,
+                  ),
+                ),
+              ),
+              if (highlighted)
+                const Text(
+                  'Your region',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.gold,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final b in entry.broadcasters) _BroadcasterRow(broadcaster: b),
+        ],
+      ),
+    );
+  }
+}
+
+class _BroadcasterRow extends StatelessWidget {
+  const _BroadcasterRow({required this.broadcaster});
+  final BroadcasterDto broadcaster;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = broadcaster.url;
+    return InkWell(
+      onTap: (url == null || url.isEmpty)
+          ? null
+          : () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22, height: 22,
+              child: PremiumImage(
+                url: broadcaster.logo,
+                fit: BoxFit.contain,
+                fallback: const Icon(Icons.tv, size: 16, color: AppColors.muted),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                broadcaster.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.fg,
+                ),
+              ),
+            ),
+            if (url != null && url.isNotEmpty)
+              const Icon(Icons.open_in_new, size: 14, color: AppColors.muted),
+          ],
+        ),
       ),
     );
   }
@@ -1327,8 +1549,11 @@ class _Pitch extends StatelessWidget {
         final y = maxRow <= 1 ? 0.5 : 0.10 + ((r - 1) / (maxRow - 1)) * 0.75;
         for (var i = 0; i < rowPlayers.length; i++) {
           final n = rowPlayers.length;
-          // Evenly distribute across 90% of pitch width.
-          final x = n == 1 ? 0.5 : 0.05 + (i / (n - 1)) * 0.90;
+          // Evenly distribute across 90% of pitch width. api-football numbers
+          // grid columns right-to-left from the team's attacking perspective,
+          // so col 1 sits on the right — mirror the index to match the
+          // broadcast convention (and Google's lineup view).
+          final x = n == 1 ? 0.5 : 0.95 - (i / (n - 1)) * 0.90;
           placed.add(_Placed(rowPlayers[i], x, y));
         }
       }
@@ -1371,30 +1596,58 @@ class _PitchChip extends StatelessWidget {
   final LineupPlayer player;
   @override
   Widget build(BuildContext context) {
+    final label =
+        player.number != null ? '${player.number}' : (player.pos.isNotEmpty ? player.pos[0] : '?');
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 36, height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFFEFD8A1), Color(0xFFC99A3D)],
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))],
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            player.number != null ? '${player.number}' : (player.pos.isNotEmpty ? player.pos[0] : '?'),
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E1810),
-              height: 1.0,
-            ),
+        SizedBox(
+          width: 40, height: 40,
+          child: Stack(
+            children: [
+              // Player headshot, falling back to the gold number disc when no
+              // photo is available (or it fails to load).
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E1810),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                child: ClipOval(
+                  child: PremiumImage(
+                    url: player.photoUrl,
+                    fit: BoxFit.cover,
+                    fallback: _numberDisc(label),
+                  ),
+                ),
+              ),
+              // Jersey number badge, kept inside the avatar bounds.
+              Positioned(
+                right: 0, bottom: 0,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC99A3D),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFF1E1810), width: 1),
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E1810),
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 4),
@@ -1421,6 +1674,30 @@ class _PitchChip extends StatelessWidget {
       ],
     );
   }
+
+  /// Gold disc with the jersey number — shown when there's no headshot.
+  Widget _numberDisc(String label) => DecoratedBox(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [Color(0xFFEFD8A1), Color(0xFFC99A3D)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E1810),
+              height: 1.0,
+            ),
+          ),
+        ),
+      );
 }
 
 /// Pitch surface — dark green gradient with alternating mowing stripes,

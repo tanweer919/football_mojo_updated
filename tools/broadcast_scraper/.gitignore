@@ -1,0 +1,4 @@
+.cache/
+broadcasts_raw.json
+broadcasts_by_fixture.json
+__pycache__/

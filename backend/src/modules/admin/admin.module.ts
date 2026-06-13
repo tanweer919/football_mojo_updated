@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { AwardsModule } from '../awards/awards.module';
+import { BroadcastsModule } from '../broadcasts/broadcasts.module';
 import { GemsModule } from '../gems/gems.module';
 import { AdminAwardsController } from './awards.controller';
+import { AdminFixturesController } from './fixtures.controller';
 import { AdminRoleGuard } from './admin-role.guard';
 import { AdminDashboardController } from './dashboard.controller';
 import { AdminPlayersController } from './players.controller';
@@ -25,7 +27,7 @@ import { PhotoBatchController } from './photo-batch.controller';
  * Mounted at `/v1/admin/*`. Consumed by the Next.js admin panel.
  */
 @Module({
-  imports: [AuthModule, AwardsModule, GemsModule],
+  imports: [AuthModule, AwardsModule, GemsModule, BroadcastsModule],
   providers: [
     AdminRoleGuard,
     AdminPlayersService,
@@ -42,6 +44,7 @@ import { PhotoBatchController } from './photo-batch.controller';
     AdminUsersController,
     AdminTeamsController,
     AdminAwardsController,
+    AdminFixturesController,
     PhotoBatchController,
   ],
 })

@@ -14,8 +14,8 @@ export function SiteHeader() {
         </Link>
         <nav className="hidden items-center gap-7 text-sm font-medium text-fg-soft sm:flex">
           <a href="/#features" className="transition hover:text-fg">Features</a>
+          <Link href="/where-to-watch" className="transition hover:text-fg">Where to Watch</Link>
           <a href="/#worldcup" className="transition hover:text-fg">World Cup 2026</a>
-          <a href="/#faq" className="transition hover:text-fg">FAQ</a>
           <Link href="/privacy" className="transition hover:text-fg">Privacy</Link>
         </nav>
         <a
@@ -52,6 +52,7 @@ export function SiteFooter() {
             <div className="flex flex-col gap-2">
               <span className="eyebrow !text-fg-muted2 mb-1">Product</span>
               <a href="/#features" className="text-fg-soft transition hover:text-gold">Features</a>
+              <Link href="/where-to-watch" className="text-fg-soft transition hover:text-gold">Where to Watch</Link>
               <a href="/#worldcup" className="text-fg-soft transition hover:text-gold">World Cup 2026</a>
               <a href={SITE.playStoreUrl} target="_blank" rel="noopener" className="text-fg-soft transition hover:text-gold">
                 Get the app

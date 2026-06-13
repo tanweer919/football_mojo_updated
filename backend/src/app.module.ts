@@ -15,6 +15,7 @@ import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ApiFootballModule } from './modules/api-football/api-football.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AwardsModule } from './modules/awards/awards.module';
+import { BroadcastsModule } from './modules/broadcasts/broadcasts.module';
 import { CardsModule } from './modules/cards/cards.module';
 import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { FantasyModule } from './modules/fantasy/fantasy.module';
@@ -70,6 +71,7 @@ import { UsersModule } from './modules/users/users.module';
     H2HModule,
     GlobalCupModule,
     InsightsModule,
+    BroadcastsModule,
     NotificationsModule,
     UsersModule,
     AdminModule,
