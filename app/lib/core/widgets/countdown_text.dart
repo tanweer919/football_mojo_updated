@@ -59,13 +59,12 @@ class _CountdownTextState extends State<CountdownText> {
 
     final mm = m.toString().padLeft(2, '0');
     final ss = s.toString().padLeft(2, '0');
-    // Always include seconds — the timer already ticks per second, so it's no
-    // extra cost. Days view: `4d 07:00:13`; under a day: `07:00:13`.
-    if (days >= 1) {
-      final hh = h.toString().padLeft(2, '0');
-      return '${days}d $hh:$mm:$ss';
-    }
-    return '${d.inHours.toString().padLeft(2, '0')}:$mm:$ss';
+    // Labelled h/m/s, always with seconds — the timer already ticks per second,
+    // so it's no extra cost. Days view: `4d 07h 00m 13s`; under a day:
+    // `07h 00m 13s`.
+    final hh = h.toString().padLeft(2, '0');
+    if (days >= 1) return '${days}d ${hh}h ${mm}m ${ss}s';
+    return '${hh}h ${mm}m ${ss}s';
   }
 
   @override

@@ -609,11 +609,14 @@ class _Hero extends ConsumerWidget {
   }
 }
 
-/// Goal events only — own-goals and penalties count, missed penalties don't.
+/// Hero events: goals (incl. own-goals + penalties, but not missed penalties)
+/// and red cards. Red cards render as a red card glyph on the sent-off
+/// player's own side.
 bool _isGoalEvent(MatchEventDto e) =>
     e.kind == EventKind.goal ||
     e.kind == EventKind.ownGoal ||
-    e.kind == EventKind.penalty;
+    e.kind == EventKind.penalty ||
+    e.kind == EventKind.red;
 
 /// Two-column scorer strip rendered under the score in the hero. Each side
 /// lists the team's scorers with minute marks (`Mbappé 23'`, `Yamal 67'`).
@@ -697,11 +700,10 @@ class _ScorerColumn extends StatelessWidget {
         ),
       );
     }
-    // Own-goals reuse the ball glyph but in red so they read as goals while
-    // still standing out from a side's regular tallies.
-    final icon = e.kind == EventKind.penalty ? Icons.adjust : Icons.sports_soccer;
+    // All goals — including penalties — use the ball glyph. Own-goals reuse it
+    // in red so they read as goals while standing out from a side's tallies.
     final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
-    return Icon(icon, size: 12, color: color);
+    return Icon(Icons.sports_soccer, size: 12, color: color);
   }
 
   String _label(MatchEventDto e) {
