@@ -29,6 +29,21 @@ class ScoresApiClient {
         .toList(growable: false);
   }
 
+  /// All fixtures in [from, to] (inclusive) in ONE request — replaces N
+  /// per-day calls for multi-day windows (home / My Team / matches screens).
+  Future<List<MatchDto>> fetchFixturesRange(DateTime from, DateTime to) async {
+    final f = from.toIso8601String().substring(0, 10);
+    final t = to.toIso8601String().substring(0, 10);
+    final res = await _dio.get<List<dynamic>>(
+      '/v1/scores/fixtures/range',
+      queryParameters: {'from': f, 'to': t},
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(MatchDto.fromJson)
+        .toList(growable: false);
+  }
+
   /// Returns null when the backend has no record of this fixture (e.g. live
   /// match from an untracked league surfaced via /scores/live but never
   /// persisted, or a stale id). Throws on transport/server errors.

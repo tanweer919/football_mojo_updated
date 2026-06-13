@@ -18,7 +18,6 @@ import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/score_flip.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../insights/data/insights_repository.dart';
-import '../../../insights/presentation/widgets/match_preview_card.dart';
 import '../../../insights/data/models/lineup_dto.dart';
 import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/models/match_stats_dto.dart';
@@ -137,17 +136,6 @@ class _MatchBody extends StatelessWidget {
         SliverToBoxAdapter(child: SizedBox(height: topInset + 6)),
         SliverToBoxAdapter(child: _Topbar(match: match)),
         SliverToBoxAdapter(child: _Hero(match: match)),
-        // Win-probability bar + H2H (api-football model). Self-hides once the
-        // match is live/finished — pre-kickoff context only.
-        SliverToBoxAdapter(
-          child: MatchPreviewCard(
-            fixtureId: match.id,
-            homeTeamId: match.homeTeam.id,
-            awayTeamId: match.awayTeam.id,
-            homeName: match.homeTeam.shortName ?? match.homeTeam.name,
-            awayName: match.awayTeam.shortName ?? match.awayTeam.name,
-          ),
-        ),
         SliverToBoxAdapter(child: _AiPreviewBlock(match: match)),
         SliverToBoxAdapter(child: _SectionHead(title: 'Stats', icon: Icons.bar_chart)),
         SliverToBoxAdapter(child: _StatsBlock(matchId: match.id)),

@@ -24,8 +24,12 @@ import '../../../scores/presentation/widgets/match_card.dart';
 /// whose LOCAL kickoff date matches the selected day.
 Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDay) async {
   final sel = DateTime(localDay.year, localDay.month, localDay.day);
-  final days = [sel.subtract(const Duration(days: 1)), sel, sel.add(const Duration(days: 1))];
-  final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
+  // One range request for the selected day ±1 (covers the local-day spillover)
+  // instead of three per-day calls.
+  final fetched = await repo.fetchFixturesRange(
+    sel.subtract(const Duration(days: 1)),
+    sel.add(const Duration(days: 1)),
+  );
 
   // Collapse duplicate rows for the same fixture. The WC seed inserts a row
   // (id `WC2026-...`, hand-entered kickoff/venue) AND the api-football poller
@@ -54,7 +58,7 @@ Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDa
   int rank(MatchDto m) =>
       (numeric.hasMatch(m.id) ? 2 : 0) + (m.status != MatchStatus.SCHEDULED ? 1 : 0);
   final byKey = <String, MatchDto>{};
-  for (final m in results.expand((e) => e)) {
+  for (final m in fetched) {
     final existing = byKey[keyOf(m)];
     if (existing == null || rank(m) > rank(existing)) byKey[keyOf(m)] = m;
   }
@@ -128,14 +132,22 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                         ? all
                         : all.where((m) => m.competitionId == selectedCompetition).toList();
                     if (matches.isEmpty) {
-                      return const SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(20, 12, 20, 130),
-                        physics: AlwaysScrollableScrollPhysics(),
-                        child: PitchEmptyState(
-                          eyebrow: 'No fixtures',
-                          title: 'No matches on this day',
-                          subtitle: 'Pick a different date from the strip above. WC, UCL and Big-Five fixtures land here as soon as they’re scheduled.',
-                          glyph: EmptyGlyph.football,
+                      // No matches → still show a large banner under the empty
+                      // state so the screen always carries an ad.
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: const [
+                            PitchEmptyState(
+                              eyebrow: 'No fixtures',
+                              title: 'No matches on this day',
+                              subtitle: 'Pick a different date from the strip above. WC, UCL and Big-Five fixtures land here as soon as they’re scheduled.',
+                              glyph: EmptyGlyph.football,
+                            ),
+                            SizedBox(height: 24),
+                            Center(child: PitchBannerAd(large: true)),
+                          ],
                         ),
                       );
                     }
@@ -143,17 +155,17 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                     // Bottom padding clears the floating tabbar (~110px) so
                     // the last card isn't covered.
                     const bottomGap = 130.0;
-                    // A single in-feed banner after the 3rd match — below the
-                    // fold so the user scrolls to it (no anchored bottom bar).
-                    final showAd = matches.length > 3;
-                    const adAt = 3;
+                    // Always show one large in-feed banner: after the 3rd match
+                    // (below the fold) for a full slate, or at the end of the
+                    // list when there are only a couple of matches.
+                    final adAt = matches.length <= 3 ? matches.length : 3;
                     return cols == 1
                         ? ListView.separated(
                             padding: const EdgeInsets.fromLTRB(12, 12, 12, bottomGap),
-                            itemCount: matches.length + (showAd ? 1 : 0),
+                            itemCount: matches.length + 1,
                             separatorBuilder: (_, __) => const SizedBox(height: 10),
                             itemBuilder: (_, i) {
-                              if (showAd && i == adAt) {
+                              if (i == adAt) {
                                 return const Center(
                                   child: PitchBannerAd(
                                     large: true,
@@ -161,7 +173,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                                   ),
                                 );
                               }
-                              final mi = showAd && i > adAt ? i - 1 : i;
+                              final mi = i > adAt ? i - 1 : i;
                               return MatchCard(match: matches[mi], indexInList: mi);
                             },
                           )

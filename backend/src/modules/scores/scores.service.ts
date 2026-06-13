@@ -339,6 +339,24 @@ export class ScoresService {
     return rows;
   }
 
+  /// All fixtures in an inclusive [from, to] date range, in ONE query — so the
+  /// home/My-Team/matches screens fetch a multi-day window in a single request
+  /// instead of one call per day.
+  async getFixturesRange(from: string, to: string) {
+    const key = `fixtures:range:${from}:${to}`;
+    const cached = await this.pub.get(key);
+    if (cached) return JSON.parse(cached);
+    const start = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T23:59:59Z`);
+    const rows = await this.prisma.match.findMany({
+      where: { kickoffAt: { gte: start, lte: end } },
+      include: { homeTeam: true, awayTeam: true, competition: true },
+      orderBy: { kickoffAt: 'asc' },
+    });
+    await this.pub.set(key, JSON.stringify(rows), 'EX', 60);
+    return rows;
+  }
+
   async getMatchDetail(id: string) {
     return this.prisma.match.findUnique({
       where: { id },
