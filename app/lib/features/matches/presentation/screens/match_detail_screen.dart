@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/network/api_error.dart';
+import '../../../../core/network/dio_provider.dart';
 import '../../../../core/util/region.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../data/ai_preview_repository.dart';
@@ -785,6 +787,58 @@ class _SectionHead extends StatelessWidget {
 /// highlighted; every other country sits behind a collapsible "More countries"
 /// row. Renders nothing until the backend's broadcast source returns data, so
 /// the section stays invisible rather than showing a broken empty card.
+const _kWatchCountryKey = 'whereToWatch.country';
+
+/// Viewer's "Where to watch" country. Defaults to the device region (no
+/// permission) but is **user-overridable + persisted** — device locale is
+/// often wrong (e.g. an en-US phone used in India reports US).
+class _WatchCountryNotifier extends Notifier<String?> {
+  bool _userPicked = false;
+
+  @override
+  String? build() {
+    _init();
+    return deviceCountryCode(); // instant placeholder while detection resolves
+  }
+
+  Future<void> _init() async {
+    // 1. A country the user explicitly chose always wins — skip detection.
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_kWatchCountryKey);
+    if (saved != null && saved.isNotEmpty) {
+      _userPicked = true;
+      state = saved;
+      return;
+    }
+    // 2. Our backend resolves country from the request IP (no third-party
+    //    rate limits); fall back to public IP providers, then device locale.
+    var code = await _countryFromBackend();
+    code ??= await countryByIp();
+    if (code != null && !_userPicked) state = code;
+  }
+
+  Future<String?> _countryFromBackend() async {
+    try {
+      final res = await ref.read(dioProvider).get<dynamic>('/v1/geo/country');
+      final data = res.data;
+      final code = (data is Map ? data['country'] : null)?.toString().trim();
+      return (code != null && code.length == 2) ? code.toUpperCase() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> set(String code) async {
+    _userPicked = true;
+    state = code;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kWatchCountryKey, code);
+  }
+}
+
+final _watchCountryProvider =
+    NotifierProvider<_WatchCountryNotifier, String?>(_WatchCountryNotifier.new);
+
 class _WhereToWatchBlock extends ConsumerWidget {
   const _WhereToWatchBlock({required this.matchId});
   final String matchId;
@@ -797,13 +851,16 @@ class _WhereToWatchBlock extends ConsumerWidget {
         );
     if (entries.isEmpty) return const SizedBox.shrink();
 
-    final cc = deviceCountryCode();
-    final mine = <MatchBroadcastDto>[];
-    final others = <MatchBroadcastDto>[];
-    for (final e in entries) {
-      (cc != null && e.countryCode == cc ? mine : others).add(e);
+    final cc = ref.watch(_watchCountryProvider);
+    MatchBroadcastDto? mine;
+    if (cc != null) {
+      for (final e in entries) {
+        if (e.countryCode == cc) {
+          mine = e;
+          break;
+        }
+      }
     }
-    others.sort((a, b) => a.countryName.compareTo(b.countryName));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -813,80 +870,236 @@ class _WhereToWatchBlock extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              for (final e in mine)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _CountryBroadcast(entry: e, highlighted: true),
-                ),
-              if (others.isNotEmpty)
-                // When the viewer's country isn't covered, there's nothing
-                // pinned on top — so show the rest expanded instead of hidden.
-                _OtherCountries(entries: others, startExpanded: mine.isEmpty),
+              if (mine != null)
+                _CountryBroadcast(
+                  entry: mine,
+                  highlighted: true,
+                  onChangeRegion: () => _pickRegion(context, ref, entries),
+                )
+              else
+                _RegionPrompt(onTap: () => _pickRegion(context, ref, entries)),
+              const SizedBox(height: 10),
+              // Only the user's card renders inline; the full ~200-country
+              // list lives behind a searchable, lazily-built sheet so the
+              // section stays light.
+              _BrowseAllButton(
+                count: entries.length,
+                onTap: () => _browseAll(context, entries),
+              ),
             ],
           ),
         ),
       ],
     );
   }
+
+  Future<void> _pickRegion(
+      BuildContext context, WidgetRef ref, List<MatchBroadcastDto> entries) async {
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CountryBrowserSheet(entries: entries, pick: true),
+    );
+    if (code != null) ref.read(_watchCountryProvider.notifier).set(code);
+  }
+
+  void _browseAll(BuildContext context, List<MatchBroadcastDto> entries) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CountryBrowserSheet(entries: entries, pick: false),
+    );
+  }
 }
 
-/// Collapsible list of the remaining countries' broadcasters.
-class _OtherCountries extends StatefulWidget {
-  const _OtherCountries({required this.entries, required this.startExpanded});
+/// Shown when we can't match the viewer's region to any listed country.
+class _RegionPrompt extends StatelessWidget {
+  const _RegionPrompt({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.public, size: 18, color: AppColors.gold),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Pick your country to see where to watch',
+                style: TextStyle(
+                    fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.fg),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: AppColors.muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrowseAllButton extends StatelessWidget {
+  const _BrowseAllButton({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.r4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.borderSoft),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.public, size: 18, color: AppColors.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Browse all $count countries',
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.fg),
+              ),
+            ),
+            const Icon(Icons.search, size: 18, color: AppColors.muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Searchable, lazily-rendered country browser in a bottom sheet. In [pick]
+/// mode each row is a selectable country tile that returns its code; otherwise
+/// each row is a full broadcaster card. `ListView.builder` keeps it cheap even
+/// with ~200 countries.
+class _CountryBrowserSheet extends StatefulWidget {
+  const _CountryBrowserSheet({required this.entries, required this.pick});
   final List<MatchBroadcastDto> entries;
-  final bool startExpanded;
+  final bool pick;
 
   @override
-  State<_OtherCountries> createState() => _OtherCountriesState();
+  State<_CountryBrowserSheet> createState() => _CountryBrowserSheetState();
 }
 
-class _OtherCountriesState extends State<_OtherCountries> {
-  late bool _open = widget.startExpanded;
+class _CountryBrowserSheetState extends State<_CountryBrowserSheet> {
+  String _q = '';
+  late final List<MatchBroadcastDto> _sorted =
+      [...widget.entries]..sort((a, b) => a.countryName.compareTo(b.countryName));
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _open = !_open),
-          borderRadius: BorderRadius.circular(AppRadii.r4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-            child: Row(
-              children: [
-                Text(
-                  _open ? 'Other countries' : 'More countries (${widget.entries.length})',
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
+    final q = _q.trim().toLowerCase();
+    final list = q.isEmpty
+        ? _sorted
+        : _sorted
+            .where((e) =>
+                e.countryName.toLowerCase().contains(q) || e.countryCode.toLowerCase().contains(q))
+            .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderSoft, borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _q = v),
+                style: const TextStyle(fontFamily: 'Inter', fontSize: 14, color: AppColors.fg),
+                decoration: InputDecoration(
+                  hintText: widget.pick ? 'Search for your country…' : 'Search countries…',
+                  hintStyle: const TextStyle(color: AppColors.muted),
+                  prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.muted),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.r4),
+                    borderSide: const BorderSide(color: AppColors.borderSoft),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.r4),
+                    borderSide: const BorderSide(color: AppColors.borderSoft),
                   ),
                 ),
-                const Spacer(),
-                Icon(_open ? Icons.expand_less : Icons.expand_more,
-                    size: 20, color: AppColors.muted),
-              ],
+              ),
             ),
-          ),
+            Expanded(
+              child: list.isEmpty
+                  ? const Center(
+                      child: Text('No countries match',
+                          style: TextStyle(fontFamily: 'Inter', color: AppColors.muted)))
+                  : ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: list.length,
+                      itemBuilder: (_, i) {
+                        final e = list[i];
+                        if (widget.pick) {
+                          return ListTile(
+                            dense: true,
+                            leading: Text(countryFlagEmoji(e.countryCode),
+                                style: const TextStyle(fontSize: 22)),
+                            title: Text(
+                              e.countryName.isNotEmpty ? e.countryName : e.countryCode,
+                              style: const TextStyle(
+                                  fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.fg),
+                            ),
+                            trailing: Text('${e.broadcasters.length}',
+                                style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.muted)),
+                            onTap: () => Navigator.pop(context, e.countryCode),
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _CountryBroadcast(entry: e, highlighted: false),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
-        if (_open)
-          for (final e in widget.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _CountryBroadcast(entry: e, highlighted: false),
-            ),
-      ],
+      ),
     );
   }
 }
 
 /// One country card: flag + name header, then a row per broadcaster.
 class _CountryBroadcast extends StatelessWidget {
-  const _CountryBroadcast({required this.entry, required this.highlighted});
+  const _CountryBroadcast({required this.entry, required this.highlighted, this.onChangeRegion});
   final MatchBroadcastDto entry;
   final bool highlighted;
+  final VoidCallback? onChangeRegion;
 
   @override
   Widget build(BuildContext context) {
@@ -922,13 +1135,25 @@ class _CountryBroadcast extends StatelessWidget {
                 ),
               ),
               if (highlighted)
-                const Text(
-                  'Your region',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.gold,
+                GestureDetector(
+                  onTap: onChangeRegion,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Your region',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                      if (onChangeRegion != null) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit, size: 12, color: AppColors.gold),
+                      ],
+                    ],
                   ),
                 ),
             ],

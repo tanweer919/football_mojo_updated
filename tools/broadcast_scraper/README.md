@@ -74,6 +74,23 @@ This is the only slow part, so it's built to be done **once and reused everywher
 Pass `--no-watch-links` to skip resolution entirely. Match pages are also fetched
 `--concurrency`-way in parallel.
 
+#### Fixing / adding a channel's link
+
+Some channels have no "Channel Website" on livesoccertv (e.g. US: FOX Network,
+fuboTV) → `url: null`. To set one **globally for every fixture**, add the slug →
+URL to **`channel-overrides.json`** (committed; always wins; never auto-written):
+
+```json
+{ "fox-network": "https://www.foxsports.com/live", "fubo-tv": "https://www.fubo.tv/" }
+```
+
+The slug is the `/channels/<slug>/` path on livesoccertv (visible in the page
+source). Then re-run the scraper + re-ingest — the override applies everywhere
+that channel appears, and overridden slugs are skipped during resolution.
+
+For a **one-off, single-fixture** link, just edit it in the **admin panel**:
+Fixtures → the match → Watch links → Edit.
+
 > **Coverage is ~identical across World Cup fixtures** (India is always ZEE5, USA
 > always FOX, …). The committed `channels.json` captures that shared directory, and
 > the per-fixture scrape is then a single fast page fetch each.

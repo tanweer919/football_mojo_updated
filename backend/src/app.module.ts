@@ -20,6 +20,7 @@ import { CardsModule } from './modules/cards/cards.module';
 import { CompetitionsModule } from './modules/competitions/competitions.module';
 import { FantasyModule } from './modules/fantasy/fantasy.module';
 import { GemsModule } from './modules/gems/gems.module';
+import { GeoModule } from './modules/geo/geo.module';
 import { GlobalCupModule } from './modules/global-cup/global-cup.module';
 import { H2HModule } from './modules/h2h/h2h.module';
 import { InsightsModule } from './modules/insights/insights.module';
@@ -72,6 +73,7 @@ import { UsersModule } from './modules/users/users.module';
     GlobalCupModule,
     InsightsModule,
     BroadcastsModule,
+    GeoModule,
     NotificationsModule,
     UsersModule,
     AdminModule,
