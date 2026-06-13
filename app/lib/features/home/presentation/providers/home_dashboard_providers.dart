@@ -88,11 +88,11 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
   // for the home "Match" hero and the followed-team digest. Each day is
   // cached server-side, but fewer client round-trips = faster, lighter load.
   final now = DateTime.now();
-  final days = <DateTime>[
-    for (int i = -2; i <= 14; i++)
-      DateTime(now.year, now.month, now.day + i),
-  ];
-  final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
+  // One range request instead of 17 per-day calls (-2 … +14 days).
+  final fetched = await repo.fetchFixturesRange(
+    DateTime(now.year, now.month, now.day - 2),
+    DateTime(now.year, now.month, now.day + 14),
+  );
   // The same real-world fixture can appear as TWO different DB rows:
   // the WC seed inserts a match with a synthetic id (and possibly its
   // own team-id codes + a placeholder kickoff time), while the
@@ -114,7 +114,7 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
   }
   int rank(MatchDto m) => m.status == MatchStatus.SCHEDULED ? 0 : 1;
   final byKey = <String, MatchDto>{};
-  for (final m in results.expand((e) => e)) {
+  for (final m in fetched) {
     final k = keyOf(m);
     final existing = byKey[k];
     if (existing == null || rank(m) > rank(existing)) {

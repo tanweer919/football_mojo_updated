@@ -19,6 +19,13 @@ export class ScoresController {
     return this.scores.getFixturesForDay(day ?? new Date().toISOString().slice(0, 10));
   }
 
+  /// Multi-day window in one request (home / My Team / matches screens).
+  @Get('fixtures/range')
+  @CacheTTL(60_000)
+  fixturesRange(@Query('from') from: string, @Query('to') to: string) {
+    return this.scores.getFixturesRange(from, to);
+  }
+
   @Get('matches/:id')
   @CacheTTL(10_000)
   async match(@Param('id') id: string) {

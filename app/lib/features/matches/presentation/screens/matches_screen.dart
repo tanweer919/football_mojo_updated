@@ -24,8 +24,12 @@ import '../../../scores/presentation/widgets/match_card.dart';
 /// whose LOCAL kickoff date matches the selected day.
 Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDay) async {
   final sel = DateTime(localDay.year, localDay.month, localDay.day);
-  final days = [sel.subtract(const Duration(days: 1)), sel, sel.add(const Duration(days: 1))];
-  final results = await Future.wait(days.map((d) => repo.fetchFixtures(day: d)));
+  // One range request for the selected day ±1 (covers the local-day spillover)
+  // instead of three per-day calls.
+  final fetched = await repo.fetchFixturesRange(
+    sel.subtract(const Duration(days: 1)),
+    sel.add(const Duration(days: 1)),
+  );
 
   // Collapse duplicate rows for the same fixture. The WC seed inserts a row
   // (id `WC2026-...`, hand-entered kickoff/venue) AND the api-football poller
@@ -54,7 +58,7 @@ Future<List<MatchDto>> _localDayFixtures(ScoresRepository repo, DateTime localDa
   int rank(MatchDto m) =>
       (numeric.hasMatch(m.id) ? 2 : 0) + (m.status != MatchStatus.SCHEDULED ? 1 : 0);
   final byKey = <String, MatchDto>{};
-  for (final m in results.expand((e) => e)) {
+  for (final m in fetched) {
     final existing = byKey[keyOf(m)];
     if (existing == null || rank(m) > rank(existing)) byKey[keyOf(m)] = m;
   }

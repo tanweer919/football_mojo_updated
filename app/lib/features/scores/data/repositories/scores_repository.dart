@@ -21,6 +21,8 @@ class ScoresRepository {
 
   Future<List<MatchDto>> fetchLive() => _api.fetchLive();
   Future<List<MatchDto>> fetchFixtures({DateTime? day}) => _api.fetchFixtures(day: day);
+  Future<List<MatchDto>> fetchFixturesRange(DateTime from, DateTime to) =>
+      _api.fetchFixturesRange(from, to);
   Future<MatchDto?> fetchMatch(String id) => _api.fetchMatch(id);
 
   Stream<MatchUpdate> updates() => _socket.updates();

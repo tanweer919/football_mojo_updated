@@ -12,7 +12,6 @@ import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../home/presentation/providers/home_dashboard_providers.dart';
 import '../../../news/data/models/news_article.dart';
-import '../../../news/data/repositories/news_repository.dart';
 import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
 import '../../../profile/data/profile_repository.dart';
@@ -21,11 +20,6 @@ import '../../../scores/presentation/widgets/match_card.dart';
 import '../../../world_cup/data/world_cup_repository.dart';
 
 const _wc = 'WC2026';
-
-/// Latest news tagged with the followed team.
-final _teamNewsProvider = FutureProvider.family<NewsPage, String>(
-  (ref, teamId) => ref.read(newsRepositoryProvider).list(teamId: teamId),
-);
 
 /// "My Team" — the followed-team home: countdown to the next match, the team's
 /// group table, and their fixtures. Built off the backend follow list.
@@ -380,7 +374,8 @@ class _TeamStories extends ConsumerWidget {
   final String teamId;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(_teamNewsProvider(teamId)).valueOrNull?.items ?? const [];
+    final items =
+        ref.watch(teamNewsProvider(teamId)).valueOrNull ?? const <NewsArticleDto>[];
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
