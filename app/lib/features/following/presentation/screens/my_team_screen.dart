@@ -43,6 +43,13 @@ class _MyTeamScreenState extends ConsumerState<MyTeamScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
+        // Tab navigation doesn't push a route, so there's no automatic back
+        // button — add one that pops when possible, else returns Home.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(RoutePaths.home),
+        ),
         title: const Text('My Team'),
         actions: [
           IconButton(
