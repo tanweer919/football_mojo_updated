@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/router/route_paths.dart';
 
 import '../../../../core/auth/auth_repository.dart';
+import '../../../../core/auth/session_reset.dart';
 import '../../../../core/auth/sign_in_sheet.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
@@ -282,7 +283,13 @@ class _ProfileBody extends ConsumerWidget {
                   expand: true,
                   onPressed: () async {
                     await ref.read(authRepositoryProvider).signOut();
-                    ref.invalidate(myProfileProvider);
+                    // Wipe the previous user's local data + every user-scoped
+                    // cache so the next account starts clean.
+                    if (context.mounted) {
+                      await clearUserSession(
+                        ProviderScope.containerOf(context, listen: false),
+                      );
+                    }
                     if (context.mounted) context.go('/home');
                   },
                 ),
