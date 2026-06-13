@@ -10,6 +10,9 @@ import '../../../../core/widgets/countdown_text.dart';
 import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
 import '../../../home/presentation/providers/home_dashboard_providers.dart';
+import '../../../news/data/models/news_article.dart';
+import '../../../news/data/repositories/news_repository.dart';
+import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
 import '../../../profile/data/profile_repository.dart';
 import '../../../scores/data/models/match_dto.dart';
@@ -17,6 +20,11 @@ import '../../../scores/presentation/widgets/match_card.dart';
 import '../../../world_cup/data/world_cup_repository.dart';
 
 const _wc = 'WC2026';
+
+/// Latest news tagged with the followed team.
+final _teamNewsProvider = FutureProvider.family<NewsPage, String>(
+  (ref, teamId) => ref.read(newsRepositoryProvider).list(teamId: teamId),
+);
 
 /// "My Team" — the followed-team home: countdown to the next match, the team's
 /// group table, and their fixtures. Built off the backend follow list.
@@ -67,6 +75,7 @@ class _MyTeamScreenState extends ConsumerState<MyTeamScreen> {
               const SizedBox(height: 16),
               _NextMatchCard(teamId: selected.id),
               const SizedBox(height: 20),
+              _TeamStories(teamId: selected.id),
               _SectionLabel('Group standings'),
               const SizedBox(height: 8),
               _TeamGroup(teamId: selected.id),
@@ -341,6 +350,80 @@ class _TeamGroup extends ConsumerWidget {
           ),
         ),
       );
+}
+
+/// "Latest news" about the team — a few tappable story rows. Hides itself
+/// (label included) when there are no stories.
+class _TeamStories extends ConsumerWidget {
+  const _TeamStories({required this.teamId});
+  final String teamId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(_teamNewsProvider(teamId)).valueOrNull?.items ?? const [];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel('Latest news'),
+        const SizedBox(height: 8),
+        for (final a in items.take(5)) _NewsRow(article: a),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+}
+
+class _NewsRow extends StatelessWidget {
+  const _NewsRow({required this.article});
+  final NewsArticleDto article;
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push('/news/${article.id}'),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 64,
+              height: 48,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: NewsThumb(imageUrl: article.imageUrl, source: article.source, dense: true),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.fg,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    article.source,
+                    style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TeamFixtures extends ConsumerWidget {

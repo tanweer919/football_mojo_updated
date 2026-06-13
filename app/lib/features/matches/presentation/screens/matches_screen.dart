@@ -128,14 +128,22 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                         ? all
                         : all.where((m) => m.competitionId == selectedCompetition).toList();
                     if (matches.isEmpty) {
-                      return const SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(20, 12, 20, 130),
-                        physics: AlwaysScrollableScrollPhysics(),
-                        child: PitchEmptyState(
-                          eyebrow: 'No fixtures',
-                          title: 'No matches on this day',
-                          subtitle: 'Pick a different date from the strip above. WC, UCL and Big-Five fixtures land here as soon as they’re scheduled.',
-                          glyph: EmptyGlyph.football,
+                      // No matches → still show a large banner under the empty
+                      // state so the screen always carries an ad.
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 130),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: const [
+                            PitchEmptyState(
+                              eyebrow: 'No fixtures',
+                              title: 'No matches on this day',
+                              subtitle: 'Pick a different date from the strip above. WC, UCL and Big-Five fixtures land here as soon as they’re scheduled.',
+                              glyph: EmptyGlyph.football,
+                            ),
+                            SizedBox(height: 24),
+                            Center(child: PitchBannerAd(large: true)),
+                          ],
                         ),
                       );
                     }
@@ -143,17 +151,17 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                     // Bottom padding clears the floating tabbar (~110px) so
                     // the last card isn't covered.
                     const bottomGap = 130.0;
-                    // A single in-feed banner after the 3rd match — below the
-                    // fold so the user scrolls to it (no anchored bottom bar).
-                    final showAd = matches.length > 3;
-                    const adAt = 3;
+                    // Always show one large in-feed banner: after the 3rd match
+                    // (below the fold) for a full slate, or at the end of the
+                    // list when there are only a couple of matches.
+                    final adAt = matches.length <= 3 ? matches.length : 3;
                     return cols == 1
                         ? ListView.separated(
                             padding: const EdgeInsets.fromLTRB(12, 12, 12, bottomGap),
-                            itemCount: matches.length + (showAd ? 1 : 0),
+                            itemCount: matches.length + 1,
                             separatorBuilder: (_, __) => const SizedBox(height: 10),
                             itemBuilder: (_, i) {
-                              if (showAd && i == adAt) {
+                              if (i == adAt) {
                                 return const Center(
                                   child: PitchBannerAd(
                                     large: true,
@@ -161,7 +169,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                                   ),
                                 );
                               }
-                              final mi = showAd && i > adAt ? i - 1 : i;
+                              final mi = i > adAt ? i - 1 : i;
                               return MatchCard(match: matches[mi], indexInList: mi);
                             },
                           )

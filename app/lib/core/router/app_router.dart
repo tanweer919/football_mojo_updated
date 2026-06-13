@@ -83,6 +83,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (ctx, state, child) => HomeShell(child: child),
         routes: [
           GoRoute(path: RoutePaths.home,        builder: (_, __) => const HomeDashboardScreen()),
+          GoRoute(path: RoutePaths.myTeam,      builder: (_, __) => const MyTeamScreen()),
           GoRoute(path: RoutePaths.matches,     builder: (_, __) => const MatchesScreen()),
           GoRoute(path: RoutePaths.fantasyHome, builder: (_, __) => const FantasyHomeScreen()),
           GoRoute(path: RoutePaths.album,       builder: (_, __) => const AlbumScreen()),
@@ -198,7 +199,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
       GoRoute(path: RoutePaths.wallet,      builder: (_, __) => const WalletScreen()),
       GoRoute(path: RoutePaths.teamPicker,  builder: (_, __) => const TeamPickerScreen()),
-      GoRoute(path: RoutePaths.myTeam,      builder: (_, __) => const MyTeamScreen()),
       GoRoute(
         path: RoutePaths.playerProfile,
         builder: (_, s) => PlayerProfileScreen(playerId: s.pathParameters['id']!),

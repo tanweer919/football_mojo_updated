@@ -8,7 +8,6 @@ import '../../../../core/design/motion.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/score_flip.dart';
 import '../../../../core/widgets/team_crest.dart';
-import '../../../insights/presentation/widgets/match_probability_bar.dart';
 import '../../../matches/presentation/widgets/match_share_card.dart';
 import '../../../predictions/presentation/widgets/predict_sheet.dart';
 import '../../data/models/match_dto.dart';
@@ -127,8 +126,6 @@ class MatchCard extends StatelessWidget {
                     ],
                   ),
                 ],
-                // Win-probability strip — upcoming matches only (pre-kickoff).
-                if (canPredict) MatchProbabilityBar(fixtureId: match.id),
               ],
             ),
           ),

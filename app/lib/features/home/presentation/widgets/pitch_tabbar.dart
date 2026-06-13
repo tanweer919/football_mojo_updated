@@ -17,6 +17,7 @@ class PitchTabbar extends ConsumerWidget {
 
   static const _items = <_Dest>[
     _Dest('Home',      _IconHome(),      RoutePaths.home),
+    _Dest('My Team',   _IconMyTeam(),    RoutePaths.myTeam),
     _Dest('World Cup', _IconWorldCup(),  RoutePaths.tournament),
     _Dest('Fantasy',   _IconFantasy(),   RoutePaths.fantasyHome),
     // Tab opens the public marketplace browse. The "Collection" affordance
@@ -134,13 +135,16 @@ class _TabItem extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label.toUpperCase(),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.fade,
               style: TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: 9,
+                fontSize: 8.5,
                 height: 1.0,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 0.72,
+                letterSpacing: 0.4,
                 color: color,
               ),
             ),
@@ -156,6 +160,11 @@ class _IconHome extends StatelessWidget {
   const _IconHome();
   @override
   Widget build(BuildContext context) => const Icon(Icons.home_outlined);
+}
+class _IconMyTeam extends StatelessWidget {
+  const _IconMyTeam();
+  @override
+  Widget build(BuildContext context) => const Icon(Icons.flag_outlined);
 }
 class _IconWorldCup extends StatelessWidget {
   const _IconWorldCup();
