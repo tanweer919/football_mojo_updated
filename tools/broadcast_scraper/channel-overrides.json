@@ -1,6 +1,9 @@
 {
   "fubo-tv": "https://www.fubo.tv/",
   "fox-network": "https://www.foxsports.com/live",
+  "fox-sports-1-usa": "https://www.foxsports.com/live",
+  "fox-one": "https://www.foxone.com/",
   "telemundo": "https://www.telemundo.com/now",
-  "telemundo-deportes": "https://www.telemundodeportes.com/"
+  "telemundo-deportes": "https://www.telemundodeportes.com/",
+  "sirius-xm": "https://www.siriusxm.com/"
 }

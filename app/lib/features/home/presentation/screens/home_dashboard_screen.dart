@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/design/app_colors.dart';
 import '../../../../core/design/app_spacing.dart';
+import '../../../../core/util/watch_country.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/eyebrow.dart';
@@ -20,6 +22,7 @@ import '../../../competitions/data/competitions_repository.dart';
 import '../../../fantasy/data/models/fantasy_models.dart';
 import '../../../fantasy/presentation/providers/fantasy_providers.dart';
 import '../../../insights/data/insights_repository.dart';
+import '../../../insights/data/models/broadcast_dto.dart';
 import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/standings_repository.dart';
 import '../../../market/data/market_models.dart';
@@ -482,6 +485,8 @@ class _MatchFeatureCard extends StatelessWidget {
               ),
               // Goals + red cards per side (live/finished), like match detail.
               _MatchHeroEvents(match: match),
+              // Compact "where to watch" — live/upcoming only, self-hides.
+              _HeroWhereToWatch(match: match),
               // Footer only for UPCOMING matches: a thin divider + the kickoff
               // line. Live + finished are fully carried by the badge (LIVE/min,
               // FT) + events, and the stadium is dropped to keep the hero short.
@@ -738,6 +743,86 @@ class _MatchHeroStatus extends StatelessWidget {
 /// Two-column goals + red-cards strip under the hero scoreline (live/finished),
 /// mirroring the match-detail hero. Own goals are credited to the opposite
 /// side; red cards stay with the player's own team.
+/// Tiny "where to watch" pill for the home hero — live/upcoming matches only.
+/// Shows the viewer's-country broadcaster (tap → open it), or a generic
+/// "Where to watch" chip (tap → match detail). Self-hides when finished or
+/// when there's no broadcast data, to keep the home hero compact.
+class _HeroWhereToWatch extends ConsumerWidget {
+  const _HeroWhereToWatch({required this.match});
+  final MatchDto match;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (match.isFinished) return const SizedBox.shrink();
+
+    final entries = ref.watch(matchBroadcastsProvider(match.id)).maybeWhen(
+          data: (b) => b.where((e) => e.broadcasters.isNotEmpty).toList(),
+          orElse: () => const <MatchBroadcastDto>[],
+        );
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final cc = ref.watch(watchCountryProvider);
+    BroadcasterDto? top;
+    if (cc != null) {
+      for (final e in entries) {
+        if (e.countryCode == cc && e.broadcasters.isNotEmpty) {
+          top = e.broadcasters.first;
+          break;
+        }
+      }
+    }
+    final label = top?.name ?? 'Where to watch';
+    final url = top?.url;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            if (url != null && url.isNotEmpty) {
+              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            } else {
+              context.push('/matches/${match.id}');
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.bg.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: AppColors.goldHairline),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.live_tv, size: 13, color: AppColors.gold),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.fgSoft,
+                    ),
+                  ),
+                ),
+                if (url != null && url.isNotEmpty) ...[
+                  const SizedBox(width: 5),
+                  const Icon(Icons.open_in_new, size: 11, color: AppColors.muted),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MatchHeroEvents extends ConsumerWidget {
   const _MatchHeroEvents({required this.match});
   final MatchDto match;

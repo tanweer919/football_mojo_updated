@@ -1,6 +1,7 @@
 .cache/
 broadcasts_raw.json
 broadcasts_by_fixture.json
+missing-links.json
 __pycache__/
 # channels.json is intentionally committed — it's the reusable, global
 # channel→website directory, shared across every fixture and machine.

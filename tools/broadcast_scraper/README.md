@@ -84,9 +84,23 @@ URL to **`channel-overrides.json`** (committed; always wins; never auto-written)
 { "fox-network": "https://www.foxsports.com/live", "fubo-tv": "https://www.fubo.tv/" }
 ```
 
-The slug is the `/channels/<slug>/` path on livesoccertv (visible in the page
-source). Then re-run the scraper + re-ingest — the override applies everywhere
-that channel appears, and overridden slugs are skipped during resolution.
+The slug is the `/channels/<slug>/` path on livesoccertv — and it's **channel-
+specific, not network-wide**: e.g. "FOX Network" is `fox-network` but "Fox Sports 1"
+is `fox-sports-1-usa` and "FOX One" is `fox-one`, all different. Overriding one
+won't touch the others.
+
+Don't guess — run **`--report-missing`** to list every channel that still has no
+link, with its exact slug, and a ready-to-fill `missing-links.json`:
+
+```bash
+python scraper.py --days 7 --report-missing
+# → prints "Fox Sports 1   slug=fox-sports-1-usa  (×12)" etc.
+#   + writes missing-links.json = { "fox-sports-1-usa": "", … }
+```
+
+Fill in the URLs, merge those entries into `channel-overrides.json`, then re-run
+the scraper + re-ingest — overrides apply everywhere that channel appears and
+overridden slugs are skipped during resolution.
 
 For a **one-off, single-fixture** link, just edit it in the **admin panel**:
 Fixtures → the match → Watch links → Edit.

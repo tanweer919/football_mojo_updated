@@ -442,6 +442,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help="cap matches per day (debug)")
     ap.add_argument("--no-watch-links", action="store_true",
                     help="skip resolving each channel's real watch URL (faster, fewer fetches)")
+    ap.add_argument("--report-missing", action="store_true",
+                    help="list channels with no watch link (slug + name) + write missing-links.json")
     ap.add_argument("--concurrency", type=int, default=6,
                     help="parallel fetches (keep low on the free Jina tier; raise with a key)")
     ap.add_argument("--ingest-url", help="POST broadcasts_by_fixture to this backend ingest endpoint")
@@ -505,15 +507,29 @@ def main() -> int:
     if resolver:
         slugs = {b.get("_slug") for s in scraped for e in s["broadcasts"] for b in e["broadcasters"]}
         resolver.resolve_all(slugs)
+    missing: dict[str, dict] = {}  # slug → {name, count} for channels with no URL
     for s in scraped:
         for e in s["broadcasts"]:
             for b in e["broadcasters"]:
                 slug = b.pop("_slug", None)
                 if resolver:
                     b["url"] = resolver.website(slug)
+                if slug and not b["url"]:
+                    m = missing.setdefault(slug, {"name": b["name"], "count": 0})
+                    m["count"] += 1
 
     Path(args.out).write_text(json.dumps(scraped, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nwrote {len(scraped)} matches → {args.out}", file=sys.stderr)
+
+    # Slugs that still have no watch URL — what you'd add to channel-overrides.json.
+    if args.report_missing and missing:
+        ranked = sorted(missing.items(), key=lambda kv: -kv[1]["count"])
+        print(f"\n{len(ranked)} channels have no watch link (most common first):", file=sys.stderr)
+        for slug, info in ranked:
+            print(f"  {info['name']:<32} slug={slug}  (×{info['count']})", file=sys.stderr)
+        skeleton = {slug: "" for slug, _ in ranked}
+        Path("missing-links.json").write_text(json.dumps(skeleton, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("\nwrote missing-links.json — fill in URLs and merge into channel-overrides.json.", file=sys.stderr)
 
     fixtures = load_fixtures(args, dates)
     if fixtures is not None:
