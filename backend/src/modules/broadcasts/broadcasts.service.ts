@@ -27,10 +27,18 @@ export class BroadcastsService {
    * countries come first and "worldwide" (null country) sinks to the end.
    */
   async groupedByMatch(matchId: string): Promise<GroupedBroadcast[]> {
-    const links = await this.prisma.watchLink.findMany({
+    let links = await this.prisma.watchLink.findMany({
       where: { matchId },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
+
+    // Fallback: World Cup broadcast coverage is near-identical per country
+    // across fixtures, so when a fixture has no links of its own we serve a
+    // representative fixture's listings (the best-covered one in the same
+    // competition). Public endpoint only — admin still sees the true state.
+    if (links.length === 0) {
+      links = await this.templateLinks(matchId);
+    }
 
     const groups = new Map<string, GroupedBroadcast>();
     for (const l of links) {
@@ -50,6 +58,36 @@ export class BroadcastsService {
       if (!a.country && b.country) return 1; // worldwide last
       if (a.country && !b.country) return -1;
       return a.countryName.localeCompare(b.countryName);
+    });
+  }
+
+  /**
+   * Pick a representative fixture's links to stand in for one that has none.
+   * Prefers a pinned fixture (env BROADCAST_TEMPLATE_FIXTURE_ID), else the
+   * fixture in the same competition with the most watch links (fullest
+   * coverage). Returns [] if nothing is available to borrow from.
+   */
+  private async templateLinks(matchId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { competitionId: true },
+    });
+
+    let templateId = process.env.BROADCAST_TEMPLATE_FIXTURE_ID?.trim() || undefined;
+    if (!templateId) {
+      const top = await this.prisma.watchLink.groupBy({
+        by: ['matchId'],
+        where: match?.competitionId ? { match: { competitionId: match.competitionId } } : {},
+        _count: { matchId: true },
+        orderBy: { _count: { matchId: 'desc' } },
+        take: 1,
+      });
+      templateId = top[0]?.matchId;
+    }
+    if (!templateId || templateId === matchId) return [];
+    return this.prisma.watchLink.findMany({
+      where: { matchId: templateId },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
   }
 

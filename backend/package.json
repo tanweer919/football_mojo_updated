@@ -26,6 +26,7 @@
     "seed:cards": "tsx prisma/seed-wc-cards.ts",
     "seed:prices": "tsx prisma/seed-card-prices.ts",
     "seed:wc-stages": "tsx prisma/seed-wc-stage-cards.ts",
+    "seed:broadcasts": "tsx prisma/ingest-broadcasts.ts",
     "seed:notification-prefs": "tsx prisma/seed-notification-prefs.ts",
     "seed:wc-roster": "tsx prisma/seed-wc-roster.ts",
     "seed:wc-2026": "tsx prisma/seed-wc-2026.ts",
