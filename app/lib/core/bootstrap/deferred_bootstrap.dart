@@ -12,6 +12,7 @@ import '../analytics/analytics_service.dart';
 import '../analytics/clarity_service.dart';
 import '../config/remote_app_config.dart';
 import '../../features/profile/data/profile_repository.dart';
+import '../auth/session_reset.dart';
 import '../deeplink/chottu_link_service.dart';
 import '../network/dio_provider.dart';
 import '../notifications/fcm_service.dart';
@@ -28,6 +29,9 @@ final clarityService = ClarityService();
 final inAppUpdateService = InAppUpdateService();
 
 final _deferred = _DeferredBootstrap();
+
+/// Last auth uid we provisioned for — used to detect an account switch.
+String? _lastAuthedUid;
 
 /// Call from the first authenticated screen's `addPostFrameCallback`.
 /// Idempotent — first call wins, subsequent calls are no-ops.
@@ -78,6 +82,13 @@ class _DeferredBootstrap {
     Future.microtask(() {
       FirebaseAuth.instance.authStateChanges().listen((user) async {
         if (user == null) return;
+        // A different account than we last saw signed in → wipe the previous
+        // user's local data + caches before loading the new one (covers an
+        // account switch that didn't go through the Sign-out button).
+        if (_lastAuthedUid != null && _lastAuthedUid != user.uid) {
+          await clearUserSession(container);
+        }
+        _lastAuthedUid = user.uid;
         await FcmBootstrap.ensureRegistered(container.read(dioProvider), force: true);
         // Subscribe to the followed teams' topics so the backend's already-live
         // goal / kickoff / full-time (and lineup/news) pushes actually reach

@@ -48,6 +48,7 @@ class RoutePaths {
 
   // Following
   static const teamPicker         = '/following/pick';
+  static const myTeam             = '/my-team';
 
   // IAP
   static const proPaywall         = '/pro';

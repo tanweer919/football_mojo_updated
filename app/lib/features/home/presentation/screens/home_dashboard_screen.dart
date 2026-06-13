@@ -40,6 +40,7 @@ import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
 import '../../../../core/config/remote_app_config.dart';
 import '../providers/home_dashboard_providers.dart';
+import '../../data/daily_brief_repository.dart';
 
 /// PITCH home dashboard. Layout matches `design-specs/android/home.html`,
 /// wired entirely to live providers — no mock content.
@@ -97,6 +98,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             const SizedBox(height: 14),
             const _HomeMatchRail(),
 
+            // AI matchday brief — today's preview / yesterday's results.
+            const _MatchdayBrief(),
+
             // Bracket card — user's WC2026 bracket: champion + progress,
             // or a CTA when they haven't started.
             const _SectionGap(),
@@ -114,9 +118,13 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             // screens — home stays focused.)
 
             // Your teams — followed-team digest (crests + news + their
-            // own fixture digest inside the card). No separate "Following
-            // matches" section — this one already covers it.
-            const _SectionGap(),
+            // own fixture digest inside the card). Header opens the dedicated
+            // My Team page (countdown + group + fixtures).
+            _SectionHead(
+              title: 'Your teams',
+              action: 'My Team →',
+              onAction: () => context.push(RoutePaths.myTeam),
+            ),
             const _YourTeamsSection(),
 
             // European leagues — hidden during WC mode since all domestic
@@ -829,6 +837,160 @@ class _HeroEventColumn extends StatelessWidget {
             ? ' (P)'
             : '';
     return '$name$extra ${e.displayMinute}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MATCHDAY BRIEF — AI digest: today's preview / yesterday's results
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MatchdayBrief extends ConsumerStatefulWidget {
+  const _MatchdayBrief();
+  @override
+  ConsumerState<_MatchdayBrief> createState() => _MatchdayBriefState();
+}
+
+class _MatchdayBriefState extends ConsumerState<_MatchdayBrief> {
+  bool _wantRecap = false; // false = today's preview, true = yesterday's recap
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ref.watch(dailyBriefProvider).maybeWhen(
+          data: (brief) {
+            if (brief.isEmpty) return const SizedBox.shrink();
+            final hasPreview = brief.preview != null;
+            final hasRecap = brief.recap != null;
+            final bothShown = hasPreview && hasRecap;
+            // Default to today's preview; fall back to recap if there's no
+            // preview (rest day today but matches yesterday).
+            final showRecap = hasRecap && (_wantRecap || !hasPreview);
+            final digest = showRecap ? brief.recap! : brief.preview!;
+            final label = showRecap
+                ? 'YESTERDAY · ${digest.matchCount} result${digest.matchCount == 1 ? '' : 's'}'
+                : 'TODAY · ${digest.matchCount} match${digest.matchCount == 1 ? '' : 'es'}';
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  border: Border.all(color: AppColors.goldHairline),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1F1814), Color(0xFF12100D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.auto_awesome, size: 16, color: AppColors.gold),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Matchday brief',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.fg,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (bothShown) _toggle(showRecap),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Eyebrow(label, gold: !showRecap, size: 9),
+                    const SizedBox(height: 8),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 180),
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        digest.content,
+                        maxLines: _expanded ? null : 5,
+                        overflow: _expanded ? null : TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.fgSoft,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: Text(
+                        _expanded ? 'Show less' : 'Read more',
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome, size: 11, color: AppColors.muted.withValues(alpha: 0.6)),
+                        const SizedBox(width: 5),
+                        const Expanded(
+                          child: Text(
+                            'AI-generated with Google Search · may contain mistakes',
+                            style: TextStyle(color: AppColors.muted, fontSize: 10.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          orElse: () => const SizedBox.shrink(),
+        );
+  }
+
+  Widget _toggle(bool showRecap) {
+    Widget pill(String text, bool active, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: active ? AppColors.gold.withValues(alpha: 0.16) : Colors.transparent,
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(
+                color: active ? AppColors.goldHairline : AppColors.borderSoft,
+              ),
+            ),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: active ? AppColors.gold : AppColors.muted,
+              ),
+            ),
+          ),
+        );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        pill('Today', !showRecap, () => setState(() {
+              _wantRecap = false;
+              _expanded = false;
+            })),
+        const SizedBox(width: 6),
+        pill('Yesterday', showRecap, () => setState(() {
+              _wantRecap = true;
+              _expanded = false;
+            })),
+      ],
+    );
   }
 }
 

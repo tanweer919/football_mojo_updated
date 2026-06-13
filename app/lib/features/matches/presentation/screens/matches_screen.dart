@@ -105,7 +105,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
               onChanged: (d) => setState(() => _day = d),
             ),
             const Divider(height: 1),
-            const PitchBannerAd(padding: EdgeInsets.fromLTRB(12, 8, 12, 0)),
             Expanded(
               child: Consumer(builder: (context, ref, _) {
                 final selectedCompetition = ref.watch(selectedCompetitionProvider);
@@ -144,12 +143,24 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                     // Bottom padding clears the floating tabbar (~110px) so
                     // the last card isn't covered.
                     const bottomGap = 130.0;
+                    // A single in-feed banner after the 3rd match — below the
+                    // fold so the user scrolls to it (no anchored bottom bar).
+                    final showAd = matches.length > 3;
+                    const adAt = 3;
                     return cols == 1
                         ? ListView.separated(
                             padding: const EdgeInsets.fromLTRB(12, 12, 12, bottomGap),
-                            itemCount: matches.length,
+                            itemCount: matches.length + (showAd ? 1 : 0),
                             separatorBuilder: (_, __) => const SizedBox(height: 10),
-                            itemBuilder: (_, i) => MatchCard(match: matches[i], indexInList: i),
+                            itemBuilder: (_, i) {
+                              if (showAd && i == adAt) {
+                                return const PitchBannerAd(
+                                  padding: EdgeInsets.symmetric(vertical: 2),
+                                );
+                              }
+                              final mi = showAd && i > adAt ? i - 1 : i;
+                              return MatchCard(match: matches[mi], indexInList: mi);
+                            },
                           )
                         : GridView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, bottomGap),

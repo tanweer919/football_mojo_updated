@@ -9,6 +9,7 @@ import '../../features/album/presentation/screens/owned_card_stats_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_home_screen.dart';
 import '../../features/fantasy/presentation/screens/leagues_screen.dart';
 import '../../features/following/presentation/screens/team_picker_screen.dart';
+import '../../features/following/presentation/screens/my_team_screen.dart';
 import '../../features/fantasy/presentation/screens/fantasy_leaderboard_screen.dart';
 import '../../features/fantasy/presentation/screens/lineup_builder_screen.dart';
 import '../../features/fantasy/presentation/screens/player_breakdown_screen.dart';
@@ -197,6 +198,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
       GoRoute(path: RoutePaths.wallet,      builder: (_, __) => const WalletScreen()),
       GoRoute(path: RoutePaths.teamPicker,  builder: (_, __) => const TeamPickerScreen()),
+      GoRoute(path: RoutePaths.myTeam,      builder: (_, __) => const MyTeamScreen()),
       GoRoute(
         path: RoutePaths.playerProfile,
         builder: (_, s) => PlayerProfileScreen(playerId: s.pathParameters['id']!),
