@@ -4,9 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../features/profile/data/profile_repository.dart';
+import '../router/app_router.dart';
 import '../router/route_paths.dart';
 import '../../features/welcome/presentation/screens/welcome_card_reveal_screen.dart';
 import '../design/app_colors.dart';
@@ -79,6 +79,12 @@ Future<User?> ensureSignedIn(
 /// signup. Subsequent sign-ins find `welcomeCard == null` (server cleared
 /// the flag on dismiss) and skip silently.
 Future<void> _maybeShowWelcomeCard(BuildContext context, WidgetRef ref) async {
+  // Capture nav handles BEFORE any await: signing in flips the auth state, the
+  // router redirects to /home, and the onboarding screen unmounts — so its
+  // `context` is gone by the time the profile fetch returns. The root navigator
+  // and the GoRouter are app-lived, so they stay valid.
+  final rootNav = Navigator.of(context, rootNavigator: true);
+  final router = ref.read(appRouterProvider);
   try {
     // Force a fresh fetch — the cached profile pre-signin had no auth header.
     ref.invalidate(myProfileProvider);
@@ -86,8 +92,8 @@ Future<void> _maybeShowWelcomeCard(BuildContext context, WidgetRef ref) async {
 
     // 1. First-signup welcome card reveal (server clears the flag on dismiss).
     final card = profile?.welcomeCard;
-    if (card != null && context.mounted) {
-      await Navigator.of(context, rootNavigator: true).push(
+    if (card != null) {
+      await rootNav.push(
         PageRouteBuilder(
           opaque: true,
           barrierColor: Colors.black,
@@ -101,8 +107,8 @@ Future<void> _maybeShowWelcomeCard(BuildContext context, WidgetRef ref) async {
 
     // 2. If they don't follow a team yet, prompt the picker — it powers the
     //    My Team page, match notifications and the home hero.
-    if (context.mounted && (profile?.followedTeams.isEmpty ?? false)) {
-      await context.push(RoutePaths.teamPicker);
+    if (profile != null && profile.followedTeams.isEmpty) {
+      router.push(RoutePaths.teamPicker);
     }
   } catch (_) {
     // Non-fatal — sign-in already succeeded. Reveal/prompt will fire on the

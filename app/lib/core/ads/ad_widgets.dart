@@ -20,21 +20,26 @@ import 'admob_service.dart';
 /// `SizedBox.shrink()` while loading or if the ad fails — zero layout
 /// impact so the screen doesn't jump.
 class PitchBannerAd extends ConsumerWidget {
-  const PitchBannerAd({super.key, this.padding});
+  const PitchBannerAd({super.key, this.padding, this.large = false});
   final EdgeInsetsGeometry? padding;
+
+  /// `true` requests a 300×250 medium rectangle (MREC) instead of the small
+  /// adaptive banner — used below the fold where a bigger unit is worth it.
+  final bool large;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final adsEnabled = ref.watch(adsEnabledProvider);
     final isPro = ref.watch(isProActiveProvider);
     if (!adsEnabled || isPro) return const SizedBox.shrink();
-    return _BannerBody(padding: padding);
+    return _BannerBody(padding: padding, large: large);
   }
 }
 
 class _BannerBody extends StatefulWidget {
-  const _BannerBody({this.padding});
+  const _BannerBody({this.padding, this.large = false});
   final EdgeInsetsGeometry? padding;
+  final bool large;
 
   @override
   State<_BannerBody> createState() => _BannerBodyState();
@@ -66,6 +71,7 @@ class _BannerBodyState extends State<_BannerBody> {
 
   void _create() {
     _ad = AdmobService.instance.createBanner(
+      size: widget.large ? AdSize.mediumRectangle : AdSize.banner,
       onLoaded: () {
         if (mounted) setState(() => _loaded = true);
       },

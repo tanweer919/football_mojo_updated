@@ -154,8 +154,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                             separatorBuilder: (_, __) => const SizedBox(height: 10),
                             itemBuilder: (_, i) {
                               if (showAd && i == adAt) {
-                                return const PitchBannerAd(
-                                  padding: EdgeInsets.symmetric(vertical: 2),
+                                return const Center(
+                                  child: PitchBannerAd(
+                                    large: true,
+                                    padding: EdgeInsets.symmetric(vertical: 4),
+                                  ),
                                 );
                               }
                               final mi = showAd && i > adAt ? i - 1 : i;
