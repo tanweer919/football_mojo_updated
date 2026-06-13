@@ -4,8 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../features/profile/data/profile_repository.dart';
+import '../router/route_paths.dart';
 import '../../features/welcome/presentation/screens/welcome_card_reveal_screen.dart';
 import '../design/app_colors.dart';
 import '../widgets/eyebrow.dart';
@@ -81,21 +83,30 @@ Future<void> _maybeShowWelcomeCard(BuildContext context, WidgetRef ref) async {
     // Force a fresh fetch — the cached profile pre-signin had no auth header.
     ref.invalidate(myProfileProvider);
     final profile = await ref.read(myProfileProvider.future);
+
+    // 1. First-signup welcome card reveal (server clears the flag on dismiss).
     final card = profile?.welcomeCard;
-    if (card == null || !context.mounted) return;
-    await Navigator.of(context, rootNavigator: true).push(
-      PageRouteBuilder(
-        opaque: true,
-        barrierColor: Colors.black,
-        transitionDuration: const Duration(milliseconds: 360),
-        pageBuilder: (_, __, ___) => WelcomeCardRevealScreen(card: card),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+    if (card != null && context.mounted) {
+      await Navigator.of(context, rootNavigator: true).push(
+        PageRouteBuilder(
+          opaque: true,
+          barrierColor: Colors.black,
+          transitionDuration: const Duration(milliseconds: 360),
+          pageBuilder: (_, __, ___) => WelcomeCardRevealScreen(card: card),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+      );
+    }
+
+    // 2. If they don't follow a team yet, prompt the picker — it powers the
+    //    My Team page, match notifications and the home hero.
+    if (context.mounted && (profile?.followedTeams.isEmpty ?? false)) {
+      await context.push(RoutePaths.teamPicker);
+    }
   } catch (_) {
-    // Non-fatal — sign-in already succeeded. Reveal will fire on the next
-    // /me read (typically when the user opens their profile).
+    // Non-fatal — sign-in already succeeded. Reveal/prompt will fire on the
+    // next /me read (typically when the user opens their profile).
   }
 }
 

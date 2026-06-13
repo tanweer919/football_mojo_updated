@@ -114,9 +114,13 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             // screens — home stays focused.)
 
             // Your teams — followed-team digest (crests + news + their
-            // own fixture digest inside the card). No separate "Following
-            // matches" section — this one already covers it.
-            const _SectionGap(),
+            // own fixture digest inside the card). Header opens the dedicated
+            // My Team page (countdown + group + fixtures).
+            _SectionHead(
+              title: 'Your teams',
+              action: 'My Team →',
+              onAction: () => context.push(RoutePaths.myTeam),
+            ),
             const _YourTeamsSection(),
 
             // European leagues — hidden during WC mode since all domestic
