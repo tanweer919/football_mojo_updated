@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_provider.dart';
+import '../../../core/util/region.dart';
+import 'models/broadcast_dto.dart';
 import 'models/h2h_dto.dart';
 import 'models/injury_dto.dart';
 import 'models/lineup_dto.dart';
@@ -38,6 +40,21 @@ class InsightsRepository {
     return (res.data ?? const [])
         .cast<Map<String, dynamic>>()
         .map(LineupDto.fromJson)
+        .toList(growable: false);
+  }
+
+  /// Where-to-watch broadcasters, grouped by country. `country` is a hint the
+  /// backend can use alongside the request IP to rank the viewer's region
+  /// first. Returns `[]` until the backend's broadcast source is wired up
+  /// (api-football carries no TV data).
+  Future<List<MatchBroadcastDto>> matchBroadcasts(String fixtureId, {String? country}) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/v1/insights/broadcasts/$fixtureId',
+      queryParameters: {if (country != null && country.isNotEmpty) 'country': country},
+    );
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(MatchBroadcastDto.fromJson)
         .toList(growable: false);
   }
 
@@ -93,6 +110,9 @@ final matchEventsProvider   = FutureProvider.family<List<MatchEventDto>,     Str
 final matchStatsProvider    = FutureProvider.family<List<TeamMatchStatsDto>, String>((ref, id) => ref.read(insightsRepositoryProvider).matchStats(id));
 final matchLineupsProvider  = FutureProvider.family<List<LineupDto>,         String>((ref, id) => ref.read(insightsRepositoryProvider).matchLineups(id));
 final matchPreviewProvider  = FutureProvider.family<MatchPreviewDto?,        String>((ref, id) => ref.read(insightsRepositoryProvider).matchPreview(id));
+final matchBroadcastsProvider = FutureProvider.family<List<MatchBroadcastDto>, String>(
+  (ref, id) => ref.read(insightsRepositoryProvider).matchBroadcasts(id, country: deviceCountryCode()),
+);
 
 final h2hProvider = FutureProvider.family<List<H2HMatchDto>, ({String team1, String team2})>(
   (ref, args) => ref.read(insightsRepositoryProvider).h2h(args.team1, args.team2),

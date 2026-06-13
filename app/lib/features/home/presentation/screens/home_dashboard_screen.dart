@@ -833,11 +833,8 @@ class _HeroEventColumn extends StatelessWidget {
         ),
       );
     }
-    final icon = e.kind == EventKind.ownGoal
-        ? Icons.cancel_outlined
-        : Icons.sports_soccer;
     final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
-    return Icon(icon, size: 11, color: color);
+    return Icon(Icons.sports_soccer, size: 11, color: color);
   }
 
   String _label(MatchEventDto e) {

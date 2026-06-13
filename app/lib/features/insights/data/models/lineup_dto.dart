@@ -33,6 +33,11 @@ class LineupPlayer {
     final parts = name.split(' ');
     return parts.length > 1 ? parts.last : name;
   }
+
+  /// api-football omits the photo from the lineup payload but serves player
+  /// headshots at a stable media URL keyed by id (same host as team logos).
+  String? get photoUrl =>
+      id.isEmpty ? null : 'https://media.api-sports.io/football/players/$id.png';
 }
 
 class LineupDto {
