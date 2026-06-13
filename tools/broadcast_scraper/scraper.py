@@ -231,11 +231,26 @@ def parse_match(html: str) -> list[dict]:
 # cold machine starts warm. This is the key to speed: broadcaster sites are global
 # and stable, so each channel is resolved at most once, ever.
 DIRECTORY_PATH = Path(__file__).resolve().parent / "channels.json"
+# Manual, committed overrides that ALWAYS win — for channels livesoccertv has
+# no "Channel Website" for (e.g. US: fox-network, fubo-tv). Hand-edit this file:
+#   { "fox-network": "https://www.fox.com/live/", "fubo-tv": "https://www.fubo.tv/" }
+# It's never auto-written, so your fixes are durable. Re-run + re-ingest to apply.
+OVERRIDES_PATH = Path(__file__).resolve().parent / "channel-overrides.json"
+
+
+def _load_overrides() -> dict[str, str]:
+    if OVERRIDES_PATH.exists():
+        try:
+            return {k: v for k, v in json.loads(OVERRIDES_PATH.read_text(encoding="utf-8")).items() if v}
+        except (ValueError, OSError):
+            return {}
+    return {}
 
 
 class ChannelResolver:
     """Resolves livesoccertv channel slugs to the broadcaster's real "Channel
     Website" watch URL (the `a.watch-button` on /channels/{slug}/), in parallel.
+    Manual `channel-overrides.json` entries take precedence over scraped ones.
     """
 
     def __init__(self, cache: Path | None, api_key: str | None, delay: float, concurrency: int):
@@ -244,6 +259,7 @@ class ChannelResolver:
         self.delay = delay
         self.concurrency = max(1, concurrency)
         self.map: dict[str, str | None] = {}
+        self.overrides = _load_overrides()
         self._lock = threading.Lock()
         if DIRECTORY_PATH.exists():
             try:
@@ -252,7 +268,9 @@ class ChannelResolver:
                 self.map = {}
 
     def website(self, slug: str | None) -> str | None:
-        return self.map.get(slug) if slug else None
+        if not slug:
+            return None
+        return self.overrides.get(slug) or self.map.get(slug)
 
     def _resolve_one(self, slug: str) -> tuple[str, str | None]:
         site = None
@@ -272,7 +290,7 @@ class ChannelResolver:
 
     def resolve_all(self, slugs: set[str | None]) -> None:
         """Resolve every not-yet-known slug concurrently, then persist once."""
-        todo = sorted(s for s in slugs if s and s not in self.map)
+        todo = sorted(s for s in slugs if s and s not in self.map and s not in self.overrides)
         if not todo:
             return
         print(f"resolving {len(todo)} new channel websites ({self.concurrency}-way parallel)…", file=sys.stderr)

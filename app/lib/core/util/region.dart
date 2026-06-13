@@ -1,4 +1,39 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
+
+import 'package:dio/dio.dart';
+
+/// Country via **IP geolocation** over HTTPS — no permission, and reflects the
+/// user's actual network location (unlike the device locale, which is just the
+/// phone's Region setting and is wrong for e.g. an en-US phone used in India).
+///
+/// Returns an ISO-3166 alpha-2 code, or null on failure. Tries a couple of free
+/// keyless providers and times out fast so it never blocks the UI. NOTE: the
+/// free `ip-api.com` is HTTP-only, which Android (cleartext) and iOS (ATS) block
+/// on real devices — so we use HTTPS providers instead.
+Future<String?> countryByIp() async {
+  final dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 4),
+    receiveTimeout: const Duration(seconds: 4),
+  ));
+  const providers = <(String, String)>[
+    ('https://ipapi.co/json/', 'country_code'),
+    ('https://ipwho.is/', 'country_code'),
+    ('https://get.geojs.io/v1/ip/country.json', 'country'),
+  ];
+  for (final (url, key) in providers) {
+    try {
+      final res = await dio.get<dynamic>(url);
+      final body = res.data;
+      final data = body is String ? jsonDecode(body) : body;
+      final code = (data is Map ? data[key] : null)?.toString().trim();
+      if (code != null && code.length == 2) return code.toUpperCase();
+    } catch (_) {
+      // Provider failed/blocked — fall through to the next one.
+    }
+  }
+  return null;
+}
 
 /// Best-effort country detection that needs **no location permission**.
 ///
