@@ -125,13 +125,18 @@ final homeFixturesProvider = FutureProvider<HomeFixtures>((ref) async {
 
   final upcoming = all
       .where((m) =>
-          // A live match must stay in the list no matter how long ago it
-          // kicked off — the old `kickoffAt > now-5min` guard dropped any
-          // fixture more than 5 minutes into play, so it vanished from both
-          // this bundle and the World Cup schedule mid-match.
+          // Keep a match in the bundle while it could still be in play. The
+          // backend flags a fixture LIVE only on the next poller pass, so for
+          // a few minutes after kickoff a started match is neither `isLive`
+          // nor `isFinished`. The old `now-5min` guard dropped it in that gap,
+          // so the hero fell back to yesterday's result and the match vanished
+          // from the WC schedule until the poller caught up. Retain anything
+          // not yet finished whose kickoff is within the last 3.5h (longer
+          // than any match can run), so it stays visible as in-progress.
           m.isLive ||
           (!m.isFinished &&
-              m.kickoffAt.isAfter(now.subtract(const Duration(minutes: 5)))))
+              m.kickoffAt
+                  .isAfter(now.subtract(const Duration(hours: 3, minutes: 30)))))
       .toList()
     ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
 

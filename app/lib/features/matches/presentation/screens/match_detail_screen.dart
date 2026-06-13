@@ -700,11 +700,10 @@ class _ScorerColumn extends StatelessWidget {
         ),
       );
     }
-    // Own-goals reuse the ball glyph but in red so they read as goals while
-    // still standing out from a side's regular tallies.
-    final icon = e.kind == EventKind.penalty ? Icons.adjust : Icons.sports_soccer;
+    // All goals — including penalties — use the ball glyph. Own-goals reuse it
+    // in red so they read as goals while standing out from a side's tallies.
     final color = e.kind == EventKind.ownGoal ? AppColors.live : AppColors.gold;
-    return Icon(icon, size: 12, color: color);
+    return Icon(Icons.sports_soccer, size: 12, color: color);
   }
 
   String _label(MatchEventDto e) {
