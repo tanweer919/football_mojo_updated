@@ -60,6 +60,14 @@ export class ScoresPoller implements OnModuleInit {
     let nextDelay = this.idleMs;
 
     try {
+      // Step 0: Reap any match frozen in a live state — ended but dropped from
+      // `live=all` while other matches kept us busy. Do this BEFORE the window
+      // check: a stuck LIVE row keeps hasActiveMatches() true, so without this
+      // we'd poll live=all every tick forever on a phantom match (and the row
+      // would never flip to full-time for clients). Pure DB, no upstream call.
+      const reaped = await this.scores.finalizeStaleLiveMatches();
+      if (reaped) this.log.warn(`reaped ${reaped} stale live match(es)`);
+
       // Step 1: Are we even in a live window across ANY tracked league? If
       // not, skip the upstream call entirely and reschedule. We OR the
       // kickoff-proximity window with a DB check for matches actually in play,
