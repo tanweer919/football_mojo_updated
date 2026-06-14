@@ -227,6 +227,42 @@ export class ScoresService {
   }
 
   /**
+   * Self-heal matches frozen in a live state. api-football drops a fixture from
+   * `live=all` the instant it ends; if other matches keep the poller in its live
+   * cadence, the ended one is never re-scanned and its row stays LIVE at the last
+   * snapshot — e.g. stuck at 90+10 indefinitely. That also keeps
+   * `hasActiveMatches()` true, so the poller burns a `live=all` call every tick
+   * forever on a phantom match.
+   *
+   * No match runs longer than ~3.5h end-to-end (90 + stoppage, or 120 of extra
+   * time + breaks + a shootout), so any fixture still LIVE/HALF_TIME whose
+   * kickoff was earlier than that is certainly over. Close it out at its last
+   * known score/penalties and publish so clients flip to full-time. Pure DB —
+   * zero api-football cost. Returns how many it reaped.
+   */
+  async finalizeStaleLiveMatches(): Promise<number> {
+    const cutoff = new Date(Date.now() - 3.5 * 60 * 60_000);
+    const stale = await this.prisma.match.findMany({
+      where: {
+        status: { in: ['LIVE', 'HALF_TIME'] },
+        kickoffAt: { lt: cutoff },
+      },
+    });
+    for (const m of stale) {
+      const updated = await this.prisma.match.update({
+        where: { id: m.id },
+        data: { status: MatchStatus.FINISHED },
+      });
+      await this.publishUpdate(updated);
+      this.log.warn(
+        `finalized stale live match ${m.id} ${m.homeScore}-${m.awayScore} ` +
+          `(kickoff ${m.kickoffAt.toISOString()}) — it had dropped from live=all`,
+      );
+    }
+    return stale.length;
+  }
+
+  /**
    * Delete any hand-seeded WC placeholder rows (`WC2026-*` ids) whose two
    * nations match the given pair, keeping `keepId` (the real numeric fixture).
    * Names are reconciled through the alias map, so api-football labels like
