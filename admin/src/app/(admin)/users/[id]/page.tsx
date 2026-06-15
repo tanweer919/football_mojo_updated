@@ -17,6 +17,19 @@ interface GemTxn {
   balanceAfter: number;
   createdAt: string;
 }
+interface FavTeam {
+  id: string;
+  name: string | null;
+  shortName: string | null;
+  crestUrl: string | null;
+  countryCode: string | null;
+}
+interface LeagueMembership {
+  id: string;
+  name: string;
+  isOwner: boolean;
+  joinedAt: string;
+}
 interface UserDetail {
   id: string;
   email: string | null;
@@ -31,6 +44,8 @@ interface UserDetail {
   proExpiresAt: string | null;
   proActive: boolean;
   favouriteTeams: string[];
+  favouriteTeamDetails: FavTeam[];
+  leagues: LeagueMembership[];
   fcmTokenCount: number;
   lastDailyClaimAt: string | null;
   welcomeCardSeenAt: string | null;
@@ -68,6 +83,26 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="panel-strong px-4 py-3 text-center">
       <div className="font-mono text-xl font-bold text-fg tabular-nums">{value.toLocaleString()}</div>
       <div className="eyebrow-gold !text-[9px] mt-1 !text-fg-muted">{label}</div>
+    </div>
+  );
+}
+
+function TeamChip({ team }: { team: FavTeam }) {
+  const label = team.name ?? team.shortName ?? team.id;
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface-2 pl-1.5 pr-3 py-1">
+      {team.crestUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={team.crestUrl} alt="" width={22} height={22} className="h-[22px] w-[22px] rounded-full object-contain" />
+      ) : (
+        <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-surface text-[9px] font-mono text-fg-muted">
+          {(team.shortName ?? team.id).slice(0, 3).toUpperCase()}
+        </span>
+      )}
+      <span className="text-sm text-fg">{label}</span>
+      {!team.name && (
+        <span className="text-[10px] font-mono text-live" title="No matching team row">unknown</span>
+      )}
     </div>
   );
 }
@@ -123,6 +158,36 @@ export default async function UserDetailPage({ params }: { params: { id: string 
           <Stat label="Gem txns" value={u._count.gemTransactions} />
         </div>
 
+        {/* Following */}
+        <Panel>
+          <SectionHead eyebrow="Following" title="Teams followed" />
+          {u.favouriteTeamDetails.length === 0 ? (
+            <Empty title="Not following any teams" />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {u.favouriteTeamDetails.map((t) => <TeamChip key={t.id} team={t} />)}
+            </div>
+          )}
+        </Panel>
+
+        {/* Fantasy leagues */}
+        <Panel>
+          <SectionHead eyebrow="Fantasy" title="Leagues" />
+          {u.leagues.length === 0 ? (
+            <Empty title="Not a member of any fantasy league" />
+          ) : (
+            <div className="flex flex-col">
+              {u.leagues.map((l) => (
+                <div key={l.id} className="flex items-center gap-2 py-2.5 border-b border-border last:border-0">
+                  <span className="text-sm text-fg">{l.name}</span>
+                  {l.isOwner && <Badge tone="gold">OWNER</Badge>}
+                  <span className="ml-auto text-xs font-mono text-fg-muted whitespace-nowrap">joined {fmt(l.joinedAt)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
         {/* Profile fields */}
         <Panel>
           <SectionHead eyebrow="Profile" title="Account details" />
@@ -133,7 +198,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
             <Info label="Pro">{u.proActive ? `Active until ${fmt(u.proExpiresAt)}` : 'Not active'}</Info>
             <Info label="Country">{u.countryCode ?? '—'}</Info>
             <Info label="Supports (WC)">{u.supportedCountryCode ?? '—'}</Info>
-            <Info label="Favourite teams">{u.favouriteTeams.length ? u.favouriteTeams.join(', ') : '—'}</Info>
+            <Info label="Teams followed">{u.favouriteTeamDetails.length}</Info>
             <Info label="Push devices">{u.fcmTokenCount}</Info>
             <Info label="Last daily claim">{fmt(u.lastDailyClaimAt)}</Info>
             <Info label="Welcome card seen">{fmt(u.welcomeCardSeenAt)}</Info>
