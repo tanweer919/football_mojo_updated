@@ -66,6 +66,40 @@ export class AdminUsersService {
     });
     if (!user) throw new NotFoundException('user_not_found');
 
+    // Resolve followed-team IDs to real teams (name + crest), preserving the
+    // saved order and falling back to a bare id for any team that no longer
+    // exists, so the panel shows crests and names instead of opaque codes.
+    const teamRows = user.favouriteTeams.length
+      ? await this.prisma.team.findMany({
+          where: { id: { in: user.favouriteTeams } },
+          select: { id: true, name: true, shortName: true, crestUrl: true, countryCode: true },
+        })
+      : [];
+    const teamById = new Map(teamRows.map((t) => [t.id, t]));
+    const favouriteTeamDetails = user.favouriteTeams.map(
+      (tid) =>
+        teamById.get(tid) ?? {
+          id: tid, name: null, shortName: null, crestUrl: null, countryCode: null,
+        },
+    );
+
+    // Fantasy leagues the user has joined (most recent first).
+    const memberships = await this.prisma.fantasyLeagueMember.findMany({
+      where: { userId: id },
+      orderBy: { joinedAt: 'desc' },
+      take: 20,
+      select: {
+        joinedAt: true,
+        league: { select: { id: true, name: true, ownerId: true } },
+      },
+    });
+    const leagues = memberships.map((m) => ({
+      id: m.league.id,
+      name: m.league.name,
+      isOwner: m.league.ownerId === id,
+      joinedAt: m.joinedAt,
+    }));
+
     const gemHistory = await this.prisma.gemTransaction.findMany({
       where: { userId: id },
       orderBy: { createdAt: 'desc' },
@@ -79,6 +113,8 @@ export class AdminUsersService {
     const { fcmTokens, ...rest } = user;
     return {
       ...rest,
+      favouriteTeamDetails,
+      leagues,
       fcmTokenCount: fcmTokens.length,
       proActive: !!user.proExpiresAt && user.proExpiresAt.getTime() > Date.now(),
       gemHistory,
