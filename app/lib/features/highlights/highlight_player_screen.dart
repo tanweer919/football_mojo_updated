@@ -40,7 +40,9 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
   YoutubePlayerController? _controller;
   StreamSubscription<YoutubePlayerValue>? _sub;
   String? _videoId;
-  bool _blocked = false; // owner disabled embedding (or video unavailable)
+  bool _blocked = false; // can't play inline (embed disabled / unavailable / failed to start)
+  bool _started = false; // player reached a real playback state at least once
+  Timer? _startTimer;
 
   @override
   void initState() {
@@ -66,11 +68,35 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
         ),
       );
       _sub = controller.stream.listen((value) {
-        final e = value.error;
-        final blocked = e == YoutubeError.notEmbeddable ||
-            e == YoutubeError.videoNotFound ||
-            e == YoutubeError.cannotFindVideo;
-        if (blocked && !_blocked && mounted) setState(() => _blocked = true);
+        // ANY player error means it can't play inline. Besides the documented
+        // embed blocks (100/101/105/150), unmapped codes — notably the "152"
+        // "video unavailable" screen — surface as YoutubeError.unknown, so we
+        // treat every non-`none` error as blocked.
+        if (value.error != YoutubeError.none) {
+          if (!_blocked && mounted) setState(() => _blocked = true);
+          return;
+        }
+        // Note the first time playback actually gets going, so the watchdog
+        // below doesn't fire on a clip that simply loaded slowly.
+        if (!_started) {
+          switch (value.playerState) {
+            case PlayerState.playing:
+            case PlayerState.buffering:
+            case PlayerState.cued:
+            case PlayerState.paused:
+            case PlayerState.ended:
+              _started = true;
+              _startTimer?.cancel();
+            default:
+              break;
+          }
+        }
+      });
+      // Some embed blocks (e.g. "152") render YouTube's own error page WITHOUT
+      // firing onError, leaving the player silently stuck. If nothing has
+      // started after a grace period, fall back to the "Watch on YouTube" card.
+      _startTimer = Timer(const Duration(seconds: 8), () {
+        if (!_started && !_blocked && mounted) setState(() => _blocked = true);
       });
       _controller = controller;
     }
@@ -78,6 +104,7 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
 
   @override
   void dispose() {
+    _startTimer?.cancel();
     _sub?.cancel();
     _controller?.close();
     // Restore the app's normal portrait lock + edge-to-edge chrome (mirrors
@@ -171,10 +198,12 @@ class _Fallback extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'The broadcaster has disabled in-app playback for this clip.',
+            Text(
+              canOpen
+                  ? 'This clip can’t play inside the app, so it opens in YouTube.'
+                  : 'We couldn’t find this video.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.muted, height: 1.4),
+              style: const TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.muted, height: 1.4),
             ),
             if (canOpen) ...[
               const SizedBox(height: 20),
