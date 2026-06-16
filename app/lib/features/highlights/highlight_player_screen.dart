@@ -33,8 +33,8 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    final embed = youtubeEmbedUrl(widget.url);
-    if (embed != null) {
+    final html = youtubeIframeHtml(widget.url);
+    if (html != null) {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(Colors.black)
@@ -43,7 +43,9 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
             if (mounted) setState(() => _loading = false);
           },
         ))
-        ..loadRequest(Uri.parse(embed));
+        // Serve the iframe from a real origin so YouTube's player accepts it
+        // (a bare embed URL has no referrer → "Error 153").
+        ..loadHtmlString(html, baseUrl: youtubeEmbedOrigin);
     }
   }
 
