@@ -35,6 +35,7 @@ _MatchDto _$MatchDtoFromJson(Map<String, dynamic> json) => _MatchDto(
   awayPenalties: (json['awayPenalties'] as num?)?.toInt(),
   stage: json['stage'] as String?,
   venue: json['venue'] as String?,
+  highlightUrl: json['highlightUrl'] as String?,
 );
 
 Map<String, dynamic> _$MatchDtoToJson(_MatchDto instance) => <String, dynamic>{
@@ -52,6 +53,7 @@ Map<String, dynamic> _$MatchDtoToJson(_MatchDto instance) => <String, dynamic>{
   'awayPenalties': instance.awayPenalties,
   'stage': instance.stage,
   'venue': instance.venue,
+  'highlightUrl': instance.highlightUrl,
 };
 
 const _$MatchStatusEnumMap = {

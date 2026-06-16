@@ -13,6 +13,11 @@ class WatchLinkBody {
   @IsOptional() @IsInt() @Min(0) position?: number;
 }
 
+class HighlightBody {
+  // Empty string clears the highlight. YouTube URLs are well under 2000 chars.
+  @IsOptional() @IsString() @MaxLength(2000) highlightUrl?: string | null;
+}
+
 /**
  * Admin: browse fixtures and curate per-fixture watch links (name + link,
  * optionally per country). Double-guarded like the rest of the admin API.
@@ -35,6 +40,12 @@ export class AdminFixturesController {
   @Get(':id')
   getOne(@Param('id') id: string) {
     return this.broadcasts.getFixture(id);
+  }
+
+  /// Set or clear the fixture's FIFA-official YouTube highlight link.
+  @Patch(':id/highlight')
+  setHighlight(@Param('id') id: string, @Body() body: HighlightBody) {
+    return this.broadcasts.setHighlight(id, body.highlightUrl ?? null);
   }
 
   @Post(':id/watch-links')

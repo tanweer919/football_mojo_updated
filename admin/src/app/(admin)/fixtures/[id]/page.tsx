@@ -4,6 +4,7 @@ import { Panel, SectionHead } from '@/components/ui';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { WatchLinksEditor, type WatchLink } from './watch-links';
+import { HighlightEditor } from './highlight-editor';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ interface FixtureDetail {
   homeTeam: { name: string };
   awayTeam: { name: string };
   competition: { name: string } | null;
+  highlightUrl: string | null;
   watchLinks: WatchLink[];
 }
 interface Me { role: string; }
@@ -52,6 +54,8 @@ export default async function FixtureDetailPage({ params }: { params: { id: stri
             <div><dt className="text-fg-muted2 text-xs">Fixture ID</dt><dd className="text-fg font-mono text-xs">{fx.id}</dd></div>
           </dl>
         </Panel>
+
+        <HighlightEditor matchId={fx.id} initial={fx.highlightUrl} />
 
         <WatchLinksEditor matchId={fx.id} initial={fx.watchLinks} />
       </div>

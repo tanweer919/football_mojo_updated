@@ -176,6 +176,7 @@ export class BroadcastsService {
           homeTeam: { select: { name: true } },
           awayTeam: { select: { name: true } },
           competition: { select: { name: true } },
+          highlightUrl: true,
           _count: { select: { watchLinks: true } },
         },
         orderBy: { kickoffAt: 'desc' },
@@ -197,11 +198,22 @@ export class BroadcastsService {
         homeTeam: { select: { name: true } },
         awayTeam: { select: { name: true } },
         competition: { select: { name: true } },
+        highlightUrl: true,
         watchLinks: { orderBy: [{ position: 'asc' }, { name: 'asc' }] },
       },
     });
     if (!match) throw new NotFoundException('match_not_found');
     return match;
+  }
+
+  /// Set or clear a fixture's FIFA-official YouTube highlight link. Pass an
+  /// empty/blank string to clear it. Returns the new value.
+  async setHighlight(matchId: string, url: string | null) {
+    const exists = await this.prisma.match.count({ where: { id: matchId } });
+    if (!exists) throw new NotFoundException('match_not_found');
+    const highlightUrl = url?.trim() || null;
+    await this.prisma.match.update({ where: { id: matchId }, data: { highlightUrl } });
+    return { highlightUrl };
   }
 
   // ── Admin: watch-link CRUD (source = ADMIN) ────────────────────────────────

@@ -15,6 +15,10 @@ class RoutePaths {
   static const shop        = '/shop';       // gem shop: bundles + single cards
   static const profile     = '/profile';
 
+  // Highlights
+  static const highlights  = '/highlights';            // list of finished-match highlights
+  static const highlightPlayer = '/highlights/play';   // in-app YouTube player
+
   // Detail
   static const matchDetail = '/matches/:id';
   static const newsReader  = '/news/:id';

@@ -43,6 +43,7 @@ abstract class MatchDto with _$MatchDto {
     int? awayPenalties,
     String? stage,
     String? venue,
+    String? highlightUrl,
   }) = _MatchDto;
 
   factory MatchDto.fromJson(Map<String, dynamic> json) => _$MatchDtoFromJson(json);
@@ -50,6 +51,9 @@ abstract class MatchDto with _$MatchDto {
   bool get isLive => status == MatchStatus.LIVE || status == MatchStatus.HALF_TIME;
   bool get isFinished => status == MatchStatus.FINISHED;
   String get scoreLabel => '$homeScore - $awayScore';
+
+  /// True when a FIFA-official highlight is available to watch in-app.
+  bool get hasHighlight => isFinished && (highlightUrl?.isNotEmpty ?? false);
 
   /// Clock label with stoppage time, e.g. `45+4'` (or `45'`). Callers render
   /// HALF_TIME as "HT" separately.

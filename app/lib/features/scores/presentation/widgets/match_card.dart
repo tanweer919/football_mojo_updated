@@ -8,6 +8,7 @@ import '../../../../core/design/motion.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/score_flip.dart';
 import '../../../../core/widgets/team_crest.dart';
+import '../../../highlights/highlight_link.dart';
 import '../../../matches/presentation/widgets/match_share_card.dart';
 import '../../../predictions/presentation/widgets/predict_sheet.dart';
 import '../../data/models/match_dto.dart';
@@ -75,6 +76,7 @@ class MatchCard extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
+                    if (match.hasHighlight) HighlightChip(match: match, dense: true),
                     if (canPredict)
                       IconButton(
                         visualDensity: VisualDensity.compact,
