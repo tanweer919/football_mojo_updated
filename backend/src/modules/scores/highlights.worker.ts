@@ -145,7 +145,10 @@ export class HighlightsWorker {
       if (a[0] !== b[0] || a[1] !== b[1]) continue;
 
       const url = `https://www.youtube.com/watch?v=${hit.videoId}`;
-      await this.prisma.match.update({ where: { id: m.id }, data: { highlightUrl: url } });
+      await this.prisma.match.update({
+        where: { id: m.id },
+        data: { highlightUrl: url, highlightSource: 'AUTO' },
+      });
       matched++;
       this.log.log(
         `highlight matched: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} → ${hit.videoId}`,

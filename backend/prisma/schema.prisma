@@ -108,7 +108,8 @@ model Match {
   awayPenalties Int?
   stage         String?                    // GROUP_A | ROUND_OF_16 | QUARTER | SEMI | FINAL
   venue         String?
-  highlightUrl  String?                    // FIFA-official YouTube highlight, set by admin once finished
+  highlightUrl  String?                    // YouTube highlight link (auto-matched or admin-set)
+  highlightSource HighlightSource?         // who set highlightUrl — admin links are never overwritten
   events        MatchEvent[]
   predictions   Prediction[]
   watchLinks    WatchLink[]
@@ -140,6 +141,11 @@ model WatchLink {
 enum WatchLinkSource {
   ADMIN
   SCRAPER
+}
+
+enum HighlightSource {
+  AUTO   // matched from the FIFA highlights playlist by the worker
+  ADMIN  // set by hand in the admin panel — never overwritten by the worker
 }
 
 /// Global per-channel watch-link override, keyed by broadcaster name. Applied

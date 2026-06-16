@@ -16,6 +16,7 @@ interface FixtureDetail {
   awayTeam: { name: string };
   competition: { name: string } | null;
   highlightUrl: string | null;
+  highlightSource: 'AUTO' | 'ADMIN' | null;
   watchLinks: WatchLink[];
 }
 interface Me { role: string; }
@@ -55,7 +56,7 @@ export default async function FixtureDetailPage({ params }: { params: { id: stri
           </dl>
         </Panel>
 
-        <HighlightEditor matchId={fx.id} initial={fx.highlightUrl} />
+        <HighlightEditor matchId={fx.id} initial={fx.highlightUrl} initialSource={fx.highlightSource} />
 
         <WatchLinksEditor matchId={fx.id} initial={fx.watchLinks} />
       </div>

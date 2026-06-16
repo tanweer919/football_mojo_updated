@@ -177,6 +177,7 @@ export class BroadcastsService {
           awayTeam: { select: { name: true } },
           competition: { select: { name: true } },
           highlightUrl: true,
+          highlightSource: true,
           _count: { select: { watchLinks: true } },
         },
         orderBy: { kickoffAt: 'desc' },
@@ -199,6 +200,7 @@ export class BroadcastsService {
         awayTeam: { select: { name: true } },
         competition: { select: { name: true } },
         highlightUrl: true,
+        highlightSource: true,
         watchLinks: { orderBy: [{ position: 'asc' }, { name: 'asc' }] },
       },
     });
@@ -206,14 +208,19 @@ export class BroadcastsService {
     return match;
   }
 
-  /// Set or clear a fixture's FIFA-official YouTube highlight link. Pass an
-  /// empty/blank string to clear it. Returns the new value.
+  /// Set or clear a fixture's YouTube highlight link by hand. Pass an
+  /// empty/blank string to clear it. A link set here is tagged ADMIN so the
+  /// auto-matcher never overwrites it (lets an admin swap in an embeddable
+  /// source when the FIFA upload has embedding disabled). Returns the new value.
   async setHighlight(matchId: string, url: string | null) {
     const exists = await this.prisma.match.count({ where: { id: matchId } });
     if (!exists) throw new NotFoundException('match_not_found');
     const highlightUrl = url?.trim() || null;
-    await this.prisma.match.update({ where: { id: matchId }, data: { highlightUrl } });
-    return { highlightUrl };
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: { highlightUrl, highlightSource: highlightUrl ? 'ADMIN' : null },
+    });
+    return { highlightUrl, highlightSource: highlightUrl ? 'ADMIN' : null };
   }
 
   // ── Admin: watch-link CRUD (source = ADMIN) ────────────────────────────────
