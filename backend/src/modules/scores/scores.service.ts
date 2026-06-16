@@ -393,6 +393,23 @@ export class ScoresService {
     return rows;
   }
 
+  /// Finished matches that have a curated highlight link, newest kickoff first.
+  /// Backs the in-app Highlights screen. Cached briefly — admins add links
+  /// sporadically, so 60s freshness is plenty.
+  async getHighlights(limit = 60) {
+    const key = `highlights:${limit}`;
+    const cached = await this.pub.get(key);
+    if (cached) return JSON.parse(cached);
+    const rows = await this.prisma.match.findMany({
+      where: { status: 'FINISHED', highlightUrl: { not: null } },
+      include: { homeTeam: true, awayTeam: true, competition: true },
+      orderBy: { kickoffAt: 'desc' },
+      take: Math.min(100, Math.max(1, limit)),
+    });
+    await this.pub.set(key, JSON.stringify(rows), 'EX', 60);
+    return rows;
+  }
+
   async getMatchDetail(id: string) {
     return this.prisma.match.findUnique({
       where: { id },

@@ -26,6 +26,13 @@ export class ScoresController {
     return this.scores.getFixturesRange(from, to);
   }
 
+  /// Finished matches with a curated highlight link — backs the Highlights screen.
+  @Get('highlights')
+  @CacheTTL(60_000)
+  highlights(@Query('limit') limit?: string) {
+    return this.scores.getHighlights(limit ? Number.parseInt(limit, 10) || 60 : 60);
+  }
+
   @Get('matches/:id')
   @CacheTTL(10_000)
   async match(@Param('id') id: string) {

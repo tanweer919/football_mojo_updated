@@ -108,6 +108,7 @@ model Match {
   awayPenalties Int?
   stage         String?                    // GROUP_A | ROUND_OF_16 | QUARTER | SEMI | FINAL
   venue         String?
+  highlightUrl  String?                    // FIFA-official YouTube highlight, set by admin once finished
   events        MatchEvent[]
   predictions   Prediction[]
   watchLinks    WatchLink[]
