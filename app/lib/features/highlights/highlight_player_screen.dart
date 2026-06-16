@@ -65,9 +65,17 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
           showControls: true,
           showFullscreenButton: false,
           enableCaption: false,
-          // 6.x defaults origin to null; the IFrame player needs a valid origin
-          // or it errors with "video unavailable" (153/152). Set it explicitly.
           origin: 'https://www.youtube.com',
+          // Use youtube.com (not the nocookie default) to match a plain
+          // embeddable iframe's origin.
+          privacyEnhancedMode: false,
+          // THE fix for "video unavailable" on embeddable clips: the default
+          // Android WebView user-agent contains "; wv)", and YouTube refuses to
+          // serve its player to a WebView UA. A clean mobile-Chrome UA makes
+          // YouTube treat it as a normal browser and the embed plays.
+          userAgent:
+              'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
         ),
       );
       _sub = controller.stream.listen((value) {
