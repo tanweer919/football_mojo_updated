@@ -11,7 +11,7 @@ description: A new Flutter project.
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 2.0.4+17
+version: 2.0.5+18
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -61,6 +61,7 @@ dependencies:
   flutter_animate: ^4.5.0          # declarative animation pipelines
   fl_chart: ^0.69.0                # match stats charts
   webview_flutter: ^4.8.0          # in-app news reader
+  youtube_player_iframe: ^5.2.0    # in-app match highlights (rides on webview_flutter)
   visibility_detector: ^0.4.0+2    # animate-on-enter for list items
 
   # i18n / formatting

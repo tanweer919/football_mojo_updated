@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../core/design/app_colors.dart';
 import '../../core/widgets/eyebrow.dart';
@@ -13,10 +13,13 @@ class HighlightArgs {
   final String title;
 }
 
-/// In-app YouTube highlight player. Plays the FIFA-official clip inside a
-/// WebView (the app already depends on webview_flutter, so this needs no new
-/// native plugin) by loading YouTube's inline embed. A thin top bar carries
-/// the match title + back.
+/// In-app YouTube highlight player.
+///
+/// Uses `youtube_player_iframe` — the official IFrame Player API wrapped over
+/// the `webview_flutter` plugin the app already ships (so no new native
+/// module). The library performs the full origin/`enablejsapi` handshake, which
+/// is what avoids the bare-iframe embed failures (Error 153 / 152). Fullscreen
+/// + orientation are handled by [YoutubePlayerScaffold].
 class HighlightPlayerScreen extends StatefulWidget {
   const HighlightPlayerScreen({super.key, required this.url, required this.title});
   final String url;
@@ -27,65 +30,76 @@ class HighlightPlayerScreen extends StatefulWidget {
 }
 
 class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
-  WebViewController? _controller;
-  bool _loading = true;
+  YoutubePlayerController? _controller;
 
   @override
   void initState() {
     super.initState();
-    final html = youtubeIframeHtml(widget.url);
-    if (html != null) {
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.black)
-        ..setNavigationDelegate(NavigationDelegate(
-          onPageFinished: (_) {
-            if (mounted) setState(() => _loading = false);
-          },
-        ))
-        // Serve the iframe from a real origin so YouTube's player accepts it
-        // (a bare embed URL has no referrer → "Error 153").
-        ..loadHtmlString(html, baseUrl: youtubeEmbedOrigin);
+    final id = youtubeIdFrom(widget.url);
+    if (id != null) {
+      _controller = YoutubePlayerController.fromVideoId(
+        videoId: id,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showControls: true,
+          showFullscreenButton: true,
+          enableCaption: false,
+        ),
+      );
     }
   }
 
   @override
+  void dispose() {
+    _controller?.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _TopBar(title: widget.title, onBack: () => context.pop()),
-            if (_loading && _controller != null)
-              const LinearProgressIndicator(
-                minHeight: 2,
-                color: AppColors.gold,
-                backgroundColor: Colors.black,
-              ),
-            Expanded(
-              child: _controller == null
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text(
-                          'This highlight link looks invalid.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.muted, fontSize: 13),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      // 16:9 player centred on the black canvas.
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: WebViewWidget(controller: _controller!),
-                      ),
+    final controller = _controller;
+    if (controller == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _TopBar(title: widget.title, onBack: () => context.pop()),
+              const Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'This highlight link looks invalid.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
-            ),
-          ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      );
+    }
+
+    return YoutubePlayerScaffold(
+      controller: controller,
+      aspectRatio: 16 / 9,
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TopBar(title: widget.title, onBack: () => context.pop()),
+                player,
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
