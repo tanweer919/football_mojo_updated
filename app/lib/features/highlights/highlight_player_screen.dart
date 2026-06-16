@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import '../../core/design/app_colors.dart';
 import '../../core/widgets/eyebrow.dart';
@@ -63,8 +63,11 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
         autoPlay: true,
         params: const YoutubePlayerParams(
           showControls: true,
-          showFullscreenButton: true,
+          showFullscreenButton: false,
           enableCaption: false,
+          // 6.x defaults origin to null; the IFrame player needs a valid origin
+          // or it errors with "video unavailable" (153/152). Set it explicitly.
+          origin: 'https://www.youtube.com',
         ),
       );
       _sub = controller.stream.listen((value) {
@@ -145,29 +148,33 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
       );
     }
 
-    return YoutubePlayerScaffold(
-      controller: controller,
-      aspectRatio: 16 / 9,
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TopBar(
-                  title: widget.title,
-                  onBack: () => context.pop(),
-                  onOpenYoutube: _openOnYoutube,
-                ),
-                // Centre + bound the 16:9 player so it letterboxes to fit the
-                // landscape canvas instead of overflowing the column height.
-                Expanded(child: Center(child: player)),
-              ],
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TopBar(
+              title: widget.title,
+              onBack: () => context.pop(),
+              onOpenYoutube: _openOnYoutube,
             ),
-          ),
-        );
-      },
+            // Centre + bound the 16:9 player so it letterboxes to fit the
+            // landscape canvas instead of overflowing the column height.
+            // We're already locked to landscape, so the player's own
+            // auto-fullscreen is off to avoid fighting the orientation.
+            Expanded(
+              child: Center(
+                child: YoutubePlayer(
+                  controller: controller,
+                  aspectRatio: 16 / 9,
+                  autoFullScreen: false,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
