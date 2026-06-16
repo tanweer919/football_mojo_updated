@@ -4,6 +4,12 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma.service';
 import { fixturePairKey } from './wc-team-aliases';
 
+// FIFA's dedicated WC 2026 highlights playlist — every item is a match
+// highlight, so it's a far cleaner + cheaper source than the channel's full
+// uploads feed. Override via YOUTUBE_HIGHLIGHTS_PLAYLIST_ID if this changes or
+// was copied incomplete (it's the `list=` value from the playlist URL).
+const DEFAULT_HIGHLIGHTS_PLAYLIST = 'PLBRLtDhTHh5o';
+
 interface YtVideo {
   id: string;
   title: string;
@@ -55,10 +61,15 @@ export function parseHighlightTitle(title: string): ParsedHighlight | null {
  * `playlistItems` read of the channel's recent uploads per tick (~1 quota unit
  * per 50 videos, vs 100 for search). Worker-node only.
  *
+ * Reads FIFA's dedicated highlights playlist by default (every item is a match
+ * highlight); falls back to the channel's uploads only if no playlist is set.
+ *
  * Config (Dokploy env, not repo):
- *   - YOUTUBE_API_KEY          required to enable auto-discovery
- *   - YOUTUBE_FIFA_HANDLE      default "fifa" (resolves the uploads playlist)
- *   - YOUTUBE_FIFA_CHANNEL_ID  optional — pin by channel id instead of handle
+ *   - YOUTUBE_API_KEY                required to enable auto-discovery
+ *   - YOUTUBE_HIGHLIGHTS_PLAYLIST_ID preferred source; the `list=` id from the
+ *                                    playlist URL. Defaults to the known WC one.
+ *   - YOUTUBE_FIFA_HANDLE            default "fifa" (uploads fallback only)
+ *   - YOUTUBE_FIFA_CHANNEL_ID        optional — pin uploads by channel id
  */
 @Injectable()
 export class HighlightsWorker {
@@ -67,7 +78,8 @@ export class HighlightsWorker {
   private readonly apiKey?: string;
   private readonly handle: string;
   private readonly channelId?: string;
-  private uploadsPlaylistId?: string;
+  private readonly highlightsPlaylistId: string;
+  private resolvedPlaylistId?: string;
 
   constructor(
     cfg: ConfigService,
@@ -79,6 +91,8 @@ export class HighlightsWorker {
     this.apiKey = cfg.get<string>('YOUTUBE_API_KEY') || undefined;
     this.handle = (cfg.get<string>('YOUTUBE_FIFA_HANDLE') || 'fifa').replace(/^@/, '');
     this.channelId = cfg.get<string>('YOUTUBE_FIFA_CHANNEL_ID') || undefined;
+    this.highlightsPlaylistId =
+      cfg.get<string>('YOUTUBE_HIGHLIGHTS_PLAYLIST_ID') || DEFAULT_HIGHLIGHTS_PLAYLIST;
   }
 
   @Cron(CronExpression.EVERY_30_MINUTES, { name: 'highlight-discover' })
@@ -101,7 +115,7 @@ export class HighlightsWorker {
 
     let videos: YtVideo[];
     try {
-      videos = await this.fetchRecentUploads(150);
+      videos = await this.fetchPlaylistVideos(200);
     } catch (e) {
       this.log.warn(`youtube fetch failed: ${(e as Error).message}`);
       return;
@@ -131,7 +145,10 @@ export class HighlightsWorker {
       if (a[0] !== b[0] || a[1] !== b[1]) continue;
 
       const url = `https://www.youtube.com/watch?v=${hit.videoId}`;
-      await this.prisma.match.update({ where: { id: m.id }, data: { highlightUrl: url } });
+      await this.prisma.match.update({
+        where: { id: m.id },
+        data: { highlightUrl: url, highlightSource: 'AUTO' },
+      });
       matched++;
       this.log.log(
         `highlight matched: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} → ${hit.videoId}`,
@@ -142,13 +159,25 @@ export class HighlightsWorker {
     }
   }
 
-  /** Resolve (and cache for the process) the channel's uploads playlist id. */
-  private async resolveUploadsPlaylist(): Promise<string | null> {
-    if (this.uploadsPlaylistId) return this.uploadsPlaylistId;
+  /**
+   * The playlist to read, cached for the process. Prefers the dedicated
+   * highlights playlist; otherwise the channel's uploads (pinned by channel id,
+   * or resolved from the @handle via one channels.list call).
+   */
+  private async resolvePlaylistId(): Promise<string | null> {
+    if (this.resolvedPlaylistId) return this.resolvedPlaylistId;
+    if (this.highlightsPlaylistId) {
+      this.resolvedPlaylistId = this.highlightsPlaylistId;
+      return this.resolvedPlaylistId;
+    }
+    if (this.channelId) {
+      // Uploads playlist id is the channel id with the 'UC' prefix → 'UU'.
+      this.resolvedPlaylistId = 'UU' + this.channelId.slice(2);
+      return this.resolvedPlaylistId;
+    }
     const url = new URL('https://www.googleapis.com/youtube/v3/channels');
     url.searchParams.set('part', 'contentDetails');
-    if (this.channelId) url.searchParams.set('id', this.channelId);
-    else url.searchParams.set('forHandle', this.handle);
+    url.searchParams.set('forHandle', this.handle);
     url.searchParams.set('key', this.apiKey!);
     const res = await fetch(url);
     if (!res.ok) throw new Error(`channels.list ${res.status}`);
@@ -156,15 +185,15 @@ export class HighlightsWorker {
       items?: Array<{ contentDetails?: { relatedPlaylists?: { uploads?: string } } }>;
     };
     const uploads = json.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-    if (uploads) this.uploadsPlaylistId = uploads;
+    if (uploads) this.resolvedPlaylistId = uploads;
     return uploads ?? null;
   }
 
-  /** Newest `max` uploads from the channel (paged, 50 at a time). */
-  private async fetchRecentUploads(max: number): Promise<YtVideo[]> {
-    const playlistId = await this.resolveUploadsPlaylist();
+  /** Up to `max` videos from the source playlist (paged, 50 at a time). */
+  private async fetchPlaylistVideos(max: number): Promise<YtVideo[]> {
+    const playlistId = await this.resolvePlaylistId();
     if (!playlistId) {
-      this.log.warn('could not resolve FIFA uploads playlist');
+      this.log.warn('could not resolve a highlights/uploads playlist');
       return [];
     }
     const out: YtVideo[] = [];

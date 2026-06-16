@@ -221,53 +221,57 @@ export class RssAggregatorService implements OnModuleInit {
       const isNew = created.fetchedAt.getTime() > Date.now() - 60_000;
       if (isNew) {
         added++;
-        // Push as breaking when the article qualifies. Two signals:
-        //   1. Tagged "breaking" or "live" upstream.
-        //   2. Published in the last 30 minutes (genuinely fresh — not a
-        //      backfill from an old feed).
-        // Both keep notification volume sane while still catching the
-        // moments that matter (transfers, injury news, match incidents).
+        // Notify when the article qualifies. Freshness keeps volume sane:
+        //   - breaking: tagged "breaking"/"live" upstream, AND
+        //   - published in the last 30 min (not an old feed backfill).
         const tagsLower = tags.map((t) => t.toLowerCase());
         const looksBreaking = tagsLower.includes('breaking') || tagsLower.includes('live');
         const publishedRecently =
           created.publishedAt.getTime() > Date.now() - 30 * 60_000;
-        if (looksBreaking && publishedRecently) {
-          // Topic broadcast — opt-in via subscription, so this fires to
-          // every device that subscribed to `news_breaking` (Flutter side
-          // gates the subscription on the breakingNews preference).
-          void this.push.pushToTopic(
-            'news_breaking',
-            {
-              title: `⚡ ${source}`,
-              body: item.title.trim().slice(0, 140),
-            },
-            {
-              type: 'news_breaking',
-              category: 'breakingNews',
-              articleId: id,
-              deepLink: `footballmojo://news/${id}`,
-            },
-          );
-        }
+        const wantBreaking = looksBreaking && publishedRecently;
+        const wantTeam = teamIds.length > 0 && publishedRecently;
 
-        // Per-team news: a fresh story about a followed team → push to each
-        // tagged team's topic (followers subscribe to `team_{id}` on follow).
-        // Gated on freshness so a newly-discovered-but-old article from a feed
-        // backfill doesn't notify. `category: breakingNews` only routes it to
-        // the news channel client-side.
-        if (teamIds.length && publishedRecently) {
-          for (const teamId of teamIds) {
-            void this.push.pushToTopic(
-              `team_${teamId}`,
-              { title: `📰 ${source}`, body: title.slice(0, 140) },
-              {
-                type: 'team_news',
-                category: 'breakingNews',
-                teamId,
-                articleId: id,
-                deepLink: `footballmojo://news/${id}`,
-              },
-            );
+        // Exactly-once notify across instances. The aggregator runs on every
+        // server (no worker gate), so without this each instance would fire
+        // the same pushes — that's the "3 notifications per article" bug. The
+        // atomic flip of notifiedAt (null → now) is won by a single instance.
+        if (wantBreaking || wantTeam) {
+          const claim = await this.prisma.newsArticle.updateMany({
+            where: { id, notifiedAt: null },
+            data: { notifiedAt: new Date() },
+          });
+          if (claim.count === 1) {
+            if (wantBreaking) {
+              // Opt-in via subscription → every device on `news_breaking`
+              // (Flutter gates the subscribe on the breakingNews preference).
+              void this.push.pushToTopic(
+                'news_breaking',
+                { title: `⚡ ${source}`, body: item.title.trim().slice(0, 140) },
+                {
+                  type: 'news_breaking',
+                  category: 'breakingNews',
+                  articleId: id,
+                  deepLink: `footballmojo://news/${id}`,
+                },
+              );
+            }
+            if (wantTeam) {
+              // One push per tagged team topic (followers subscribe to
+              // `team_{id}` on follow). teamIds is already de-duplicated.
+              for (const teamId of teamIds) {
+                void this.push.pushToTopic(
+                  `team_${teamId}`,
+                  { title: `📰 ${source}`, body: title.slice(0, 140) },
+                  {
+                    type: 'team_news',
+                    category: 'breakingNews',
+                    teamId,
+                    articleId: id,
+                    deepLink: `footballmojo://news/${id}`,
+                  },
+                );
+              }
+            }
           }
         }
       }

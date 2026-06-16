@@ -30,7 +30,15 @@ function youtubeId(raw: string): string | null {
   return null;
 }
 
-export function HighlightEditor({ matchId, initial }: { matchId: string; initial: string | null }) {
+export function HighlightEditor({
+  matchId,
+  initial,
+  initialSource,
+}: {
+  matchId: string;
+  initial: string | null;
+  initialSource: 'AUTO' | 'ADMIN' | null;
+}) {
   const [url, setUrl] = useState(initial ?? '');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -69,15 +77,24 @@ export function HighlightEditor({ matchId, initial }: { matchId: string; initial
     <Panel>
       <SectionHead
         eyebrow="Highlights"
-        title="FIFA highlight video"
-        action={initial ? <span className="text-xs font-mono text-pitch">Set</span> : <span className="text-xs font-mono text-fg-muted2">None</span>}
+        title="Highlight video"
+        action={
+          !initial ? (
+            <span className="text-xs font-mono text-fg-muted2">None</span>
+          ) : initialSource === 'ADMIN' ? (
+            <span className="text-xs font-mono text-gold">Set by admin</span>
+          ) : (
+            <span className="text-xs font-mono text-pitch">Auto-matched</span>
+          )
+        }
       />
       <p className="text-xs text-fg-muted2 mb-3 leading-relaxed">
-        Highlights are matched <span className="text-fg-soft">automatically</span> from
-        {' '}<span className="text-fg-soft">youtube.com/@fifa</span> a while after full time
-        (titles like <span className="text-fg-soft">&quot;Highlights | Canada 1-1 Bosnia and Herzegovina | FIFA World Cup 2026™&quot;</span>).
-        Use this only to override or fill one in early — a link set here is never replaced by the
-        auto-matcher. It plays inside the app.
+        Highlights are matched <span className="text-fg-soft">automatically</span> from the FIFA
+        playlist a while after full time. Set a link here to override or fill one in early —
+        an admin link is <span className="text-fg-soft">never replaced</span> by the auto-matcher.
+        {' '}If a clip won&apos;t play in-app (the owner disabled embedding, e.g. some FIFA uploads),
+        paste an <span className="text-fg-soft">embeddable</span> YouTube link from a rights-holder
+        that allows it — embeddable links play inline; blocked ones open in the YouTube app.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-end">
         <Field label="YouTube URL" hint={id ? `Video id: ${id}` : 'watch?v=… · youtu.be/… · embed/…'}>

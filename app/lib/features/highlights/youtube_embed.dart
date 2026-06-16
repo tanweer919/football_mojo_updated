@@ -22,13 +22,3 @@ String? youtubeThumb(String? raw) {
   final id = youtubeIdFrom(raw);
   return id == null ? null : 'https://i.ytimg.com/vi/$id/mqdefault.jpg';
 }
-
-/// Embed URL that autoplays inline inside a WebView. `youtube-nocookie` keeps
-/// it privacy-friendly; `playsinline=1` avoids forcing the native fullscreen
-/// player on iOS.
-String? youtubeEmbedUrl(String? raw) {
-  final id = youtubeIdFrom(raw);
-  return id == null
-      ? null
-      : 'https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&rel=0&modestbranding=1';
-}
