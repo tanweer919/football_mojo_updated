@@ -207,58 +207,101 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   }
 }
 
-class _DayStrip extends StatelessWidget {
+class _DayStrip extends StatefulWidget {
   const _DayStrip({required this.selected, required this.onChanged});
   final DateTime selected;
   final ValueChanged<DateTime> onChanged;
 
   @override
+  State<_DayStrip> createState() => _DayStripState();
+}
+
+class _DayStripState extends State<_DayStrip> {
+  // Wide enough to browse the whole tournament: well over a month back and a
+  // month forward. The strip opens scrolled to the selected (today) day.
+  static const _daysBack = 45;
+  static const _daysForward = 35;
+  static const _itemWidth = 62.0;
+  static const _gap = 8.0;
+
+  late final DateTime _start;
+  late final ScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _start = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: _daysBack));
+    // Open with the selected day a couple of slots in from the left so a few
+    // prior days are visible for context.
+    final selIndex = _indexOf(widget.selected);
+    final offset =
+        ((selIndex - 2) * (_itemWidth + _gap)).clamp(0.0, double.infinity);
+    _controller = ScrollController(initialScrollOffset: offset);
+  }
+
+  int _indexOf(DateTime d) =>
+      DateTime(d.year, d.month, d.day).difference(_start).inDays;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final start = today.subtract(const Duration(days: 3));
     final theme = Theme.of(context);
+    const count = _daysBack + _daysForward + 1;
     return SizedBox(
       height: 72,
       child: ListView.separated(
+        controller: _controller,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         scrollDirection: Axis.horizontal,
-        itemCount: 14,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemCount: count,
+        separatorBuilder: (_, __) => const SizedBox(width: _gap),
         itemBuilder: (_, i) {
-          final d = start.add(Duration(days: i));
-          final isSelected = _sameDay(d, selected);
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
+          final d = _start.add(Duration(days: i));
+          final isSelected = _sameDay(d, widget.selected);
+          return SizedBox(
+            width: _itemWidth,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => onChanged(d),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        DateFormat.E().format(d),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => widget.onChanged(d),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          DateFormat.E().format(d),
+                          maxLines: 1,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        DateFormat('d MMM').format(d),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat('d MMM').format(d),
+                          maxLines: 1,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
