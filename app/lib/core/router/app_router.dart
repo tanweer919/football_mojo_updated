@@ -27,6 +27,8 @@ import '../../features/home/presentation/screens/home_shell.dart';
 import '../../features/market/presentation/screens/cards_market_screen.dart';
 import '../../features/market/presentation/screens/gem_shop_screen.dart';
 import '../../features/market/presentation/screens/market_template_detail_screen.dart';
+import '../../features/highlights/highlight_player_screen.dart';
+import '../../features/highlights/highlights_screen.dart';
 import '../../features/matches/presentation/screens/match_detail_screen.dart';
 import '../../features/matches/presentation/screens/matches_screen.dart';
 import '../../features/news/presentation/screens/news_reader_screen.dart';
@@ -98,6 +100,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // Detail
       GoRoute(path: RoutePaths.matchDetail, builder: (_, s) => MatchDetailScreen(matchId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.newsReader,  builder: (_, s) => NewsReaderScreen(articleId: s.pathParameters['id']!)),
+
+      // Highlights
+      GoRoute(path: RoutePaths.highlights, builder: (_, __) => const HighlightsScreen()),
+      GoRoute(
+        path: RoutePaths.highlightPlayer,
+        builder: (_, s) {
+          final args = s.extra as HighlightArgs?;
+          return HighlightPlayerScreen(
+            url: args?.url ?? '',
+            title: args?.title ?? 'Highlights',
+          );
+        },
+      ),
       GoRoute(path: RoutePaths.cardDetail,  builder: (_, s) => CardDetailScreen(ownedCardId: s.pathParameters['id']!)),
       GoRoute(path: RoutePaths.cardStats,   builder: (_, s) => OwnedCardStatsScreen(ownedCardId: s.pathParameters['id']!)),
       GoRoute(

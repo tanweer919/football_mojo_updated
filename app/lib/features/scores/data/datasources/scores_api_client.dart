@@ -44,6 +44,15 @@ class ScoresApiClient {
         .toList(growable: false);
   }
 
+  /// Finished matches that have a FIFA-official highlight, newest first.
+  Future<List<MatchDto>> fetchHighlights() async {
+    final res = await _dio.get<List<dynamic>>('/v1/scores/highlights');
+    return (res.data ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(MatchDto.fromJson)
+        .toList(growable: false);
+  }
+
   /// Returns null when the backend has no record of this fixture (e.g. live
   /// match from an untracked league surfaced via /scores/live but never
   /// persisted, or a stale id). Throws on transport/server errors.

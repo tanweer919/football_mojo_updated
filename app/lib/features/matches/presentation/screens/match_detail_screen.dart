@@ -13,6 +13,7 @@ import '../../../../core/network/api_error.dart';
 import '../../../../core/util/region.dart';
 import '../../../../core/util/watch_country.dart';
 import '../../../../core/widgets/eyebrow.dart';
+import '../../../highlights/highlight_link.dart';
 import '../../data/ai_preview_repository.dart';
 import '../../../../core/widgets/live_dot.dart';
 import '../../../../core/widgets/pitch_buttons.dart';
@@ -587,6 +588,10 @@ class _Hero extends ConsumerWidget {
                     events: heroEvents,
                     homeTeamId: match.homeTeam.id,
                   ),
+                ],
+                if (match.hasHighlight) ...[
+                  const SizedBox(height: 16),
+                  Center(child: HighlightChip(match: match)),
                 ],
                 if (match.venue != null) ...[
                   const SizedBox(height: 18),

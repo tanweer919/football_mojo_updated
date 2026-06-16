@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/ads/ad_widgets.dart';
 import '../../../../core/deeplink/chottu_link_service.dart';
+import '../../../../core/router/route_paths.dart';
 import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/widgets/empty_states.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -88,6 +90,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
       appBar: AppBar(
         title: const Text('Matches'),
         actions: [
+          IconButton(
+            tooltip: 'Highlights',
+            icon: const Icon(Icons.play_circle_outline),
+            onPressed: () => context.push(RoutePaths.highlights),
+          ),
           IconButton(
             tooltip: 'Share',
             icon: const Icon(Icons.ios_share_rounded),

@@ -25,6 +25,7 @@ import '../../../insights/data/insights_repository.dart';
 import '../../../insights/data/models/broadcast_dto.dart';
 import '../../../insights/data/models/match_event_dto.dart';
 import '../../../insights/data/standings_repository.dart';
+import '../../../highlights/highlight_link.dart';
 import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
@@ -487,6 +488,11 @@ class _MatchFeatureCard extends StatelessWidget {
               _MatchHeroEvents(match: match),
               // Compact "where to watch" — live/upcoming only, self-hides.
               _HeroWhereToWatch(match: match),
+              // Finished match with a highlight → in-app "Highlights" pill.
+              if (match.hasHighlight) ...[
+                const SizedBox(height: 12),
+                Center(child: HighlightChip(match: match)),
+              ],
               // Footer only for UPCOMING matches: a thin divider + the kickoff
               // line. Live + finished are fully carried by the badge (LIVE/min,
               // FT) + events, and the stadium is dropped to keep the hero short.
