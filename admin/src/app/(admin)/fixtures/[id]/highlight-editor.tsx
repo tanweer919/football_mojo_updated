@@ -73,9 +73,11 @@ export function HighlightEditor({ matchId, initial }: { matchId: string; initial
         action={initial ? <span className="text-xs font-mono text-pitch">Set</span> : <span className="text-xs font-mono text-fg-muted2">None</span>}
       />
       <p className="text-xs text-fg-muted2 mb-3 leading-relaxed">
-        Paste the YouTube link from <span className="text-fg-soft">youtube.com/@fifa</span>. The official
-        clip is titled like <span className="text-fg-soft">&quot;Highlights | Canada 1-1 Bosnia and Herzegovina | FIFA World Cup 2026™&quot;</span>.
-        It plays inside the app.
+        Highlights are matched <span className="text-fg-soft">automatically</span> from
+        {' '}<span className="text-fg-soft">youtube.com/@fifa</span> a while after full time
+        (titles like <span className="text-fg-soft">&quot;Highlights | Canada 1-1 Bosnia and Herzegovina | FIFA World Cup 2026™&quot;</span>).
+        Use this only to override or fill one in early — a link set here is never replaced by the
+        auto-matcher. It plays inside the app.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-end">
         <Field label="YouTube URL" hint={id ? `Video id: ${id}` : 'watch?v=… · youtu.be/… · embed/…'}>
