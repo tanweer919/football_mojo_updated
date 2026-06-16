@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -44,6 +45,14 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Highlights are a lean-back, full-bleed experience → force landscape +
+    // immersive while this screen is up. Restored in dispose().
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
     final id = youtubeIdFrom(widget.url);
     _videoId = id;
     if (id != null) {
@@ -71,6 +80,13 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
   void dispose() {
     _sub?.cancel();
     _controller?.close();
+    // Restore the app's normal portrait lock + edge-to-edge chrome (mirrors
+    // main.dart) — these are app-wide, so they must be reset on the way out.
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -117,7 +133,9 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
                   onBack: () => context.pop(),
                   onOpenYoutube: _openOnYoutube,
                 ),
-                player,
+                // Centre + bound the 16:9 player so it letterboxes to fit the
+                // landscape canvas instead of overflowing the column height.
+                Expanded(child: Center(child: player)),
               ],
             ),
           ),
