@@ -579,6 +579,7 @@ model NewsArticle {
   tags        String[] @default([])
   teamIds     String[] @default([])
   fetchedAt   DateTime @default(now())
+  notifiedAt  DateTime?                 // set once when push notifications fire — guarantees one notify per article across all server instances
   @@index([publishedAt])
   @@index([source])
 }
