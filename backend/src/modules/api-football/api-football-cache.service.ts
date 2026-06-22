@@ -224,6 +224,48 @@ export class ApiFootballCacheService {
   }
 
   /**
+   * Prime the per-fixture events/lineups/statistics/players caches for a set of
+   * LIVE fixtures using ONE batched `/fixtures?ids=` call per 20 ids — instead
+   * of the 3+ separate per-match calls the on-demand getters fire. Those getters
+   * read these same keys, so priming simply turns their upstream calls into
+   * cache hits (and keeps the data fresh for everyone, not just whoever opened
+   * the match). Called by the poller each live tick. Best-effort: never throws.
+   */
+  async primeLiveFixtures(fixtureIds: number[]): Promise<void> {
+    const ids = [...new Set(fixtureIds)].filter((n) => Number.isFinite(n));
+    if (ids.length === 0) return;
+    for (let i = 0; i < ids.length; i += 20) {
+      const batch = ids.slice(i, i + 20);
+      let fixtures: ApiFixture[];
+      try {
+        fixtures = await this.api.fixturesByIds(batch);
+      } catch (e) {
+        this.log.warn(`prime batch failed: ${(e as Error).message}`);
+        continue;
+      }
+      for (const f of fixtures) {
+        const id = f.fixture?.id;
+        if (!id) continue;
+        const writes: Array<Promise<void>> = [];
+        if (f.events) writes.push(this.put(`apif:fxe:f${id}`, f.events));
+        if (f.statistics) writes.push(this.put(`apif:fxs:f${id}`, f.statistics));
+        if (f.lineups) writes.push(this.put(`apif:fxl:f${id}`, f.lineups));
+        if (f.players) writes.push(this.put(`apif:fxp:f${id}`, f.players));
+        await Promise.allSettled(writes);
+      }
+    }
+  }
+
+  /** Write a primed value to a per-fixture cache key (live TTL). Best-effort. */
+  private async put(key: string, value: unknown): Promise<void> {
+    try {
+      await this.redis.set(key, JSON.stringify(value), 'EX', TTL.fixtureLive);
+    } catch (e) {
+      this.log.warn(`prime write failed for ${key}: ${(e as Error).message}`);
+    }
+  }
+
+  /**
    * Once a fixture goes FT, freeze its derived caches at "no expiry" so we
    * never re-fetch frozen data again. Call from the poller when status flips.
    */

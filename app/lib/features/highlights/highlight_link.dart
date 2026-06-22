@@ -13,7 +13,8 @@ String highlightTitle(MatchDto m) {
   return '$h ${m.homeScore}-${m.awayScore} $a';
 }
 
-/// Open the in-app YouTube player for a finished match's highlight.
+/// Open the in-app highlight player for a finished match. The player itself
+/// offers an "Open in YouTube" escape hatch if the embed won't play.
 void openHighlight(BuildContext context, MatchDto m) {
   final url = m.highlightUrl;
   if (url == null || url.isEmpty) return;

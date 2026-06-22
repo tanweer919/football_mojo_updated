@@ -1,10 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/design/app_colors.dart';
 import '../../core/widgets/eyebrow.dart';
@@ -17,16 +15,23 @@ class HighlightArgs {
   final String title;
 }
 
-/// In-app YouTube highlight player.
+// A clean mobile-Chrome user-agent. The default Android WebView UA contains
+// "; wv)", which YouTube detects and refuses to serve its player to.
+const _chromeUserAgent =
+    'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+
+/// In-app highlight player.
 ///
-/// Uses `youtube_player_iframe` (the official IFrame Player API over the
-/// `webview_flutter` plugin the app already ships — no new native module).
-///
-/// Rights-managed clips (FIFA highlights often are) can have *embedding
-/// disabled by the owner*; YouTube then refuses to play them in ANY embed and
-/// returns notEmbeddable/videoNotFound. There's no compliant way to play those
-/// inline, so we detect the error and surface a "Watch on YouTube" button that
-/// opens the clip in the YouTube app. Embeddable clips still play inline.
+/// Renders the SAME plain `<iframe>` embed that works on the web — not the
+/// JS IFrame Player API the youtube_player_* packages use (that handshake was
+/// failing with "video unavailable" 152/153). The combination that satisfies
+/// YouTube's checks inside a WebView:
+///   - a real document origin → `loadHtmlString(baseUrl: youtube.com)`
+///     (Android's loadDataWithBaseURL), so the embed has a valid Referer,
+///   - `referrerpolicy="strict-origin-when-cross-origin"` on the iframe,
+///   - a clean (non-`wv`) user-agent.
+/// An "Open in YouTube" action is always present as an escape hatch.
 class HighlightPlayerScreen extends StatefulWidget {
   const HighlightPlayerScreen({super.key, required this.url, required this.title});
   final String url;
@@ -37,16 +42,14 @@ class HighlightPlayerScreen extends StatefulWidget {
 }
 
 class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
-  YoutubePlayerController? _controller;
-  StreamSubscription<YoutubePlayerValue>? _sub;
+  WebViewController? _controller;
   String? _videoId;
-  bool _blocked = false; // owner disabled embedding (or video unavailable)
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    // Highlights are a lean-back, full-bleed experience → force landscape +
-    // immersive while this screen is up. Restored in dispose().
+    // Lean-back, full-bleed → landscape + immersive while open. Restored below.
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -56,32 +59,43 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
     final id = youtubeIdFrom(widget.url);
     _videoId = id;
     if (id != null) {
-      final controller = YoutubePlayerController.fromVideoId(
-        videoId: id,
-        autoPlay: true,
-        params: const YoutubePlayerParams(
-          showControls: true,
-          showFullscreenButton: true,
-          enableCaption: false,
-        ),
-      );
-      _sub = controller.stream.listen((value) {
-        final e = value.error;
-        final blocked = e == YoutubeError.notEmbeddable ||
-            e == YoutubeError.videoNotFound ||
-            e == YoutubeError.cannotFindVideo;
-        if (blocked && !_blocked && mounted) setState(() => _blocked = true);
-      });
-      _controller = controller;
+      final src =
+          'https://www.youtube.com/embed/$id?playsinline=1&autoplay=1&rel=0&modestbranding=1';
+      final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; height: 100%; overflow: hidden; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+  <iframe
+    src="$src"
+    referrerpolicy="strict-origin-when-cross-origin"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen></iframe>
+</body>
+</html>
+''';
+      _controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setUserAgent(_chromeUserAgent)
+        ..setBackgroundColor(Colors.black)
+        ..setNavigationDelegate(NavigationDelegate(
+          onPageFinished: (_) {
+            if (mounted) setState(() => _loading = false);
+          },
+        ))
+        ..loadHtmlString(html, baseUrl: 'https://www.youtube.com');
     }
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
-    _controller?.close();
-    // Restore the app's normal portrait lock + edge-to-edge chrome (mirrors
-    // main.dart) — these are app-wide, so they must be reset on the way out.
+    // Restore the app's portrait lock + edge-to-edge chrome (mirrors main.dart).
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -93,118 +107,48 @@ class _HighlightPlayerScreenState extends State<HighlightPlayerScreen> {
   Future<void> _openOnYoutube() async {
     final id = _videoId;
     final uri = Uri.parse(id != null ? 'https://www.youtube.com/watch?v=$id' : widget.url);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
-    // No parseable id, or the owner blocked embedding → external-only fallback.
-    if (controller == null || _blocked) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _TopBar(
-                title: widget.title,
-                onBack: () => context.pop(),
-                onOpenYoutube: controller == null && _videoId == null ? null : _openOnYoutube,
-              ),
-              Expanded(child: _Fallback(canOpen: _videoId != null, onOpen: _openOnYoutube)),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return YoutubePlayerScaffold(
-      controller: controller,
-      aspectRatio: 16 / 9,
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TopBar(
-                  title: widget.title,
-                  onBack: () => context.pop(),
-                  onOpenYoutube: _openOnYoutube,
-                ),
-                // Centre + bound the 16:9 player so it letterboxes to fit the
-                // landscape canvas instead of overflowing the column height.
-                Expanded(child: Center(child: player)),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Shown when the clip can't be embedded — directs the user to YouTube.
-class _Fallback extends StatelessWidget {
-  const _Fallback({required this.canOpen, required this.onOpen});
-  final bool canOpen;
-  final VoidCallback onOpen;
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.smart_display_outlined, size: 48, color: AppColors.muted),
-            const SizedBox(height: 16),
-            Text(
-              canOpen ? 'Watch this highlight on YouTube' : 'This highlight is unavailable',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.fg,
+            _TopBar(
+              title: widget.title,
+              onBack: () => context.pop(),
+              onOpenYoutube: _videoId == null ? null : _openOnYoutube,
+            ),
+            if (_loading && controller != null)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.gold,
+                backgroundColor: Colors.black,
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'The broadcaster has disabled in-app playback for this clip.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.muted, height: 1.4),
-            ),
-            if (canOpen) ...[
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: onOpen,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.live,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        'Watch on YouTube',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+            Expanded(
+              child: Center(
+                child: controller == null
+                    ? const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                          'This highlight link looks invalid.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.muted, fontSize: 13),
                         ),
+                      )
+                    : AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: WebViewWidget(controller: controller),
                       ),
-                    ],
-                  ),
-                ),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -249,10 +193,13 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           if (onOpenYoutube != null)
-            IconButton(
-              tooltip: 'Open in YouTube',
+            TextButton.icon(
               onPressed: onOpenYoutube,
-              icon: const Icon(Icons.open_in_new_rounded, color: AppColors.muted, size: 20),
+              icon: const Icon(Icons.open_in_new_rounded, color: AppColors.muted, size: 18),
+              label: const Text(
+                'YouTube',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.muted),
+              ),
             ),
         ],
       ),

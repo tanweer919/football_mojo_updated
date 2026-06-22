@@ -51,6 +51,12 @@ export class ScoresPoller implements OnModuleInit {
       this.log.log('Skipping poller — WORKER_MODE not set');
       return;
     }
+    // Backfill group standings from existing results on boot — they're seeded
+    // at 0 and only recomputed on subsequent full-time transitions, so without
+    // this the table stays stale for matches that finished before this deploy.
+    this.scores
+      .recomputeStandings()
+      .catch((e) => this.log.warn(`standings backfill failed: ${(e as Error).message}`));
     this.tick().catch((e) => this.log.error('initial tick failed', e));
   }
 
@@ -100,6 +106,16 @@ export class ScoresPoller implements OnModuleInit {
       const wasLive = liveMatches.length > 0;
       if (wasLive) await this.cache.markLive();
 
+      // Prime events/lineups/statistics for the live matches in ONE batched
+      // `/fixtures?ids=` call, instead of the app firing 3 separate per-match
+      // enrichment calls on every open. Turns those into cache hits and keeps
+      // the data fresh for everyone. Best-effort — never blocks the tick.
+      if (wasLive) {
+        await this.cache
+          .primeLiveFixtures(liveMatches.map((f) => f.fixture.id))
+          .catch((e) => this.log.warn(`prime failed: ${(e as Error).message}`));
+      }
+
       // Nothing live anywhere → idle refresh per league (parallel) so
       // SCHEDULED→LIVE transitions get caught.
       if (!liveMatches.length) {
@@ -122,6 +138,13 @@ export class ScoresPoller implements OnModuleInit {
 
       for (const id of finishedFixtureIds ?? []) {
         await this.cache.freezeFixture(id);
+      }
+
+      // A match just reached full-time → refresh the group tables from results.
+      if ((finishedFixtureIds?.length ?? 0) > 0) {
+        await this.scores
+          .recomputeStandings()
+          .catch((e) => this.log.warn(`standings recompute failed: ${(e as Error).message}`));
       }
 
       await this.recomputeNextKickoff(scanned);
