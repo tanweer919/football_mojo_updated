@@ -57,10 +57,14 @@ abstract class MatchDto with _$MatchDto {
 
   /// Clock label with stoppage time, e.g. `45+4'` (or `45'`). Callers render
   /// HALF_TIME as "HT" separately.
+  ///
+  /// Only show `+extra` when there's a real base minute — api-football
+  /// sometimes sends `extra` with a null/0 `elapsed`, which would otherwise
+  /// render the nonsensical `0+3'`.
   String get minuteLabel {
     final m = minute ?? 0;
     final x = minuteExtra;
-    return (x != null && x > 0) ? "$m+$x'" : "$m'";
+    return (x != null && x > 0 && m > 0) ? "$m+$x'" : "$m'";
   }
 }
 

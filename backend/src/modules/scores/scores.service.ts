@@ -61,7 +61,10 @@ export class ScoresService {
       const homePenalties = u.score.penalty.home;
       const awayPenalties = u.score.penalty.away;
       const minute        = u.fixture.status.elapsed;
-      const minuteExtra   = u.fixture.status.extra;
+      // api-football occasionally sends `extra` (stoppage) with a null/0
+      // `elapsed`, which downstream renders as the nonsensical "0+3". Only keep
+      // stoppage when there's a real base minute to add it to.
+      const minuteExtra   = (minute && minute > 0) ? u.fixture.status.extra : null;
 
       if (status === 'LIVE' || status === 'HALF_TIME') {
         live++;
