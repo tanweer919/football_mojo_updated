@@ -56,9 +56,12 @@ EventKind _classify(String type, String detail) {
   final t = type.toLowerCase();
   final d = detail.toLowerCase();
   if (t == 'goal') {
+    // Order matters: api-football sends a missed penalty as
+    // type "Goal", detail "Missed Penalty" — which also contains "penalty",
+    // so the missed check MUST come first or it's mistaken for a penalty goal.
+    if (d.contains('missed')) return EventKind.penaltyMissed;
     if (d.contains('own')) return EventKind.ownGoal;
     if (d.contains('penalty')) return EventKind.penalty;
-    if (d.contains('missed')) return EventKind.penaltyMissed;
     return EventKind.goal;
   }
   if (t == 'card') {
