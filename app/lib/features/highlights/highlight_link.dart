@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/design/app_colors.dart';
-import '../../core/router/route_paths.dart';
 import '../scores/data/models/match_dto.dart';
-import 'highlight_player_screen.dart';
+import 'youtube_embed.dart';
 
-/// Short match label for the player top bar, e.g. "Canada 1-1 Bosnia".
-String highlightTitle(MatchDto m) {
-  final h = m.homeTeam.shortName ?? m.homeTeam.name;
-  final a = m.awayTeam.shortName ?? m.awayTeam.name;
-  return '$h ${m.homeScore}-${m.awayScore} $a';
-}
-
-/// Open the in-app highlight player for a finished match. The player itself
-/// offers an "Open in YouTube" escape hatch if the embed won't play.
-void openHighlight(BuildContext context, MatchDto m) {
-  final url = m.highlightUrl;
-  if (url == null || url.isEmpty) return;
-  context.push(
-    RoutePaths.highlightPlayer,
-    extra: HighlightArgs(url: url, title: highlightTitle(m)),
-  );
+/// Open a finished match's highlight in the YouTube app (falling back to the
+/// browser). In-app embedding is unreliable for rights-managed clips and
+/// YouTube blocks WebView playback, so we hand off to YouTube directly.
+Future<void> openHighlight(BuildContext context, MatchDto m) async {
+  final raw = m.highlightUrl;
+  if (raw == null || raw.isEmpty) return;
+  final id = youtubeIdFrom(raw);
+  final uri = Uri.parse(id != null ? 'https://www.youtube.com/watch?v=$id' : raw);
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened) {
+    final viaBrowser = await launchUrl(uri, mode: LaunchMode.platformDefault);
+    if (!viaBrowser && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t open the highlight')),
+      );
+    }
+  }
 }
 
 /// Compact "Highlights" pill with a play glyph — the standard affordance shown
