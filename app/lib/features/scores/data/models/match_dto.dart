@@ -56,7 +56,8 @@ abstract class MatchDto with _$MatchDto {
   bool get hasHighlight => isFinished && (highlightUrl?.isNotEmpty ?? false);
 
   /// Clock label with stoppage time, e.g. `45+4'` (or `45'`). Callers render
-  /// HALF_TIME as "HT" separately.
+  /// HALF_TIME as "HT" separately. The backend only sends `minuteExtra` when
+  /// there's a valid base minute, so we never render a bare `0+3`.
   String get minuteLabel {
     final m = minute ?? 0;
     final x = minuteExtra;
