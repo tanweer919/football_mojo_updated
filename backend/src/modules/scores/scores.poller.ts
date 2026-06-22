@@ -106,6 +106,16 @@ export class ScoresPoller implements OnModuleInit {
       const wasLive = liveMatches.length > 0;
       if (wasLive) await this.cache.markLive();
 
+      // Prime events/lineups/statistics for the live matches in ONE batched
+      // `/fixtures?ids=` call, instead of the app firing 3 separate per-match
+      // enrichment calls on every open. Turns those into cache hits and keeps
+      // the data fresh for everyone. Best-effort — never blocks the tick.
+      if (wasLive) {
+        await this.cache
+          .primeLiveFixtures(liveMatches.map((f) => f.fixture.id))
+          .catch((e) => this.log.warn(`prime failed: ${(e as Error).message}`));
+      }
+
       // Nothing live anywhere → idle refresh per league (parallel) so
       // SCHEDULED→LIVE transitions get caught.
       if (!liveMatches.length) {

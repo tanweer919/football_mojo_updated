@@ -62,6 +62,18 @@ export interface ApiFixture {
     extratime: { home: number | null; away: number | null };
     penalty:  { home: number | null; away: number | null };
   };
+  // Embedded detail objects — present only on `/fixtures?id=` / `?ids=` (the
+  // batched detail call), same shapes as the standalone endpoints. Used to
+  // prime per-fixture caches in ONE request instead of 3 calls per match.
+  events?: ApiFixtureEvent[];
+  lineups?: ApiLineup[];
+  statistics?: ApiFixtureStatistics[];
+  players?: ApiFixturePlayersTeam[];
+}
+
+export interface ApiFixtureStatistics {
+  team: { id: number };
+  statistics: Array<{ type: string; value: number | string | null }>;
 }
 
 export interface ApiSquadPlayer { id: number; name: string; age: number | null; number: number | null; position: string; photo: string }
@@ -193,10 +205,16 @@ export class ApiFootballClient {
   }
 
   fixtureStatistics(fixtureId: number) {
-    return this.get<{ team: { id: number }; statistics: Array<{ type: string; value: number | string | null }> }>(
-      '/fixtures/statistics',
-      { fixture: fixtureId },
-    );
+    return this.get<ApiFixtureStatistics>('/fixtures/statistics', { fixture: fixtureId });
+  }
+
+  /**
+   * Batched fixture detail — up to 20 ids per call, each with embedded
+   * events/lineups/statistics/players (per the official WC-2026 guide). One
+   * call replaces 3-per-match enrichment requests.
+   */
+  fixturesByIds(ids: number[]) {
+    return this.get<ApiFixture>('/fixtures', { ids: ids.join('-') });
   }
 
   injuries(leagueId: number, season: number) {
