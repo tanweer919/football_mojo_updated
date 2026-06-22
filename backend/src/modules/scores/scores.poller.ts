@@ -51,6 +51,12 @@ export class ScoresPoller implements OnModuleInit {
       this.log.log('Skipping poller — WORKER_MODE not set');
       return;
     }
+    // Backfill group standings from existing results on boot — they're seeded
+    // at 0 and only recomputed on subsequent full-time transitions, so without
+    // this the table stays stale for matches that finished before this deploy.
+    this.scores
+      .recomputeStandings()
+      .catch((e) => this.log.warn(`standings backfill failed: ${(e as Error).message}`));
     this.tick().catch((e) => this.log.error('initial tick failed', e));
   }
 
@@ -122,6 +128,13 @@ export class ScoresPoller implements OnModuleInit {
 
       for (const id of finishedFixtureIds ?? []) {
         await this.cache.freezeFixture(id);
+      }
+
+      // A match just reached full-time → refresh the group tables from results.
+      if ((finishedFixtureIds?.length ?? 0) > 0) {
+        await this.scores
+          .recomputeStandings()
+          .catch((e) => this.log.warn(`standings recompute failed: ${(e as Error).message}`));
       }
 
       await this.recomputeNextKickoff(scanned);

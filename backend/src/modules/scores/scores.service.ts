@@ -263,6 +263,75 @@ export class ScoresService {
   }
 
   /**
+   * Recompute every group table from FINISHED match results and write it into
+   * `GroupStanding`. We own this — the seed creates the rows at 0 and nothing
+   * else ever updates them, so the World Cup screen (`/competitions/:id/groups`)
+   * and bracket scoring (which reads `standings.played`/`position`) were stuck
+   * at zero. Deriving from our own results is exact and costs zero api-football
+   * quota. Two nations only ever meet in the group stage (the bracket keeps
+   * same-group teams apart), so "both teams in the same group + FINISHED" is a
+   * safe group-match test without depending on `Match.stage`.
+   *
+   * Ranking: points, then goal difference, then goals for (the standard primary
+   * order; full FIFA head-to-head tie-breaks are out of scope).
+   */
+  async recomputeStandings(): Promise<void> {
+    const groups = await this.prisma.group.findMany({
+      include: { standings: { select: { teamId: true } } },
+    });
+    if (groups.length === 0) return;
+
+    const groupOfTeam = new Map<string, string>();
+    for (const g of groups) {
+      for (const s of g.standings) groupOfTeam.set(s.teamId, g.id);
+    }
+
+    type Tally = { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; pts: number };
+    const blank = (): Tally => ({ played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 });
+    const acc = new Map<string, Map<string, Tally>>();
+    for (const g of groups) {
+      const m = new Map<string, Tally>();
+      for (const s of g.standings) m.set(s.teamId, blank());
+      acc.set(g.id, m);
+    }
+
+    const matches = await this.prisma.match.findMany({
+      where: { status: 'FINISHED' },
+      select: { homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true },
+    });
+    for (const mt of matches) {
+      const gid = groupOfTeam.get(mt.homeTeamId);
+      if (!gid || gid !== groupOfTeam.get(mt.awayTeamId)) continue; // not a group match
+      const table = acc.get(gid)!;
+      const h = table.get(mt.homeTeamId)!;
+      const a = table.get(mt.awayTeamId)!;
+      h.played++; a.played++;
+      h.gf += mt.homeScore; h.ga += mt.awayScore;
+      a.gf += mt.awayScore; a.ga += mt.homeScore;
+      if (mt.homeScore > mt.awayScore) { h.won++; h.pts += 3; a.lost++; }
+      else if (mt.homeScore < mt.awayScore) { a.won++; a.pts += 3; h.lost++; }
+      else { h.drawn++; a.drawn++; h.pts++; a.pts++; }
+    }
+
+    for (const g of groups) {
+      const rows = [...acc.get(g.id)!.entries()]
+        .map(([teamId, t]) => ({ teamId, ...t, gd: t.gf - t.ga }))
+        .sort((x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || x.teamId.localeCompare(y.teamId));
+      let position = 1;
+      for (const r of rows) {
+        await this.prisma.groupStanding.updateMany({
+          where: { groupId: g.id, teamId: r.teamId },
+          data: {
+            played: r.played, won: r.won, drawn: r.drawn, lost: r.lost,
+            goalsFor: r.gf, goalsAg: r.ga, points: r.pts, position,
+          },
+        });
+        position++;
+      }
+    }
+  }
+
+  /**
    * Delete any hand-seeded WC placeholder rows (`WC2026-*` ids) whose two
    * nations match the given pair, keeping `keepId` (the real numeric fixture).
    * Names are reconciled through the alias map, so api-football labels like
