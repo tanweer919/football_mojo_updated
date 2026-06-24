@@ -179,15 +179,21 @@ export class MatchPreviewService {
       : `Final result: ${m.homeTeam.name} ${m.homeScore}-${m.awayScore} ${m.awayTeam.name} (${comp})${venue}.`;
 
     const ask = live
-      ? `Using ONLY the facts below plus current information, describe how the match is unfolding: who is on top and why, the decisive moments so far, the momentum, and what to watch for the rest of the game. ` +
+      ? `Using ONLY the facts below plus current information, describe how the match is unfolding: who is on top and why (lean on the xG and shot numbers if present, not just possession), the decisive moments so far, the momentum, and what to watch for the rest of the game. ` +
         `Write 110–150 words of plain text, accurate and neutral.`
-      : `Using the facts below plus current match reports, recap how the game played out: the story of the match, the decisive moments and goals with scorers and minutes, the standout performers, and what the result means in the competition. ` +
-        `Write 130–170 words of plain text, authoritative and neutral.`;
+      : `Using the facts below plus current match reports, write the definitive post-match analysis. Cover, in flowing prose (not headings): ` +
+        `(1) a sharp one-line verdict on the result; ` +
+        `(2) the story of the game — decisive moments and goals with scorers and minutes; ` +
+        `(3) what the underlying numbers say — read the expected goals (xG) against the actual scoreline and judge whether the win was deserved, a smash-and-grab, or against the run of play (ONLY if xG appears in the facts; never invent it); ` +
+        `(4) the standout performer and the turning point; ` +
+        `(5) what the result means in the competition. ` +
+        `Then end with ONE striking, non-obvious insight a casual viewer would miss — a quirk in the data (e.g. heavy xG over/under-performance, shot dominance that didn't convert, a goalkeeper bailing out a side) or a genuine record/streak/historical rarity from your sources — on its own final line prefixed exactly "Beyond the box score: ". ` +
+        `Write 150–200 words of plain text, authoritative and neutral.`;
 
     return (
       `${header}\n${subject}\n\n` +
       `Match facts so far:\n${facts}\n\n` +
-      `${ask} Do not invent events, scorers or stats that are not supported by the facts or your sources. No betting tips or odds.`
+      `${ask} Treat the listed stats and events as ground truth; do not invent events, scorers, xG or other stats that are not in the facts or supported by your sources. No betting tips or odds.`
     );
   }
 
@@ -228,18 +234,38 @@ export class MatchPreviewService {
         stats.find((s) => String(s.team.id) === teamId)?.statistics ?? [];
       const home = pick(m.homeTeam.id);
       const away = pick(m.awayTeam.id);
-      const val = (arr: typeof home, type: string) =>
-        arr.find((s) => s.type === type)?.value ?? '—';
+      const raw = (arr: typeof home, type: string) =>
+        arr.find((s) => s.type === type)?.value ?? null;
+      const val = (arr: typeof home, type: string) => raw(arr, type) ?? '—';
       const row = (label: string, type: string) =>
         `- ${label}: ${val(home, type)} vs ${val(away, type)}`;
       if (home.length || away.length) {
         lines.push(
           'Team stats (home vs away):',
           row('Possession', 'Ball Possession'),
-          row('Shots', 'Total Shots'),
+          row('Expected goals (xG)', 'expected_goals'),
+          row('Total shots', 'Total Shots'),
           row('Shots on target', 'Shots on Goal'),
+          row('Shots inside box', 'Shots insidebox'),
+          row('Goalkeeper saves', 'Goalkeeper Saves'),
           row('Corners', 'Corner Kicks'),
+          row('Passing accuracy', 'Passes %'),
         );
+        // Explicit xG-vs-result read — the "deserved or lucky" signal that's the
+        // headline insight a viewer can't compute in their head. Only when both
+        // sides report xG (api-football coverage varies).
+        const hx = parseFloat(String(raw(home, 'expected_goals') ?? ''));
+        const ax = parseFloat(String(raw(away, 'expected_goals') ?? ''));
+        if (Number.isFinite(hx) && Number.isFinite(ax)) {
+          const favours =
+            Math.abs(hx - ax) < 0.2
+              ? 'the xG was even'
+              : `xG favoured ${hx > ax ? m.homeTeam.name : m.awayTeam.name}`;
+          lines.push(
+            `xG read: ${m.homeTeam.name} ${hx.toFixed(2)} – ${ax.toFixed(2)} ${m.awayTeam.name} ` +
+              `vs actual goals ${m.homeScore}-${m.awayScore} (${favours}).`,
+          );
+        }
       }
     } catch (e) {
       this.log.warn(`stats fetch failed for ${m.id}: ${(e as Error).message}`);
