@@ -35,7 +35,12 @@ All Play CTAs carry UTM `?utm_source=web&utm_medium=organic&utm_campaign=worldcu
 - ISR revalidate: hub/fixtures/leagues 600s, groups/match 300s, editorial/blog 1d.
 
 ## ⚠️ Known gaps / pass-2 TODO (call these out before launch)
-1. **i18n (locale routes).** Pass 1 ships **English at root** with the i18n scaffold (`LOCALES`, hreflang helper) in place. The 12 non-English locale routes are **not built yet** — they need the human-reviewed translations (titles/H1/meta per the keyword lists). Doing them as thin machine translations would trip the anti-spam guardrail, so they're deliberately deferred. `hreflangFor` currently emits only `x-default`+`en`; expand it when locale routes land.
+1. **i18n (locale routes) — DONE for the hub.** The World Cup hub is now localized at `/[locale]/world-cup-2026` for all 12 non-English codes (en-GB, en-IN, fr, fr-CA, de, it, pt-BR, pt-PT, es, es-419, es-ES, ar), driven by 7 base-language dictionaries in `lib/i18n.ts` (variants reuse base + keyword tweaks). The English hub emits full per-locale **hreflang**; the sitemap lists each variant with `alternates`. Remaining i18n work:
+   - **Native-speaker review** of the 7 dictionaries before relying on them for ranking (they're keyword-aware drafts).
+   - Variant dicts (es-ES/es-419, pt-BR/pt-PT, en-GB/en-IN, fr-CA) currently differ only by a couple of keys — flesh out the "en vivo/en directo", "ao vivo/em direto", "soccer/football" distinctions.
+   - Other pages (fixtures, groups, match, leagues, blog) remain **English-only** (they emit x-default+en hreflang, no locale alternates). Localize next if the data pages need to rank per-market.
+   - Tournament **phase labels** ("Group stage", "Round of 32") and the `ComingSoon`/match-row chrome are still English on localized pages — translate for full coverage.
+   - The localized hub sets `lang`/`dir` on a wrapper `<div>` (RTL works for Arabic); the root `<html lang>` stays `en`. For perfect per-locale `<html lang>`, move routes under a `[locale]` root layout later.
 2. **Per-route OG images.** All pages currently fall back to the root `opengraph-image.tsx`. Add dynamic `@vercel/og` (`next/og` `ImageResponse`) per route (match scoreline cards, group cards) for better social CTR.
 3. **MDX blog.** Posts are structured data in `lib/blog.ts` (zero new deps). Swap to `@next/mdx` if you want rich authoring.
 4. **Match-page resolution** scans the tournament fixtures feed per request (ISR-cached). Fine now; add a backend `GET /scores/match-by-slug` (or include a slug/date in the fixtures payload) to make it O(1) at scale.

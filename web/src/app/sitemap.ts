@@ -4,6 +4,7 @@ import { getUpcomingFixtures, getCompetitionFixtures } from '@/lib/api';
 import { WC, GROUP_LETTERS, matchSlug } from '@/lib/wc';
 import { LEAGUES } from '@/lib/leagues';
 import { POSTS } from '@/lib/blog';
+import { NON_DEFAULT_LOCALES } from '@/lib/i18n';
 
 export const revalidate = 3600;
 
@@ -23,8 +24,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Core
     { url: u('/'), lastModified: now, changeFrequency: 'weekly', priority: 1 },
 
-    // World Cup hub (highest priority during the tournament)
-    { url: u('/world-cup-2026'), lastModified: now, changeFrequency: 'hourly', priority: 0.95 },
+    // World Cup hub (highest priority during the tournament) + localized variants.
+    {
+      url: u('/world-cup-2026'),
+      lastModified: now,
+      changeFrequency: 'hourly',
+      priority: 0.95,
+      alternates: {
+        languages: Object.fromEntries([
+          ['x-default', u('/world-cup-2026')],
+          ['en', u('/world-cup-2026')],
+          ...NON_DEFAULT_LOCALES.map((l) => [l, u(`/${l}/world-cup-2026`)] as const),
+        ]),
+      },
+    },
+    ...NON_DEFAULT_LOCALES.map((l) => ({ url: u(`/${l}/world-cup-2026`), lastModified: now, changeFrequency: 'hourly' as const, priority: 0.8 })),
     { url: u('/world-cup-2026/fixtures'), lastModified: now, changeFrequency: 'daily', priority: 0.9 },
     ...wcDates.map((d) => ({ url: u(`/world-cup-2026/fixtures/${d}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
     ...GROUP_LETTERS.map((l) => ({ url: u(`/world-cup-2026/groups/${l.toLowerCase()}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),

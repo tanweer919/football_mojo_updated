@@ -1,18 +1,9 @@
 import type { Metadata } from 'next';
 import { SITE } from '@/lib/site';
+import { LOCALES, NON_DEFAULT_LOCALES, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
-/**
- * Locales we localize for (mirrors the 13-locale Play Store listing). Pass 1
- * ships English at root paths; locale routes are added in pass 2 with
- * human-reviewed translations, at which point `hreflangFor` starts emitting
- * per-locale alternates. Until then we emit x-default → the English page so we
- * never point hreflang at pages that don't exist yet (which would hurt ranking).
- */
-export const LOCALES = [
-  'en', 'en-GB', 'en-IN', 'fr', 'fr-CA', 'de', 'it',
-  'pt-BR', 'pt-PT', 'es', 'es-419', 'es-ES', 'ar',
-] as const;
-export type Locale = (typeof LOCALES)[number];
+export { LOCALES };
+export type { Locale };
 
 /** Play Store URL with campaign UTM so installs are attributable per page. */
 export function playUrl(pageSlug: string): string {
@@ -24,42 +15,47 @@ export function playUrl(pageSlug: string): string {
   return u.toString();
 }
 
-/** hreflang alternates for a path. Pass 1: canonical + x-default only. */
-function hreflangFor(path: string): Metadata['alternates'] {
-  return {
-    canonical: path,
-    languages: {
-      // x-default + en both resolve to the English page for now.
-      'x-default': path,
-      en: path,
-    },
-  };
+/**
+ * hreflang alternates. `basePath` is the locale-less path (e.g. '/world-cup-2026').
+ * - English lives at the root path; other locales at `/{locale}{basePath}`.
+ * - `localized` pages (those that actually have locale routes) emit a full
+ *   per-locale alternate set; everything else emits only x-default + en so we
+ *   never point hreflang at a route that doesn't exist.
+ */
+function hreflangFor(basePath: string, locale: Locale, localized: boolean): Metadata['alternates'] {
+  const canonical = locale === DEFAULT_LOCALE ? basePath : `/${locale}${basePath}`;
+  const languages: Record<string, string> = { 'x-default': basePath, en: basePath };
+  if (localized) for (const l of NON_DEFAULT_LOCALES) languages[l] = `/${l}${basePath}`;
+  return { canonical, languages };
 }
 
 interface PageMetaInput {
   title: string;          // ≤60 chars, no brand suffix (template adds it)
   description: string;    // ≤155 chars
-  path: string;           // e.g. '/world-cup-2026'
+  path: string;           // locale-LESS base path, e.g. '/world-cup-2026'
   index?: boolean;        // default true; false → noindex (thin/coming-soon)
   ogTitle?: string;
+  locale?: Locale;        // default 'en' (root); set for /[locale]/… pages
+  localized?: boolean;    // true → this route has locale variants (emit all hreflang)
 }
 
 /** Standard page metadata: unique title/description, canonical, hreflang, OG. */
-export function pageMeta({ title, description, path, index = true, ogTitle }: PageMetaInput): Metadata {
+export function pageMeta({ title, description, path, index = true, ogTitle, locale = DEFAULT_LOCALE, localized = false }: PageMetaInput): Metadata {
+  const url = locale === DEFAULT_LOCALE ? `${SITE.url}${path}` : `${SITE.url}/${locale}${path}`;
   return {
     title,
     description,
-    alternates: hreflangFor(path),
+    alternates: hreflangFor(path, locale, localized),
     robots: index
       ? { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 } }
       : { index: false, follow: true },
     openGraph: {
       type: 'website',
       siteName: SITE.name,
-      url: `${SITE.url}${path}`,
+      url,
       title: ogTitle ?? `${title} · ${SITE.name}`,
       description,
-      // Each route's opengraph-image.tsx (or the root one) supplies the image.
+      locale: locale.replace('-', '_'),
     },
     twitter: { card: 'summary_large_image', title: ogTitle ?? title, description },
   };

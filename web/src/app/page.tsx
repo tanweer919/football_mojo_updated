@@ -118,7 +118,7 @@ export default function HomePage() {
               FIFA World Cup 2026
             </span>
             <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              Your World Cup,
+              Live football scores &amp; your World Cup 2026,
               <br />
               <span className="text-gold-grad">all in one app.</span>
             </h1>
