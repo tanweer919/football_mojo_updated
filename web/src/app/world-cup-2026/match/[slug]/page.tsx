@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { Fixture } from '@/lib/api';
-import { getCompetitionFixtures, flagEmoji } from '@/lib/api';
+import { getCompetitionFixtures } from '@/lib/api';
+import { TeamCrest } from '@/components/team-crest';
 import { WC, matchSlug } from '@/lib/wc';
 import { pageMeta, breadcrumbLd, sportsEventLd } from '@/lib/seo';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
@@ -67,7 +68,7 @@ export default async function WcMatch({ params }: { params: { slug: string } }) 
         </h1>
 
         <div className="panel mt-6 flex items-center justify-center gap-6 p-8">
-          <Side name={f.homeTeam.name} code={f.homeTeam.countryCode} />
+          <Side team={f.homeTeam} />
           <div className="text-center">
             {done || ['LIVE', 'HALF_TIME', '1H', '2H', 'HT'].includes(f.status) ? (
               <div className="font-mono text-4xl font-extrabold text-fg">{f.homeScore}–{f.awayScore}</div>
@@ -76,7 +77,7 @@ export default async function WcMatch({ params }: { params: { slug: string } }) 
             )}
             <div className="mt-1 text-xs uppercase tracking-wide text-fg-muted2">{done ? 'Full time' : f.status}</div>
           </div>
-          <Side name={f.awayTeam.name} code={f.awayTeam.countryCode} />
+          <Side team={f.awayTeam} />
         </div>
 
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-fg-soft">
@@ -91,11 +92,11 @@ export default async function WcMatch({ params }: { params: { slug: string } }) 
   );
 }
 
-function Side({ name, code }: { name: string; code: string | null }) {
+function Side({ team }: { team: Fixture['homeTeam'] }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2 text-center">
-      <span className="text-4xl" aria-hidden>{flagEmoji(code ?? '')}</span>
-      <span className="text-sm font-bold text-fg">{name}</span>
+      <TeamCrest team={team} size={56} />
+      <span className="text-sm font-bold text-fg">{team.name}</span>
     </div>
   );
 }

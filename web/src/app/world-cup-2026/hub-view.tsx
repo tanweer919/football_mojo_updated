@@ -5,6 +5,7 @@ import { WC, WC_PHASES, HOST_CITIES } from '@/lib/wc';
 import { type Dict, type Locale, isRtl } from '@/lib/i18n';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { FixtureList, GroupTable, ComingSoon } from '@/components/match-bits';
+import { WcSubnav } from '@/components/wc-subnav';
 
 /**
  * The World Cup 2026 hub, rendered from a localized `dict`. Used by the English
@@ -37,6 +38,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
       <JsonLd data={breadcrumbLd(crumbs)} />
       <JsonLd data={faqLd(dict.faqs)} />
       <JsonLd data={appLd()} />
+      {locale === 'en' && <WcSubnav />}
       <Breadcrumbs items={crumbs} />
 
       <section className="container-x pt-8">
@@ -61,7 +63,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
         )}
       </section>
 
-      <section className="container-x mt-16">
+      <section id="standings" className="container-x mt-16 scroll-mt-32">
         <h2 className="mb-4 font-display text-2xl font-bold">{dict.standingsHeading}</h2>
         {groups.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -73,7 +75,12 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
       </section>
 
       <section className="container-x mt-16">
-        <h2 className="mb-4 font-display text-2xl font-bold">{dict.bracketHeading}</h2>
+        <div className="mb-4 flex items-end justify-between">
+          <h2 className="font-display text-2xl font-bold">{dict.bracketHeading}</h2>
+          <Link href="/world-cup-2026/bracket" className="text-sm font-medium text-gold transition hover:text-gold-soft">
+            {dict.allFixtures}
+          </Link>
+        </div>
         {knockout.length > 0 ? (
           <FixtureList fixtures={knockout} />
         ) : (

@@ -40,6 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     ...NON_DEFAULT_LOCALES.map((l) => ({ url: u(`/${l}/world-cup-2026`), lastModified: now, changeFrequency: 'hourly' as const, priority: 0.8 })),
     { url: u('/world-cup-2026/fixtures'), lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: u('/world-cup-2026/bracket'), lastModified: now, changeFrequency: 'daily', priority: 0.85 },
     ...wcDates.map((d) => ({ url: u(`/world-cup-2026/fixtures/${d}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
     ...GROUP_LETTERS.map((l) => ({ url: u(`/world-cup-2026/groups/${l.toLowerCase()}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
     ...wcFixtures.map((f) => ({

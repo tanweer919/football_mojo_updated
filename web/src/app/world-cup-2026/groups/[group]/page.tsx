@@ -4,6 +4,7 @@ import { getGroups, getCompetitionFixtures } from '@/lib/api';
 import { WC, GROUP_LETTERS } from '@/lib/wc';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { GroupTable, FixtureList, ComingSoon } from '@/components/match-bits';
+import { WcSubnav } from '@/components/wc-subnav';
 
 export const revalidate = 300;
 export const dynamicParams = false;
@@ -41,6 +42,7 @@ export default async function WcGroup({ params }: { params: { group: string } })
   return (
     <>
       <JsonLd data={breadcrumbLd(crumbs)} />
+      <WcSubnav />
       <Breadcrumbs items={crumbs} />
       <section className="container-x pt-8">
         <p className="eyebrow">FIFA World Cup 2026</p>

@@ -1,15 +1,11 @@
 import Link from 'next/link';
 import type { Fixture, Group, StandingRow } from '@/lib/api';
-import { flagEmoji } from '@/lib/api';
 import { matchSlug } from '@/lib/wc';
 import { KickoffTime } from '@/components/kickoff-time';
+import { TeamCrest } from '@/components/team-crest';
 
 const FINISHED = new Set(['FINISHED', 'FT', 'AET', 'PEN']);
 const LIVE = new Set(['LIVE', 'HALF_TIME', '1H', '2H', 'HT', 'ET', 'P']);
-
-function crest(team: { countryCode: string | null }) {
-  return <span aria-hidden className="text-base leading-none">{flagEmoji(team.countryCode ?? '')}</span>;
-}
 
 /** One fixture as a compact, linkable row. Links to the per-match SEO page. */
 export function FixtureRow({ f }: { f: Fixture }) {
@@ -23,7 +19,7 @@ export function FixtureRow({ f }: { f: Fixture }) {
     >
       <div className="flex flex-1 items-center justify-end gap-2 text-right">
         <span className="truncate text-sm font-semibold text-fg">{f.homeTeam.shortName ?? f.homeTeam.name}</span>
-        {crest(f.homeTeam)}
+        <TeamCrest team={f.homeTeam} size={20} />
       </div>
       <div className="shrink-0 px-2 text-center">
         {finished || live ? (
@@ -36,7 +32,7 @@ export function FixtureRow({ f }: { f: Fixture }) {
         {live && <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-wide text-live">Live</span>}
       </div>
       <div className="flex flex-1 items-center gap-2">
-        {crest(f.awayTeam)}
+        <TeamCrest team={f.awayTeam} size={20} />
         <span className="truncate text-sm font-semibold text-fg">{f.awayTeam.shortName ?? f.awayTeam.name}</span>
       </div>
     </Link>
@@ -82,7 +78,7 @@ export function GroupTable({ group }: { group: Group }) {
               <td className="px-4 py-2">
                 <span className="flex items-center gap-2">
                   <span className="w-4 text-fg-muted2">{r.position}</span>
-                  <span aria-hidden>{flagEmoji(r.team.countryCode ?? '')}</span>
+                  <TeamCrest team={r.team} size={18} />
                   <span className="font-medium text-fg">{r.team.shortName ?? r.team.name}</span>
                 </span>
               </td>

@@ -5,6 +5,7 @@ import { getCompetitionFixtures } from '@/lib/api';
 import { WC } from '@/lib/wc';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { FixtureList, ComingSoon } from '@/components/match-bits';
+import { WcSubnav } from '@/components/wc-subnav';
 
 export const revalidate = 600;
 const PATH = '/world-cup-2026/fixtures';
@@ -34,6 +35,7 @@ export default async function WcFixtures() {
   return (
     <>
       <JsonLd data={breadcrumbLd(crumbs)} />
+      <WcSubnav />
       <Breadcrumbs items={crumbs} />
       <section className="container-x pt-8">
         <p className="eyebrow">FIFA World Cup 2026</p>
