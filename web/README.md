@@ -1,7 +1,7 @@
 # FootballMojo — marketing site
 
 Next.js 14 (App Router) landing page + privacy policy for **FootballMojo**.
-Deploys to **pitch.footballmojo.in**.
+Deploys to **footballmojo.in**.
 
 ## What's here
 
@@ -40,9 +40,9 @@ npm run build      # production build
 
 1. New Vercel project → import this repo → set **Root Directory** to `web`.
 2. Framework preset: **Next.js** (defaults are correct; no env vars required).
-3. Add the custom domain **pitch.footballmojo.in** and point its DNS (CNAME → Vercel) per
+3. Add the custom domain **footballmojo.in** and point its DNS (CNAME → Vercel) per
    Vercel's instructions.
 
-`SITE.url` in `src/lib/site.ts` is already set to `https://pitch.footballmojo.in` (used for
+`SITE.url` in `src/lib/site.ts` is already set to `https://footballmojo.in` (used for
 canonical URLs, sitemap, OG). Update `src/lib/site.ts` if any contact emails or the Play
 Store ID change.

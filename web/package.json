@@ -2,7 +2,7 @@
   "name": "footballmojo-web",
   "version": "0.1.0",
   "private": true,
-  "description": "FootballMojo marketing site — landing + privacy policy. Deployed at pitch.footballmojo.in",
+  "description": "FootballMojo marketing site — landing + privacy policy. Deployed at footballmojo.in",
   "engines": {
     "node": ">=22.18.0",
     "npm": ">=10"
