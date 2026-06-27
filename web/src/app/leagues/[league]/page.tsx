@@ -4,7 +4,7 @@ import { pageMeta, breadcrumbLd } from '@/lib/seo';
 import { getCompetitionFixtures } from '@/lib/api';
 import { LEAGUES, leagueBySlug } from '@/lib/leagues';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
-import { FixtureList } from '@/components/match-bits';
+import { FixtureList, FixtureGroups } from '@/components/match-bits';
 
 export const revalidate = 600;
 export const dynamicParams = false;
@@ -61,7 +61,7 @@ export default async function LeaguePage({ params }: { params: { league: string 
         {upcoming.length > 0 && (
           <section>
             <h2 className="mb-3 font-display text-xl font-bold">Upcoming fixtures</h2>
-            <FixtureList fixtures={upcoming} />
+            <FixtureGroups fixtures={upcoming} />
           </section>
         )}
         {recent.length === 0 && upcoming.length === 0 && (

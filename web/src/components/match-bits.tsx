@@ -47,6 +47,30 @@ export function FixtureList({ fixtures }: { fixtures: Fixture[] }) {
   );
 }
 
+/** Fixtures split into date sections with a header per day. */
+export function FixtureGroups({ fixtures }: { fixtures: Fixture[] }) {
+  const byDate = new Map<string, Fixture[]>();
+  for (const f of fixtures) {
+    const d = f.kickoffAt.slice(0, 10);
+    (byDate.get(d) ?? byDate.set(d, []).get(d)!).push(f);
+  }
+  const dates = [...byDate.keys()].sort();
+  return (
+    <div className="space-y-6">
+      {dates.map((d) => (
+        <div key={d}>
+          <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-fg-muted">{longDate(d)}</h4>
+          <FixtureList fixtures={byDate.get(d)!} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function longDate(d: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(d));
+}
+
 /** A single group standings table. */
 export function GroupTable({ group }: { group: Group }) {
   return (

@@ -4,7 +4,7 @@ import { getGroups, getCompetitionFixtures } from '@/lib/api';
 import { WC, WC_PHASES, HOST_CITIES } from '@/lib/wc';
 import { type Dict, type Locale, isRtl } from '@/lib/i18n';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
-import { FixtureList, GroupTable, ComingSoon } from '@/components/match-bits';
+import { FixtureList, FixtureGroups, GroupTable, ComingSoon } from '@/components/match-bits';
 import { WcSubnav } from '@/components/wc-subnav';
 
 /**
@@ -57,7 +57,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
           </Link>
         </div>
         {recent.length > 0 && (<><h3 className="eyebrow mb-3 !text-fg-muted">{dict.latestResults}</h3><FixtureList fixtures={recent} /></>)}
-        {upcoming.length > 0 && (<><h3 className="eyebrow mb-3 mt-8 !text-fg-muted">{dict.upcoming}</h3><FixtureList fixtures={upcoming} /></>)}
+        {upcoming.length > 0 && (<><h3 className="eyebrow mb-3 mt-8 !text-fg-muted">{dict.upcoming}</h3><FixtureGroups fixtures={upcoming} /></>)}
         {recent.length === 0 && upcoming.length === 0 && (
           <ComingSoon title={dict.fixturesHeading} note={dict.bracketSoonNote} />
         )}
@@ -82,7 +82,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
           </Link>
         </div>
         {knockout.length > 0 ? (
-          <FixtureList fixtures={knockout} />
+          <FixtureGroups fixtures={knockout} />
         ) : (
           <ComingSoon title={dict.bracketSoonTitle} note={dict.bracketSoonNote} />
         )}
