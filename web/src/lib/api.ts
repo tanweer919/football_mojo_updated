@@ -10,6 +10,7 @@ export interface Team {
   name: string;
   shortName: string | null;
   crestUrl: string | null;
+  countryCode: string | null;
 }
 export interface Fixture {
   id: string;
@@ -20,6 +21,8 @@ export interface Fixture {
   homeTeam: Team;
   awayTeam: Team;
   competition: { id: string; name: string } | null;
+  stage?: string | null;  // GROUP_A | ROUND_OF_32 | ROUND_OF_16 | QUARTER | SEMI | FINAL
+  venue?: string | null;
 }
 export interface Broadcaster {
   name: string;
@@ -59,6 +62,44 @@ export async function getFixture(id: string): Promise<Fixture | null> {
 export async function getBroadcasts(fixtureId: string): Promise<CountryBroadcast[]> {
   const rows = await get<CountryBroadcast[]>(`/insights/broadcasts/${fixtureId}`, 600);
   return rows ?? [];
+}
+
+// ── Group standings ──────────────────────────────────────────────────────────
+export interface StandingRow {
+  position: number;
+  team: { id: string; name: string; shortName: string | null; countryCode: string | null; crestUrl: string | null };
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDiff: number;
+  points: number;
+}
+export interface Group {
+  id: string;
+  name: string;   // "Group A"
+  letter: string; // "A"
+  standings: StandingRow[];
+}
+
+/** Group tables for a competition (computed from results on the backend). */
+export async function getGroups(competitionId: string): Promise<Group[]> {
+  const rows = await get<Group[]>(`/competitions/${competitionId}/groups`, 300);
+  return rows ?? [];
+}
+
+/** Fixtures in [from,to] for one competition (by name match), sorted by kickoff. */
+export async function getCompetitionFixtures(
+  competitionNameMatch: RegExp,
+  from: string,
+  to: string,
+): Promise<Fixture[]> {
+  const rows = await get<Fixture[]>(`/scores/fixtures/range?from=${from}&to=${to}`, 600);
+  return (rows ?? [])
+    .filter((f) => f.competition != null && competitionNameMatch.test(f.competition.name))
+    .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));
 }
 
 /** 🇮🇳 from "IN" — Regional Indicator Symbols, no flag assets needed. */
