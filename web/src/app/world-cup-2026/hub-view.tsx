@@ -24,6 +24,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
   ]);
 
   const isKnockout = (s?: string | null) => !!s && !/^GROUP/i.test(s);
+  const live = fixtures.filter((f) => ['LIVE', 'HALF_TIME', '1H', '2H', 'HT', 'ET', 'BT', 'P'].includes(f.status));
   const upcoming = fixtures.filter((f) => f.status === 'SCHEDULED').slice(0, 8);
   const recent = fixtures.filter((f) => ['FINISHED', 'FT', 'AET', 'PEN'].includes(f.status)).slice(-6).reverse();
   const knockout = fixtures.filter((f) => isKnockout(f.stage)).slice(0, 16);
@@ -56,9 +57,17 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
             {dict.allFixtures}
           </Link>
         </div>
-        {recent.length > 0 && (<><h3 className="eyebrow mb-3 !text-fg-muted">{dict.latestResults}</h3><FixtureList fixtures={recent} /></>)}
+        {live.length > 0 && (
+          <>
+            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-live">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-live" />Live now
+            </h3>
+            <FixtureList fixtures={live} />
+          </>
+        )}
+        {recent.length > 0 && (<><h3 className={`eyebrow mb-3 !text-fg-muted ${live.length ? 'mt-8' : ''}`}>{dict.latestResults}</h3><FixtureList fixtures={recent} /></>)}
         {upcoming.length > 0 && (<><h3 className="eyebrow mb-3 mt-8 !text-fg-muted">{dict.upcoming}</h3><FixtureGroups fixtures={upcoming} /></>)}
-        {recent.length === 0 && upcoming.length === 0 && (
+        {live.length === 0 && recent.length === 0 && upcoming.length === 0 && (
           <ComingSoon title={dict.fixturesHeading} note={dict.bracketSoonNote} />
         )}
       </section>
