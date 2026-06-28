@@ -167,7 +167,15 @@ export class ScoresPoller implements OnModuleInit {
     }
   }
 
-  /** Pull the schedule for every tracked league (parallel) and persist next kickoff. */
+  /**
+   * Pull the full schedule for every tracked league (parallel), then:
+   *  - SETTLE every fixture against it (silent — no goal pushes): corrects a
+   *    match the live loop lost track of (e.g. a stale-reaped one frozen mid-game
+   *    at the wrong score, or one stuck SCHEDULED because we never caught it live).
+   *    The full schedule carries the real final status/score for every match.
+   *  - recompute standings + knockout bracket if anything settled to full-time.
+   *  - persist the next kickoff.
+   */
   private async refreshSchedule(): Promise<void> {
     try {
       const lists = await Promise.all(
@@ -180,7 +188,21 @@ export class ScoresPoller implements OnModuleInit {
             }),
         ),
       );
-      await this.recomputeNextKickoff(lists.flat());
+      const all = lists.flat();
+
+      const { changed, finishedFixtureIds } = await this.scores.ingestSnapshot(all, { silent: true });
+      for (const id of finishedFixtureIds ?? []) {
+        await this.cache.freezeFixture(id);
+      }
+      if ((finishedFixtureIds?.length ?? 0) > 0) {
+        await this.scores
+          .recomputeStandings()
+          .then(() => this.scores.reconcileKnockout())
+          .catch((e) => this.log.warn(`settle standings/knockout failed: ${(e as Error).message}`));
+      }
+      if (changed) this.log.log(`schedule settle: corrected ${changed} fixture(s)`);
+
+      await this.recomputeNextKickoff(all);
     } catch (e) {
       this.log.warn(`schedule refresh failed: ${(e as Error).message}`);
     }
