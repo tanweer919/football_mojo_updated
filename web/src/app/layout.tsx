@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import './globals.css';
-import { Analytics } from '@vercel/analytics/react';
+import { Analytics } from '@vercel/analytics/next';
 import { SITE } from '@/lib/site';
 import { SiteHeader, SiteFooter } from '@/components/site-chrome';
 
