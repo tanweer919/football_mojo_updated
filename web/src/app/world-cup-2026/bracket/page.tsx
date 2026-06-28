@@ -75,18 +75,20 @@ export default async function BracketPage() {
         )}
       </section>
 
-      {/* Two-sided bracket: left rounds → Final → right rounds. Scrolls on small screens. */}
+      {/* Two-sided bracket: left rounds → Final → right rounds. Equal-height
+          columns + justify-around keep boxes on the same level aligned; subtle
+          connector stubs point each winner toward the centre. Scrolls on small screens. */}
       <div className="mt-10 overflow-x-auto pb-8">
-        <div className="container-x flex w-max items-stretch gap-3">
-          {LEFT.map((k) => <Column key={`L-${k}`} label={KO[k].label} list={cells(k, 'left')} />)}
+        <div className="mx-auto flex min-h-[700px] w-max items-stretch gap-x-5 px-3 sm:px-5">
+          {LEFT.map((k) => <Column key={`L-${k}`} label={KO[k].label} list={cells(k, 'left')} stub="right" />)}
 
-          <div className="flex min-w-[150px] flex-col justify-center">
+          <div className="mx-3 flex w-[160px] flex-col justify-center px-2">
             <h2 className="mb-3 text-center text-xs font-bold uppercase tracking-wide text-gold">Final</h2>
             <BracketMatch f={finalMatch} highlight />
             <p className="mt-3 text-center text-[10px] uppercase tracking-wide text-fg-muted2">New York · 19 Jul</p>
           </div>
 
-          {RIGHT.map((k) => <Column key={`R-${k}`} label={KO[k].label} list={cells(k, 'right')} />)}
+          {RIGHT.map((k) => <Column key={`R-${k}`} label={KO[k].label} list={cells(k, 'right')} stub="left" />)}
         </div>
       </div>
 
@@ -95,51 +97,59 @@ export default async function BracketPage() {
   );
 }
 
-function Column({ label, list }: { label: string; list: (Fixture | null)[] }) {
+function Column({ label, list, stub }: { label: string; list: (Fixture | null)[]; stub: 'left' | 'right' }) {
   return (
-    <div className="flex min-w-[170px] flex-col">
-      <h2 className="mb-3 text-center text-xs font-bold uppercase tracking-wide text-gold">{label}</h2>
-      <div className="flex flex-1 flex-col justify-around gap-3">
-        {list.map((m, i) => <BracketMatch key={m?.id ?? `${label}-${i}`} f={m} />)}
+    <div className="flex w-[148px] flex-col">
+      <h2 className="mb-3 text-center text-[11px] font-bold uppercase tracking-wide text-gold">{label}</h2>
+      <div className="flex flex-1 flex-col justify-around">
+        {list.map((m, i) => <BracketMatch key={m?.id ?? `${label}-${i}`} f={m} stub={stub} />)}
       </div>
     </div>
   );
 }
 
-function BracketMatch({ f, highlight = false }: { f: Fixture | null; highlight?: boolean }) {
+// Connector stub pointing toward the final (left columns → right edge, right columns → left edge).
+const STUB = {
+  right: "relative after:absolute after:left-full after:top-1/2 after:h-px after:w-5 after:bg-border after:content-['']",
+  left: "relative before:absolute before:right-full before:top-1/2 before:h-px before:w-5 before:bg-border before:content-['']",
+  none: '',
+} as const;
+
+function BracketMatch({ f, stub = 'none', highlight = false }: { f: Fixture | null; stub?: 'left' | 'right' | 'none'; highlight?: boolean }) {
+  const wrap = `rounded-md border px-2 py-1.5 ${STUB[stub]} `;
   if (!f) {
     return (
-      <div className={`rounded-lg border border-dashed px-3 py-2.5 ${highlight ? 'border-gold/40 bg-gold/5' : 'border-border-soft bg-surface-1/30'}`}>
+      <div className={wrap + (highlight ? 'border-dashed border-gold/40 bg-gold/5' : 'border-dashed border-border-soft bg-surface-1/30')}>
         <Slot /><div className="my-1 h-px bg-border-soft/60" /><Slot />
       </div>
     );
   }
   const done = FINISHED.has(f.status);
   return (
-    <div className={`rounded-lg border px-3 py-2 shadow-card ${highlight ? 'border-gold/50 bg-gold/5' : 'border-border bg-surface-1/70'}`}>
+    <div className={wrap + (highlight ? 'border-gold/50 bg-gold/5 shadow-card' : 'border-border bg-surface-1/70')}>
       <TeamRow team={f.homeTeam} score={done ? f.homeScore : null} winner={done && f.homeScore > f.awayScore} />
       <div className="my-1 h-px bg-border-soft/60" />
       <TeamRow team={f.awayTeam} score={done ? f.awayScore : null} winner={done && f.awayScore > f.homeScore} />
-      {!done && <p className="mt-1.5 text-center text-[10px] font-mono text-fg-muted2"><KickoffTime iso={f.kickoffAt} withDate /></p>}
+      {!done && <p className="mt-1 text-center text-[9px] font-mono text-fg-muted2"><KickoffTime iso={f.kickoffAt} withDate /></p>}
     </div>
   );
 }
 
 function TeamRow({ team, score, winner }: { team: Fixture['homeTeam']; score: number | null; winner: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <TeamCrest team={team} size={18} />
-      <span className={`flex-1 truncate text-sm ${winner ? 'font-bold text-fg' : 'font-medium text-fg-soft'}`}>{prettyTeamName(team.shortName ?? team.name)}</span>
-      {score !== null && <span className={`font-mono text-sm ${winner ? 'font-bold text-fg' : 'text-fg-muted'}`}>{score}</span>}
+    <div className="flex items-center gap-1.5">
+      <TeamCrest team={team} size={15} />
+      <span className={`flex-1 truncate text-xs ${winner ? 'font-bold text-fg' : 'font-medium text-fg-soft'}`}>{prettyTeamName(team.shortName ?? team.name)}</span>
+      {score !== null && <span className={`font-mono text-xs ${winner ? 'font-bold text-fg' : 'text-fg-muted'}`}>{score}</span>}
     </div>
   );
 }
 
 function Slot() {
   return (
-    <div className="flex items-center gap-2">
-      <span className="h-[18px] w-[18px] shrink-0 rounded-sm bg-surface-2" />
-      <span className="text-sm text-fg-muted2">TBC</span>
+    <div className="flex items-center gap-1.5">
+      <span className="h-[15px] w-[15px] shrink-0 rounded-sm bg-surface-2" />
+      <span className="text-xs text-fg-muted2">TBC</span>
     </div>
   );
 }
