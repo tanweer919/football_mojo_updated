@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { Fixture } from '@/lib/api';
 import { getCompetitionFixtures } from '@/lib/api';
-import { WC } from '@/lib/wc';
+import { WC, prettyTeamName } from '@/lib/wc';
 import { pageMeta, breadcrumbLd } from '@/lib/seo';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { WcSubnav } from '@/components/wc-subnav';
@@ -129,7 +129,7 @@ function TeamRow({ team, score, winner }: { team: Fixture['homeTeam']; score: nu
   return (
     <div className="flex items-center gap-2">
       <TeamCrest team={team} size={18} />
-      <span className={`flex-1 truncate text-sm ${winner ? 'font-bold text-fg' : 'font-medium text-fg-soft'}`}>{team.shortName ?? team.name}</span>
+      <span className={`flex-1 truncate text-sm ${winner ? 'font-bold text-fg' : 'font-medium text-fg-soft'}`}>{prettyTeamName(team.shortName ?? team.name)}</span>
       {score !== null && <span className={`font-mono text-sm ${winner ? 'font-bold text-fg' : 'text-fg-muted'}`}>{score}</span>}
     </div>
   );

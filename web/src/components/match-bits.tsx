@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Fixture, Group, StandingRow } from '@/lib/api';
-import { matchSlug } from '@/lib/wc';
+import { matchSlug, prettyTeamName } from '@/lib/wc';
 import { KickoffTime } from '@/components/kickoff-time';
 import { TeamCrest } from '@/components/team-crest';
 
@@ -18,7 +18,7 @@ export function FixtureRow({ f }: { f: Fixture }) {
       className="flex items-center gap-3 rounded-xl border border-border-soft bg-surface-1/50 px-4 py-3 transition hover:border-gold/40"
     >
       <div className="flex flex-1 items-center justify-end gap-2 text-right">
-        <span className="truncate text-sm font-semibold text-fg">{f.homeTeam.shortName ?? f.homeTeam.name}</span>
+        <span className="truncate text-sm font-semibold text-fg">{prettyTeamName(f.homeTeam.shortName ?? f.homeTeam.name)}</span>
         <TeamCrest team={f.homeTeam} size={20} />
       </div>
       <div className="shrink-0 px-2 text-center">
@@ -33,7 +33,7 @@ export function FixtureRow({ f }: { f: Fixture }) {
       </div>
       <div className="flex flex-1 items-center gap-2">
         <TeamCrest team={f.awayTeam} size={20} />
-        <span className="truncate text-sm font-semibold text-fg">{f.awayTeam.shortName ?? f.awayTeam.name}</span>
+        <span className="truncate text-sm font-semibold text-fg">{prettyTeamName(f.awayTeam.shortName ?? f.awayTeam.name)}</span>
       </div>
     </Link>
   );

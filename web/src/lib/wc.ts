@@ -61,6 +61,19 @@ export const HOST_CITIES: HostCity[] = [
   { city: 'Monterrey', country: 'Mexico', stadium: 'Estadio BBVA' },
 ];
 
+/**
+ * Make a knockout placeholder team name human-readable.
+ * api-football / the seed use positional codes for undecided slots:
+ *   "A1" → "Winner A", "B2" → "Runner-up B", "3rd A/B/C/D/F" → "3rd place A/B/C/D/F".
+ * Real team names pass through unchanged.
+ */
+export function prettyTeamName(name: string): string {
+  const m = name.match(/^([A-L])([12])$/);
+  if (m) return `${m[2] === '1' ? 'Winner' : 'Runner-up'} ${m[1]}`;
+  if (/^3rd\b/i.test(name)) return name.replace(/^3rd\s*/i, '3rd place ');
+  return name;
+}
+
 /** A URL-safe match slug: "canada-vs-bosnia-and-herzegovina-2026-06-13". */
 export function matchSlug(home: string, away: string, kickoffISO: string): string {
   const norm = (s: string) =>
