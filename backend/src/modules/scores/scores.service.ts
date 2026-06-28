@@ -335,6 +335,92 @@ export class ScoresService {
   }
 
   /**
+   * Resolve knockout-bracket placeholders into real teams, and drop duplicates.
+   *
+   * The WC seed creates the full knockout tree up front with PLACEHOLDER teams
+   * named by bracket slot ("A1", "B2", … = group winner/runner-up). api-football
+   * separately publishes the real knockout fixtures (numeric ids) as positions
+   * lock — so the bracket shows cryptic "A2/B1" placeholders AND duplicates.
+   *
+   * This:
+   *   1. From FINAL group tables (group fully played), maps each slot code
+   *      (`A1`…`L4`) to its real team.
+   *   2. Rewrites each seed placeholder fixture in place — `A2` → the real
+   *      Group A runner-up — so the bracket fills in the moment a group ends,
+   *      without waiting on api-football.
+   *   3. Drops the seed row once a real api fixture exists for the same slot
+   *      (same stage + team pair), so each knockout match appears exactly once
+   *      with its real schedule + score.
+   *
+   * Third-place-qualifier slots ("3rd A/B/C/D/F") need the FIFA allocation table
+   * and are intentionally left as placeholders for now (never mis-assigned).
+   */
+  async reconcileKnockout(): Promise<void> {
+    // 1) Slot code → team, only from groups that have finished all matches.
+    const groups = await this.prisma.group.findMany({
+      include: { standings: { select: { teamId: true, position: true, played: true } } },
+    });
+    const codeToTeam = new Map<string, string>();
+    for (const g of groups) {
+      const letter = g.name.replace(/^Group\s+/i, '').trim().toUpperCase();
+      if (!letter) continue;
+      const rows = g.standings;
+      if (rows.length !== 4 || !rows.every((r) => r.played >= 3)) continue; // not final
+      for (const r of rows) codeToTeam.set(`${letter}${r.position}`, r.teamId);
+    }
+    if (codeToTeam.size === 0) return;
+
+    // 2) Resolve seed placeholders in place. Placeholder team names are slot
+    //    codes like "A2"; group-stage seeds carry real names and are skipped.
+    const seeds = await this.prisma.match.findMany({
+      where: { id: { startsWith: 'WC2026-' } },
+      select: {
+        id: true, homeTeamId: true, awayTeamId: true,
+        homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } },
+      },
+    });
+    const codeOf = (name?: string) => {
+      const c = (name ?? '').trim().toUpperCase();
+      return /^[A-L][1-4]$/.test(c) ? c : null;
+    };
+    for (const m of seeds) {
+      const data: { homeTeamId?: string; awayTeamId?: string } = {};
+      const hc = codeOf(m.homeTeam?.name);
+      const ac = codeOf(m.awayTeam?.name);
+      if (hc) { const t = codeToTeam.get(hc); if (t && t !== m.homeTeamId) data.homeTeamId = t; }
+      if (ac) { const t = codeToTeam.get(ac); if (t && t !== m.awayTeamId) data.awayTeamId = t; }
+      if (Object.keys(data).length) {
+        await this.prisma.match
+          .update({ where: { id: m.id }, data })
+          .catch((e) => this.log.warn(`knockout resolve failed ${m.id}: ${(e as Error).message}`));
+      }
+    }
+
+    // 3) Drop seed rows superseded by a real api fixture for the same slot
+    //    (same stage + team pair, now both resolved). Keep the api row — it has
+    //    the authoritative schedule, status and score.
+    const withStage = await this.prisma.match.findMany({
+      where: { stage: { not: null } },
+      select: { id: true, stage: true, homeTeamId: true, awayTeamId: true },
+    });
+    const ko = withStage.filter((m) => m.stage && !/group/i.test(m.stage));
+    const key = (m: (typeof ko)[number]) =>
+      `${(m.stage ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase()}|${[m.homeTeamId, m.awayTeamId].sort().join('-')}`;
+    const seedByKey = new Map<string, string>();
+    for (const m of ko) if (m.id.startsWith('WC2026-')) seedByKey.set(key(m), m.id);
+    const drop: string[] = [];
+    for (const m of ko) {
+      if (m.id.startsWith('WC2026-')) continue; // real api rows only
+      const seedId = seedByKey.get(key(m));
+      if (seedId) drop.push(seedId);
+    }
+    if (drop.length) {
+      await this.prisma.match.deleteMany({ where: { id: { in: drop } } });
+      this.log.log(`knockout dedup: dropped ${drop.length} superseded seed placeholder(s)`);
+    }
+  }
+
+  /**
    * Delete any hand-seeded WC placeholder rows (`WC2026-*` ids) whose two
    * nations match the given pair, keeping `keepId` (the real numeric fixture).
    * Names are reconciled through the alias map, so api-football labels like

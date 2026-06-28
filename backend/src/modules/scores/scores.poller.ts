@@ -56,7 +56,8 @@ export class ScoresPoller implements OnModuleInit {
     // this the table stays stale for matches that finished before this deploy.
     this.scores
       .recomputeStandings()
-      .catch((e) => this.log.warn(`standings backfill failed: ${(e as Error).message}`));
+      .then(() => this.scores.reconcileKnockout())
+      .catch((e) => this.log.warn(`standings/knockout backfill failed: ${(e as Error).message}`));
     this.tick().catch((e) => this.log.error('initial tick failed', e));
   }
 
@@ -140,11 +141,13 @@ export class ScoresPoller implements OnModuleInit {
         await this.cache.freezeFixture(id);
       }
 
-      // A match just reached full-time → refresh the group tables from results.
+      // A match just reached full-time → refresh group tables, then resolve the
+      // knockout bracket (group winners/runners-up → real teams; drop dup seeds).
       if ((finishedFixtureIds?.length ?? 0) > 0) {
         await this.scores
           .recomputeStandings()
-          .catch((e) => this.log.warn(`standings recompute failed: ${(e as Error).message}`));
+          .then(() => this.scores.reconcileKnockout())
+          .catch((e) => this.log.warn(`standings/knockout recompute failed: ${(e as Error).message}`));
       }
 
       await this.recomputeNextKickoff(scanned);
