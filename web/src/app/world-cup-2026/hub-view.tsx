@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { breadcrumbLd, faqLd, appLd } from '@/lib/seo';
+import { breadcrumbLd, faqLd, appLd, tournamentLd, playUrl } from '@/lib/seo';
 import { getGroups, getCompetitionFixtures } from '@/lib/api';
 import { WC, WC_PHASES, HOST_CITIES } from '@/lib/wc';
 import { type Dict, type Locale, isRtl } from '@/lib/i18n';
@@ -39,6 +39,7 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
       <JsonLd data={breadcrumbLd(crumbs)} />
       <JsonLd data={faqLd(dict.faqs)} />
       <JsonLd data={appLd()} />
+      <JsonLd data={tournamentLd()} />
       {locale === 'en' && <WcSubnav />}
       <Breadcrumbs items={crumbs} />
 
@@ -70,6 +71,21 @@ export async function HubView({ dict, locale }: { dict: Dict; locale: Locale }) 
         {live.length === 0 && recent.length === 0 && upcoming.length === 0 && (
           <ComingSoon title={dict.fixturesHeading} note={dict.bracketSoonNote} />
         )}
+      </section>
+
+      {/* High-intent inline CTA — sell what the page can't do: live alerts. */}
+      <section className="container-x mt-6">
+        <a
+          href={playUrl('wc-goal-alerts')}
+          target="_blank"
+          rel="noopener"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 px-5 py-3.5 transition hover:border-gold/60"
+        >
+          <span className="text-sm font-semibold text-fg">
+            ⚡ Don&apos;t just check scores — get <span className="text-gold">instant goal alerts</span> for your team, plus AI previews &amp; recaps.
+          </span>
+          <span className="shrink-0 text-sm font-bold text-gold">Get the app →</span>
+        </a>
       </section>
 
       <section id="standings" className="container-x mt-16 scroll-mt-32">

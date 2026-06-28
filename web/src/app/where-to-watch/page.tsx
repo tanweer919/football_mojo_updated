@@ -56,13 +56,15 @@ export default async function WhereToWatchPage() {
         />
         <p className="eyebrow">📺 Where to watch</p>
         <h1 className="mt-3 font-display text-4xl font-extrabold leading-[1.05] sm:text-5xl lg:text-6xl">
-          Every World Cup 2026 match,
+          Where to Watch World Cup 2026:
           <br />
-          <span className="text-gold-grad">on every screen.</span>
+          <span className="text-gold-grad">TV Channels &amp; Live Streams</span>
         </h1>
-        <p className="mt-5 max-w-2xl text-lg text-fg-soft">
-          TV channels and live streams for all 104 fixtures — in your country and {`200+`} others.
-          Free, no sign-up. Pick a match below.
+        <p className="mt-4 text-lg font-medium text-fg-soft">Every World Cup 2026 match, on every screen.</p>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-fg-soft">
+          Find the TV channel or live stream for every FIFA World Cup 2026 fixture — in your country
+          and 200+ others. Pick a match below for its broadcaster guide. Free, no sign-up, no betting.
+          Hosted across the USA, Canada and Mexico, the 48-team tournament runs 11 June – 19 July 2026.
         </p>
       </header>
 
@@ -121,7 +123,7 @@ function TeamRow({ team, className = '' }: { team: Fixture['homeTeam']; classNam
     <div className={`flex items-center gap-2.5 ${className}`}>
       {team.crestUrl
         ? // eslint-disable-next-line @next/next/no-img-element
-          <img src={team.crestUrl} alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+          <img src={team.crestUrl} alt={`${team.name} crest`} width={20} height={20} className="h-5 w-5 object-contain" />
         : <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-2 text-[9px] text-fg-muted">{team.shortName ?? '?'}</span>}
       <span className="truncate text-sm font-semibold text-fg">{team.name}</span>
     </div>

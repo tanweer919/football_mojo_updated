@@ -1,4 +1,4 @@
-import { SITE } from '@/lib/site';
+import { playUrl } from '@/lib/seo';
 
 /** The colourful Google Play triangle mark. */
 function PlayMark({ className }: { className?: string }) {
@@ -17,10 +17,10 @@ function PlayMark({ className }: { className?: string }) {
  * (Swap for the official Google Play badge asset if you prefer — drop it in
  * /public and replace the inner markup.)
  */
-export function PlayButton({ className = '' }: { className?: string }) {
+export function PlayButton({ className = '', slug = 'site' }: { className?: string; slug?: string }) {
   return (
     <a
-      href={SITE.playStoreUrl}
+      href={playUrl(slug)}
       target="_blank"
       rel="noopener"
       aria-label="Download FootballMojo on Google Play"

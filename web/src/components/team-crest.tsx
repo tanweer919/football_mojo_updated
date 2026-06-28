@@ -20,7 +20,7 @@ export function TeamCrest({ team, size = 22 }: { team: TeamLike; size?: number }
       <span className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-sm" style={box}>
         <Image
           src={team.crestUrl}
-          alt=""
+          alt={`${team.name} crest`}
           width={size}
           height={size}
           className="h-full w-full object-contain"

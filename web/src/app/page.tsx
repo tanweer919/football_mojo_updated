@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     'Free football app: live scores, FIFA World Cup 2026 schedule, fixtures & bracket, fantasy and AI match previews & recaps — no betting, no gambling.',
   alternates: { canonical: '/', languages: { 'x-default': '/', en: '/' } },
   openGraph: {
+    type: 'website',
+    url: SITE.url,
+    siteName: SITE.name,
     title: 'FootballMojo — Live Football Scores, World Cup 2026 & Fantasy',
     description:
       'Live scores, World Cup 2026 fixtures, bracket, fantasy and AI previews. Free, family-safe, no betting.',
@@ -127,7 +130,7 @@ export default function HomePage() {
               collectible player cards — everything for the FIFA World Cup 2026, in your pocket.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <PlayButton />
+              <PlayButton slug="home" />
               <a href="#features" className="btn-ghost">See what’s inside</a>
             </div>
             <p className="mt-5 text-sm text-fg-muted">Free · No gambling · Built for the 2026 World Cup</p>
@@ -234,7 +237,7 @@ export default function HomePage() {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <PlayButton />
+              <PlayButton slug="home" />
               <Link
                 href="/world-cup-2026"
                 className="text-sm font-semibold text-gold transition hover:text-gold-soft"
@@ -308,7 +311,7 @@ export default function HomePage() {
             Free to download. No gambling. Just the beautiful game, all in one place.
           </p>
           <div className="mt-8 flex justify-center">
-            <PlayButton />
+            <PlayButton slug="home" />
           </div>
         </div>
       </section>
