@@ -89,7 +89,10 @@ export class ScoresService {
    *   - Half-time: `score.halftime` is informational only; we still want the running total.
    * `goals` is always the running total so it's safe across every state.
    */
-  async ingestSnapshot(upstream: ApiFixture[]): Promise<{ changed: number; live: number; finishedFixtureIds: number[] }> {
+  async ingestSnapshot(
+    upstream: ApiFixture[],
+    opts: { silent?: boolean } = {},
+  ): Promise<{ changed: number; live: number; finishedFixtureIds: number[] }> {
     let changed = 0;
     let live = 0;
     const liveIds: string[] = [];
@@ -161,12 +164,16 @@ export class ScoresService {
       await this.publishUpdate(updated);
 
       // Goal-edge detection → synthesize a GOAL event so the FCM dispatcher fires
-      // even if /fixtures/events hasn't caught up yet.
-      if (homeScore > existing.homeScore) {
-        await this.recordSynthEvent(id, minute ?? 0, 'GOAL', existing.homeTeamId);
-      }
-      if (awayScore > existing.awayScore) {
-        await this.recordSynthEvent(id, minute ?? 0, 'GOAL', existing.awayTeamId);
+      // even if /fixtures/events hasn't caught up yet. Skipped in `silent` settle
+      // passes (re-ingesting the full schedule) so correcting an old/stale score
+      // never fires push notifications for a match that finished hours ago.
+      if (!opts.silent) {
+        if (homeScore > existing.homeScore) {
+          await this.recordSynthEvent(id, minute ?? 0, 'GOAL', existing.homeTeamId);
+        }
+        if (awayScore > existing.awayScore) {
+          await this.recordSynthEvent(id, minute ?? 0, 'GOAL', existing.awayTeamId);
+        }
       }
     }
 
