@@ -1,6 +1,23 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PlayButton } from '@/components/play-button';
 import { PhoneFrame } from '@/components/phone';
 import { SITE } from '@/lib/site';
+
+// Homepage metadata — tight, keyword-front-loaded title (≤60) + description
+// (≤155), overriding the longer layout defaults. `absolute` bypasses the
+// "%s · FootballMojo" template so the title isn't double-branded.
+export const metadata: Metadata = {
+  title: { absolute: 'FootballMojo: Live Scores, World Cup 2026 & Fantasy' },
+  description:
+    'Free football app: live scores, FIFA World Cup 2026 schedule, fixtures & bracket, fantasy and AI match previews & recaps — no betting, no gambling.',
+  alternates: { canonical: '/', languages: { 'x-default': '/', en: '/' } },
+  openGraph: {
+    title: 'FootballMojo — Live Football Scores, World Cup 2026 & Fantasy',
+    description:
+      'Live scores, World Cup 2026 fixtures, bracket, fantasy and AI previews. Free, family-safe, no betting.',
+  },
+};
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 
@@ -101,7 +118,7 @@ export default function HomePage() {
               FIFA World Cup 2026
             </span>
             <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              Your World Cup,
+              Live football scores &amp; your World Cup 2026,
               <br />
               <span className="text-gold-grad">all in one app.</span>
             </h1>
@@ -216,8 +233,14 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-            <div className="mt-8">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <PlayButton />
+              <Link
+                href="/world-cup-2026"
+                className="text-sm font-semibold text-gold transition hover:text-gold-soft"
+              >
+                World Cup 2026 schedule, fixtures &amp; bracket →
+              </Link>
             </div>
           </div>
           <div className="relative flex justify-center">

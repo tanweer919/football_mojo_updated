@@ -1,21 +1,64 @@
 import type { MetadataRoute } from 'next';
 import { SITE } from '@/lib/site';
-import { getUpcomingFixtures } from '@/lib/api';
+import { getUpcomingFixtures, getCompetitionFixtures } from '@/lib/api';
+import { WC, GROUP_LETTERS, matchSlug } from '@/lib/wc';
+import { LEAGUES } from '@/lib/leagues';
+import { POSTS } from '@/lib/blog';
+import { NON_DEFAULT_LOCALES } from '@/lib/i18n';
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const fixtures = await getUpcomingFixtures(21);
+  const u = (path: string) => `${SITE.url}${path}`;
+
+  const [whereToWatch, wcFixtures] = await Promise.all([
+    getUpcomingFixtures(21),
+    getCompetitionFixtures(WC.competitionNameMatch, WC.startDate, WC.endDate),
+  ]);
+
+  // Dates within the tournament window that actually have ≥1 fixture.
+  const wcDates = [...new Set(wcFixtures.map((f) => f.kickoffAt.slice(0, 10)))].sort();
+
   return [
-    { url: `${SITE.url}/`, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${SITE.url}/where-to-watch`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
-    ...fixtures.map((f) => ({
-      url: `${SITE.url}/where-to-watch/${f.id}`,
+    // Core
+    { url: u('/'), lastModified: now, changeFrequency: 'weekly', priority: 1 },
+
+    // World Cup hub (highest priority during the tournament) + localized variants.
+    {
+      url: u('/world-cup-2026'),
       lastModified: now,
-      changeFrequency: 'daily' as const,
-      priority: 0.6,
+      changeFrequency: 'hourly',
+      priority: 0.95,
+      alternates: {
+        languages: Object.fromEntries([
+          ['x-default', u('/world-cup-2026')],
+          ['en', u('/world-cup-2026')],
+          ...NON_DEFAULT_LOCALES.map((l) => [l, u(`/${l}/world-cup-2026`)] as const),
+        ]),
+      },
+    },
+    ...NON_DEFAULT_LOCALES.map((l) => ({ url: u(`/${l}/world-cup-2026`), lastModified: now, changeFrequency: 'hourly' as const, priority: 0.8 })),
+    { url: u('/world-cup-2026/fixtures'), lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: u('/world-cup-2026/bracket'), lastModified: now, changeFrequency: 'daily', priority: 0.85 },
+    ...wcDates.map((d) => ({ url: u(`/world-cup-2026/fixtures/${d}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
+    ...GROUP_LETTERS.map((l) => ({ url: u(`/world-cup-2026/groups/${l.toLowerCase()}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
+    ...wcFixtures.map((f) => ({
+      url: u(`/world-cup-2026/match/${matchSlug(f.homeTeam.name, f.awayTeam.name, f.kickoffAt)}`),
+      lastModified: now, changeFrequency: 'daily' as const, priority: 0.6,
     })),
-    { url: `${SITE.url}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.5 },
+
+    // Evergreen leagues
+    ...LEAGUES.map((l) => ({ url: u(`/leagues/${l.slug}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
+
+    // Editorial + blog
+    { url: u('/best-football-score-apps'), lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
+    { url: u('/blog'), lastModified: now, changeFrequency: 'weekly', priority: 0.5 },
+    ...POSTS.map((p) => ({ url: u(`/blog/${p.slug}`), lastModified: new Date(p.date), changeFrequency: 'monthly' as const, priority: 0.5 })),
+
+    // Existing
+    { url: u('/where-to-watch'), lastModified: now, changeFrequency: 'daily', priority: 0.8 },
+    ...whereToWatch.map((f) => ({ url: u(`/where-to-watch/${f.id}`), lastModified: now, changeFrequency: 'daily' as const, priority: 0.5 })),
+    { url: u('/privacy'), lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
   ];
 }

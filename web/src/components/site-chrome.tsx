@@ -13,9 +13,9 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm font-medium text-fg-soft sm:flex">
-          <a href="/#features" className="transition hover:text-fg">Features</a>
+          <Link href="/world-cup-2026" className="transition hover:text-fg">World Cup 2026</Link>
           <Link href="/where-to-watch" className="transition hover:text-fg">Where to Watch</Link>
-          <a href="/#worldcup" className="transition hover:text-fg">World Cup 2026</a>
+          <a href="/#features" className="transition hover:text-fg">Features</a>
           <Link href="/privacy" className="transition hover:text-fg">Privacy</Link>
         </nav>
         <a
@@ -48,18 +48,24 @@ export function SiteFooter() {
               fantasy XI, predictions and collectible cards.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-x-14 gap-y-2 text-sm">
+          <div className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm sm:grid-cols-3">
             <div className="flex flex-col gap-2">
-              <span className="eyebrow !text-fg-muted2 mb-1">Product</span>
-              <a href="/#features" className="text-fg-soft transition hover:text-gold">Features</a>
+              <span className="eyebrow !text-fg-muted2 mb-1">World Cup 2026</span>
+              <Link href="/world-cup-2026" className="text-fg-soft transition hover:text-gold">Schedule &amp; scores</Link>
+              <Link href="/world-cup-2026/fixtures" className="text-fg-soft transition hover:text-gold">Fixtures</Link>
+              <Link href="/world-cup-2026/bracket" className="text-fg-soft transition hover:text-gold">Bracket</Link>
               <Link href="/where-to-watch" className="text-fg-soft transition hover:text-gold">Where to Watch</Link>
-              <a href="/#worldcup" className="text-fg-soft transition hover:text-gold">World Cup 2026</a>
-              <a href={SITE.playStoreUrl} target="_blank" rel="noopener" className="text-fg-soft transition hover:text-gold">
-                Get the app
-              </a>
             </div>
             <div className="flex flex-col gap-2">
-              <span className="eyebrow !text-fg-muted2 mb-1">Legal</span>
+              <span className="eyebrow !text-fg-muted2 mb-1">Football</span>
+              <Link href="/leagues/premier-league" className="text-fg-soft transition hover:text-gold">Premier League</Link>
+              <Link href="/leagues/champions-league" className="text-fg-soft transition hover:text-gold">Champions League</Link>
+              <Link href="/best-football-score-apps" className="text-fg-soft transition hover:text-gold">Best score apps</Link>
+              <Link href="/blog" className="text-fg-soft transition hover:text-gold">Blog</Link>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow !text-fg-muted2 mb-1">Company</span>
+              <a href={SITE.playStoreUrl} target="_blank" rel="noopener" className="text-fg-soft transition hover:text-gold">Get the app</a>
               <Link href="/privacy" className="text-fg-soft transition hover:text-gold">Privacy Policy</Link>
               <a href={`mailto:${SITE.contactEmail}`} className="text-fg-soft transition hover:text-gold">Contact</a>
             </div>

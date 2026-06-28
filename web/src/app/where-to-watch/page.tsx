@@ -32,8 +32,17 @@ function kickoff(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+const FINISHED = new Set(['FINISHED', 'FT', 'AET', 'PEN']);
+
 export default async function WhereToWatchPage() {
-  const fixtures = await getUpcomingFixtures(14);
+  const all = await getUpcomingFixtures(14);
+  // Only forward-looking matches: drop anything finished or already kicked off
+  // (the day-range query can include earlier-today / timezone-spillover games).
+  // The 2h grace keeps matches currently in progress.
+  const now = Date.now();
+  const fixtures = all.filter(
+    (f) => !FINISHED.has(f.status) && new Date(f.kickoffAt).getTime() > now - 2 * 3_600_000,
+  );
   const groups = groupByDate(fixtures);
 
   return (

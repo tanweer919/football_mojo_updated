@@ -1,8 +1,8 @@
 /** Single source of truth for site-wide constants (URLs, copy, contacts). */
 export const SITE = {
   name: "FootballMojo",
-  domain: "pitch.footballmojo.in",
-  url: "https://pitch.footballmojo.in",
+  domain: "footballmojo.in",
+  url: "https://footballmojo.in",
   tagline:
     "Live football, World Cup 2026 brackets, fantasy XI & collectible cards",
   description:

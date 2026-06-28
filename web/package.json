@@ -2,7 +2,7 @@
   "name": "footballmojo-web",
   "version": "0.1.0",
   "private": true,
-  "description": "FootballMojo marketing site — landing + privacy policy. Deployed at pitch.footballmojo.in",
+  "description": "FootballMojo marketing site — landing + privacy policy. Deployed at footballmojo.in",
   "engines": {
     "node": ">=22.18.0",
     "npm": ">=10"
@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
