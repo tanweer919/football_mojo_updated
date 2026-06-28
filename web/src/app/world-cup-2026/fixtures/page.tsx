@@ -7,7 +7,7 @@ import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { FixtureList, ComingSoon } from '@/components/match-bits';
 import { WcSubnav } from '@/components/wc-subnav';
 
-export const revalidate = 600;
+export const revalidate = 120;
 const PATH = '/world-cup-2026/fixtures';
 
 export const metadata: Metadata = pageMeta({

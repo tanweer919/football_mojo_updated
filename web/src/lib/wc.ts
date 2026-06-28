@@ -71,6 +71,13 @@ export function prettyTeamName(name: string): string {
   const m = name.match(/^([A-L])([12])$/);
   if (m) return `${m[2] === '1' ? 'Winner' : 'Runner-up'} ${m[1]}`;
   if (/^3rd\b/i.test(name)) return name.replace(/^3rd\s*/i, '3rd place ');
+  // Knockout feed refs: W74 = winner of match 74, L101 = loser of match 101.
+  const w = name.match(/^([WL])(\d{2,3})$/i);
+  if (w) {
+    const n = +w[2];
+    const round = n <= 88 ? 'R32' : n <= 96 ? 'R16' : n <= 100 ? 'QF' : 'SF';
+    return `${w[1].toUpperCase() === 'W' ? 'Winner' : 'Loser'} ${round}`;
+  }
   return name;
 }
 
