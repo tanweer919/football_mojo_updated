@@ -88,7 +88,7 @@ function TeamBadge({ name, crest }: { name: string; crest: string | null }) {
     <div className="flex w-28 flex-col items-center gap-2 sm:w-36">
       {crest
         ? // eslint-disable-next-line @next/next/no-img-element
-          <img src={crest} alt="" width={56} height={56} className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+          <img src={crest} alt={`${name} crest`} width={56} height={56} className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
         : <div className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-fg-muted sm:h-14 sm:w-14">{name.slice(0, 3)}</div>}
       <span className="text-center text-sm font-bold text-fg">{name}</span>
     </div>

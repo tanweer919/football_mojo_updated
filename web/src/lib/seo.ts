@@ -5,13 +5,22 @@ import { LOCALES, NON_DEFAULT_LOCALES, DEFAULT_LOCALE, type Locale } from '@/lib
 export { LOCALES };
 export type { Locale };
 
-/** Play Store URL with campaign UTM so installs are attributable per page. */
-export function playUrl(pageSlug: string): string {
+/**
+ * Play Store URL with **install-referrer** attribution. Google Play only
+ * captures the single `referrer` param (URL-encoded) into the Install Referrer
+ * API / Play Console acquisition reports — loose `utm_*` query params on the
+ * Play URL are ignored. So we pack the UTM into `referrer`. `pageSlug` lets you
+ * see which page drove the install.
+ */
+export function playUrl(pageSlug = 'site'): string {
   const u = new URL(SITE.playStoreUrl);
-  u.searchParams.set('utm_source', 'web');
-  u.searchParams.set('utm_medium', 'organic');
-  u.searchParams.set('utm_campaign', 'worldcup2026');
-  u.searchParams.set('utm_content', pageSlug);
+  const referrer = new URLSearchParams({
+    utm_source: SITE.domain,        // footballmojo.in
+    utm_medium: 'web',
+    utm_campaign: 'worldcup2026',
+    utm_content: pageSlug,
+  }).toString();
+  u.searchParams.set('referrer', referrer); // URLSearchParams encodes the value
   return u.toString();
 }
 
@@ -106,6 +115,26 @@ export function faqLd(qas: Array<{ q: string; a: string }>) {
       name: qa.q,
       acceptedAnswer: { '@type': 'Answer', text: qa.a },
     })),
+  };
+}
+
+/** The whole tournament as a SportsEvent — for the hub. */
+export function tournamentLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'SportsEvent',
+    name: 'FIFA World Cup 2026',
+    sport: 'Soccer',
+    startDate: '2026-06-11',
+    endDate: '2026-07-19',
+    url: `${SITE.url}/world-cup-2026`,
+    organizer: { '@type': 'Organization', name: 'FIFA' },
+    location: [
+      { '@type': 'Country', name: 'United States' },
+      { '@type': 'Country', name: 'Canada' },
+      { '@type': 'Country', name: 'Mexico' },
+    ],
+    description: 'The 2026 FIFA World Cup — 48 teams, 104 matches, hosted across the USA, Canada and Mexico.',
   };
 }
 

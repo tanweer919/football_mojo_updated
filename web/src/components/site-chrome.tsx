@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { SITE } from '@/lib/site';
+import { playUrl } from '@/lib/seo';
 
 export function SiteHeader() {
   return (
@@ -19,7 +20,7 @@ export function SiteHeader() {
           <Link href="/privacy" className="transition hover:text-fg">Privacy</Link>
         </nav>
         <a
-          href={SITE.playStoreUrl}
+          href={playUrl('nav')}
           target="_blank"
           rel="noopener"
           className="btn-gold !px-5 !py-2 text-xs"
@@ -65,7 +66,7 @@ export function SiteFooter() {
             </div>
             <div className="flex flex-col gap-2">
               <span className="eyebrow !text-fg-muted2 mb-1">Company</span>
-              <a href={SITE.playStoreUrl} target="_blank" rel="noopener" className="text-fg-soft transition hover:text-gold">Get the app</a>
+              <a href={playUrl('footer')} target="_blank" rel="noopener" className="text-fg-soft transition hover:text-gold">Get the app</a>
               <Link href="/privacy" className="text-fg-soft transition hover:text-gold">Privacy Policy</Link>
               <a href={`mailto:${SITE.contactEmail}`} className="text-fg-soft transition hover:text-gold">Contact</a>
             </div>
