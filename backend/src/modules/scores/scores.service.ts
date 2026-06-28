@@ -7,9 +7,59 @@ import { ApiFixture } from '../api-football/api-football.client';
 import { mapApiFootballStatus } from '../api-football/status-map';
 import { competitionIdForApi } from '../competitions/leagues.config';
 import { CHANNELS, MatchUpdatePayload } from './scores.events';
-import { fixturePairKey } from './wc-team-aliases';
+import { fixturePairKey, canonicalTeamName, normalizeTeamName } from './wc-team-aliases';
 
 const WC_COMPETITION_ID = 'WC2026';
+
+/**
+ * Authoritative Round-of-32 matchups, keyed by the seed fixture id. Each seed
+ * R32 row is uniquely identified by its stadium + date, and that maps 1:1 to the
+ * official bracket — so the real teams can be filled in without guessing the
+ * FIFA positional / third-place allocation table. Home/away follow the official
+ * listing; the api fixture (with the live score) supersedes these once published.
+ */
+const WC2026_R32_TEMPLATE: Record<string, [string, string]> = {
+  'WC2026-R32-M73': ['South Africa', 'Canada'],
+  'WC2026-R32-M74': ['Germany', 'Paraguay'],
+  'WC2026-R32-M75': ['Netherlands', 'Morocco'],
+  'WC2026-R32-M76': ['Brazil', 'Japan'],
+  'WC2026-R32-M77': ['France', 'Sweden'],
+  'WC2026-R32-M78': ['Ivory Coast', 'Norway'],
+  'WC2026-R32-M79': ['Mexico', 'Ecuador'],
+  'WC2026-R32-M80': ['England', 'DR Congo'],
+  'WC2026-R32-M81': ['United States', 'Bosnia and Herzegovina'],
+  'WC2026-R32-M82': ['Belgium', 'Senegal'],
+  'WC2026-R32-M83': ['Portugal', 'Croatia'],
+  'WC2026-R32-M84': ['Spain', 'Austria'],
+  'WC2026-R32-M85': ['Switzerland', 'Algeria'],
+  'WC2026-R32-M86': ['Argentina', 'Cape Verde'],
+  'WC2026-R32-M87': ['Colombia', 'Ghana'],
+  'WC2026-R32-M88': ['Australia', 'Egypt'],
+};
+
+/**
+ * Knockout feed tree (match number → its two feeders), parsed from the seed
+ * placeholders. "W74" = winner of match 74; "L101" = loser of match 101 (the
+ * bronze final feeds off the semis). Combined with the R32 template, this lets
+ * every later round (R16 → final) resolve automatically as results come in — no
+ * manual data needed beyond the Round of 32.
+ */
+const WC2026_KO_FEED: Record<number, [string, string]> = {
+  89: ['W74', 'W77'], 90: ['W73', 'W75'], 91: ['W76', 'W78'], 92: ['W79', 'W80'],
+  93: ['W83', 'W84'], 94: ['W81', 'W82'], 95: ['W86', 'W88'], 96: ['W85', 'W87'],
+  97: ['W89', 'W90'], 98: ['W93', 'W94'], 99: ['W91', 'W92'], 100: ['W95', 'W96'],
+  101: ['W97', 'W98'], 102: ['W99', 'W100'], 103: ['L101', 'L102'], 104: ['W101', 'W102'],
+};
+
+/** Seed fixture id for a knockout match number (matches the WC seed's id scheme). */
+function wcSeedId(n: number): string {
+  if (n <= 88) return `WC2026-R32-M${n}`;
+  if (n <= 96) return `WC2026-R16-M${n}`;
+  if (n <= 100) return `WC2026-QF-M${n}`;
+  if (n <= 102) return `WC2026-SF-M${n}`;
+  if (n === 103) return `WC2026-3RD-M${n}`;
+  return `WC2026-FINAL-M${n}`;
+}
 
 const REDIS_KEYS = {
   liveMatchIds: 'live:match-ids',
@@ -342,81 +392,101 @@ export class ScoresService {
    * separately publishes the real knockout fixtures (numeric ids) as positions
    * lock — so the bracket shows cryptic "A2/B1" placeholders AND duplicates.
    *
-   * This:
-   *   1. From FINAL group tables (group fully played), maps each slot code
-   *      (`A1`…`L4`) to its real team.
-   *   2. Rewrites each seed placeholder fixture in place — `A2` → the real
-   *      Group A runner-up — so the bracket fills in the moment a group ends,
-   *      without waiting on api-football.
-   *   3. Drops the seed row once a real api fixture exists for the same slot
-   *      (same stage + team pair), so each knockout match appears exactly once
-   *      with its real schedule + score.
-   *
-   * Third-place-qualifier slots ("3rd A/B/C/D/F") need the FIFA allocation table
-   * and are intentionally left as placeholders for now (never mis-assigned).
+   * Pipeline:
+   *   1. Apply the authoritative R32 template (seedId → real teams) via an
+   *      alias-aware nation→team lookup — resolves all 16 R32 ties including the
+   *      eight third-place qualifiers, the moment the nations exist.
+   *   2. Propagate winners/losers through the feed tree (WC2026_KO_FEED): once a
+   *      result is in, fill the next round's "W74"/"L101" placeholders. Iterating
+   *      in match-number order resolves R16 → final in one pass — no manual data
+   *      beyond the R32 template.
+   *   3. Drop a seed row once a real api fixture covers the same tie (alias-aware
+   *      nation pair) — keeping the api row's live schedule/score, no duplicates.
    */
   async reconcileKnockout(): Promise<void> {
-    // 1) Slot code → team, only from groups that have finished all matches.
+    // Canonical nation name → the real team row used in results.
     const groups = await this.prisma.group.findMany({
-      include: { standings: { select: { teamId: true, position: true, played: true } } },
+      include: { standings: { select: { team: { select: { id: true, name: true } } } } },
     });
-    const codeToTeam = new Map<string, string>();
-    for (const g of groups) {
-      const letter = g.name.replace(/^Group\s+/i, '').trim().toUpperCase();
-      if (!letter) continue;
-      const rows = g.standings;
-      if (rows.length !== 4 || !rows.every((r) => r.played >= 3)) continue; // not final
-      for (const r of rows) codeToTeam.set(`${letter}${r.position}`, r.teamId);
-    }
-    if (codeToTeam.size === 0) return;
+    const nameToId = new Map<string, string>();
+    for (const g of groups)
+      for (const r of g.standings) nameToId.set(normalizeTeamName(canonicalTeamName(r.team.name)), r.team.id);
+    const idFor = (canonName: string) => nameToId.get(normalizeTeamName(canonName));
 
-    // 2) Resolve seed placeholders in place. Placeholder team names are slot
-    //    codes like "A2"; group-stage seeds carry real names and are skipped.
-    const seeds = await this.prisma.match.findMany({
-      where: { id: { startsWith: 'WC2026-' } },
+    // 1) R32 template → resolved canonical-name pair per match number.
+    const teamsOf = new Map<number, [string, string]>();
+    for (const [seedId, [home, away]] of Object.entries(WC2026_R32_TEMPLATE)) {
+      teamsOf.set(+seedId.split('-M')[1], [canonicalTeamName(home), canonicalTeamName(away)]);
+    }
+
+    // Index every finished knockout result by alias-aware pair → winner/loser.
+    const allKo = await this.prisma.match.findMany({
+      where: { stage: { not: null } },
       select: {
-        id: true, homeTeamId: true, awayTeamId: true,
+        id: true, stage: true, status: true,
+        homeScore: true, awayScore: true, homePenalties: true, awayPenalties: true,
         homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } },
       },
     });
-    const codeOf = (name?: string) => {
-      const c = (name ?? '').trim().toUpperCase();
-      return /^[A-L][1-4]$/.test(c) ? c : null;
-    };
-    for (const m of seeds) {
-      const data: { homeTeamId?: string; awayTeamId?: string } = {};
-      const hc = codeOf(m.homeTeam?.name);
-      const ac = codeOf(m.awayTeam?.name);
-      if (hc) { const t = codeToTeam.get(hc); if (t && t !== m.homeTeamId) data.homeTeamId = t; }
-      if (ac) { const t = codeToTeam.get(ac); if (t && t !== m.awayTeamId) data.awayTeamId = t; }
-      if (Object.keys(data).length) {
-        await this.prisma.match
-          .update({ where: { id: m.id }, data })
-          .catch((e) => this.log.warn(`knockout resolve failed ${m.id}: ${(e as Error).message}`));
+    const ko = allKo.filter((m) => m.stage && !/group/i.test(m.stage));
+    const resultByPair = new Map<string, { winner: string; loser: string }>();
+    for (const m of ko) {
+      if (m.status !== MatchStatus.FINISHED) continue;
+      const hn = canonicalTeamName(m.homeTeam?.name ?? '');
+      const an = canonicalTeamName(m.awayTeam?.name ?? '');
+      const hScore = m.homeScore ?? 0, aScore = m.awayScore ?? 0;
+      let winner = hn, loser = an;
+      if (hScore < aScore) { winner = an; loser = hn; }
+      else if (hScore === aScore) {
+        const hp = m.homePenalties ?? 0, ap = m.awayPenalties ?? 0;
+        if (hp === ap) continue; // not actually decided
+        if (hp < ap) { winner = an; loser = hn; }
       }
+      resultByPair.set(fixturePairKey(hn, an), { winner, loser });
     }
 
-    // 3) Drop seed rows superseded by a real api fixture for the same slot
-    //    (same stage + team pair, now both resolved). Keep the api row — it has
-    //    the authoritative schedule, status and score.
-    const withStage = await this.prisma.match.findMany({
-      where: { stage: { not: null } },
-      select: { id: true, stage: true, homeTeamId: true, awayTeamId: true },
-    });
-    const ko = withStage.filter((m) => m.stage && !/group/i.test(m.stage));
-    const key = (m: (typeof ko)[number]) =>
-      `${(m.stage ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase()}|${[m.homeTeamId, m.awayTeamId].sort().join('-')}`;
-    const seedByKey = new Map<string, string>();
-    for (const m of ko) if (m.id.startsWith('WC2026-')) seedByKey.set(key(m), m.id);
+    // 2) Propagate winners/losers through the tree, in match-number order so each
+    //    later round sees its feeders already resolved.
+    for (let n = 89; n <= 104; n++) {
+      const feed = WC2026_KO_FEED[n];
+      if (!feed) continue;
+      const resolve = (ref: string): string | undefined => {
+        const pair = teamsOf.get(+ref.slice(1));
+        if (!pair) return undefined;
+        const r = resultByPair.get(fixturePairKey(pair[0], pair[1]));
+        if (!r) return undefined;
+        return ref[0] === 'W' ? r.winner : r.loser;
+      };
+      const home = resolve(feed[0]);
+      const away = resolve(feed[1]);
+      if (home && away) teamsOf.set(n, [home, away]);
+    }
+
+    // Write resolved teams onto the seed rows (R32 + any propagated later rounds).
+    for (const [n, [home, away]] of teamsOf) {
+      const hid = idFor(home), aid = idFor(away);
+      if (!hid || !aid) continue; // nation not in the DB yet — retry next pass
+      const id = wcSeedId(n);
+      const ex = await this.prisma.match.findUnique({ where: { id }, select: { homeTeamId: true, awayTeamId: true } });
+      if (!ex || (ex.homeTeamId === hid && ex.awayTeamId === aid)) continue; // gone or unchanged
+      await this.prisma.match
+        .update({ where: { id }, data: { homeTeamId: hid, awayTeamId: aid } })
+        .catch((e) => this.log.warn(`knockout resolve failed ${id}: ${(e as Error).message}`));
+    }
+
+    // 3) Drop seed rows superseded by a real api fixture for the same tie. A tie
+    //    is unique across the knockout, so the alias-aware nation pair is enough
+    //    (and survives api/seed stage-string differences). Seed pairs come from
+    //    `teamsOf` (post-resolution); api pairs from their own real names.
+    const apiPairs = new Set<string>();
+    for (const m of ko) if (!m.id.startsWith('WC2026-')) apiPairs.add(fixturePairKey(m.homeTeam?.name ?? '', m.awayTeam?.name ?? ''));
     const drop: string[] = [];
-    for (const m of ko) {
-      if (m.id.startsWith('WC2026-')) continue; // real api rows only
-      const seedId = seedByKey.get(key(m));
-      if (seedId) drop.push(seedId);
+    for (const [n, [home, away]] of teamsOf) {
+      if (apiPairs.has(fixturePairKey(home, away))) drop.push(wcSeedId(n));
     }
     if (drop.length) {
-      await this.prisma.match.deleteMany({ where: { id: { in: drop } } });
-      this.log.log(`knockout dedup: dropped ${drop.length} superseded seed placeholder(s)`);
+      const { count } = await this.prisma.match.deleteMany({ where: { id: { in: drop } } });
+      if (count) this.log.log(`knockout dedup: dropped ${count} superseded seed placeholder(s)`);
     }
   }
 
