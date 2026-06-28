@@ -2,12 +2,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { SITE } from '@/lib/site';
 import { playUrl } from '@/lib/seo';
+import { MobileNav } from '@/components/mobile-nav';
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-bg-deep/70 backdrop-blur-xl">
-      <div className="container-x flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
+      <div className="container-x flex h-16 items-center justify-between gap-3">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <Image src="/logo.png" alt="FootballMojo logo" width={32} height={32} className="rounded-lg" />
           <span className="text-lg font-extrabold tracking-tight">
             Football<span className="text-gold">Mojo</span>
@@ -19,14 +20,17 @@ export function SiteHeader() {
           <a href="/#features" className="transition hover:text-fg">Features</a>
           <Link href="/privacy" className="transition hover:text-fg">Privacy</Link>
         </nav>
-        <a
-          href={playUrl('nav')}
-          target="_blank"
-          rel="noopener"
-          className="btn-gold !px-5 !py-2 text-xs"
-        >
-          Download
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href={playUrl('nav')}
+            target="_blank"
+            rel="noopener"
+            className="btn-gold !px-4 !py-2 text-xs"
+          >
+            Download
+          </a>
+          <MobileNav />
+        </div>
       </div>
     </header>
   );
