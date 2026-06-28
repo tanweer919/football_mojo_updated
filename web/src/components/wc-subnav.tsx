@@ -10,12 +10,13 @@ const TABS = [
   { label: 'Bracket', href: '/world-cup-2026/bracket', match: (p: string) => p.startsWith('/world-cup-2026/bracket') },
 ];
 
-/** Sticky sub-navigation for the World Cup section so the pages interlink. */
+/** Section tabs for the World Cup pages — a lightweight in-page strip, not a
+ *  second sticky nav bar (the global header is the only sticky nav). */
 export function WcSubnav() {
   const pathname = usePathname() ?? '';
   return (
-    <nav aria-label="World Cup 2026 sections" className="sticky top-16 z-40 border-b border-border/60 bg-bg-deep/80 backdrop-blur">
-      <div className="container-x flex gap-1 overflow-x-auto py-2">
+    <nav aria-label="World Cup 2026 sections" className="border-b border-border/50">
+      <div className="container-x -mb-px flex gap-1 overflow-x-auto pt-4">
         {TABS.map((t) => {
           const active = t.match(pathname);
           return (
@@ -23,8 +24,10 @@ export function WcSubnav() {
               key={t.href}
               href={t.href}
               className={
-                'shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
-                (active ? 'bg-gold/15 text-gold' : 'text-fg-soft hover:bg-surface-1 hover:text-fg')
+                'shrink-0 whitespace-nowrap border-b-2 px-3 pb-2.5 text-sm font-semibold transition ' +
+                (active
+                  ? 'border-gold text-gold'
+                  : 'border-transparent text-fg-muted hover:text-fg')
               }
             >
               {t.label}

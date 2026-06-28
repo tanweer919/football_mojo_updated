@@ -86,7 +86,7 @@ export interface Group {
 
 /** Group tables for a competition (computed from results on the backend). */
 export async function getGroups(competitionId: string): Promise<Group[]> {
-  const rows = await get<Group[]>(`/competitions/${competitionId}/groups`, 300);
+  const rows = await get<Group[]>(`/competitions/${competitionId}/groups`, 120);
   return rows ?? [];
 }
 
@@ -96,7 +96,7 @@ export async function getCompetitionFixtures(
   from: string,
   to: string,
 ): Promise<Fixture[]> {
-  const rows = await get<Fixture[]>(`/scores/fixtures/range?from=${from}&to=${to}`, 600);
+  const rows = await get<Fixture[]>(`/scores/fixtures/range?from=${from}&to=${to}`, 120);
   return (rows ?? [])
     .filter((f) => f.competition != null && competitionNameMatch.test(f.competition.name))
     .sort((a, b) => a.kickoffAt.localeCompare(b.kickoffAt));

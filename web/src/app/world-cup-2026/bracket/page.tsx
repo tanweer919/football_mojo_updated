@@ -8,7 +8,7 @@ import { WcSubnav } from '@/components/wc-subnav';
 import { TeamCrest } from '@/components/team-crest';
 import { KickoffTime } from '@/components/kickoff-time';
 
-export const revalidate = 300;
+export const revalidate = 120;
 const PATH = '/world-cup-2026/bracket';
 
 export const metadata: Metadata = pageMeta({

@@ -3,7 +3,7 @@ import { pageMeta } from '@/lib/seo';
 import { getDict } from '@/lib/i18n';
 import { HubView } from './hub-view';
 
-export const revalidate = 600;
+export const revalidate = 120;
 
 const dict = getDict('en');
 

@@ -4,7 +4,7 @@ import { pageMeta } from '@/lib/seo';
 import { getDict, NON_DEFAULT_LOCALES, LOCALES, type Locale } from '@/lib/i18n';
 import { HubView } from '../../world-cup-2026/hub-view';
 
-export const revalidate = 600;
+export const revalidate = 120;
 export const dynamicParams = false;
 
 /** English lives at the root /world-cup-2026; this handles the other locales. */
