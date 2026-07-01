@@ -249,27 +249,43 @@ class _Score extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ScoreFlip(
-            value: match.homeScore,
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ScoreFlip(
+                value: match.homeScore,
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 4, height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ScoreFlip(
+                value: match.awayScore,
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 4, height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
+          if (match.hasPenaltyShootout)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'pens ${match.penaltyLabel}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          ScoreFlip(
-            value: match.awayScore,
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
         ],
       ),
     );

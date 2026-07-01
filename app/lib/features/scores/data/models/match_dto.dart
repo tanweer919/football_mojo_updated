@@ -52,6 +52,17 @@ abstract class MatchDto with _$MatchDto {
   bool get isFinished => status == MatchStatus.FINISHED;
   String get scoreLabel => '$homeScore - $awayScore';
 
+  /// True when the tie was decided by a penalty shootout (knockouts drawn after
+  /// extra time). Both penalty counts are present and at least one is > 0.
+  bool get hasPenaltyShootout =>
+      homePenalties != null &&
+      awayPenalties != null &&
+      (homePenalties! > 0 || awayPenalties! > 0);
+
+  /// Shootout score, e.g. "4 - 3". Null when there was no shootout.
+  String? get penaltyLabel =>
+      hasPenaltyShootout ? '$homePenalties - $awayPenalties' : null;
+
   /// True when a FIFA-official highlight is available to watch in-app.
   bool get hasHighlight => isFinished && (highlightUrl?.isNotEmpty ?? false);
 
