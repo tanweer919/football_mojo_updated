@@ -26,11 +26,15 @@ import { ScoresService } from './scores.service';
 @Injectable()
 export class ScoresPoller implements OnModuleInit {
   private readonly log = new Logger(ScoresPoller.name);
-  private readonly liveMs: number;
-  private readonly idleMs: number;
+  private readonly liveMs: number;      // cadence while ≥1 match is live (fast)
+  private readonly watchMs: number;     // cadence in the run-up to kickoff (no live yet)
+  private readonly preWindowMs: number; // start watching this long before kickoff
+  private readonly maxIdleMs: number;   // longest single sleep when nothing is near
+  private readonly refreshEveryMs: number; // min gap between full-schedule refreshes
   private readonly leagues: LeagueConfig[];
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
+  private lastScheduleRefresh = 0;
 
   constructor(
     cfg: ConfigService,
@@ -39,7 +43,17 @@ export class ScoresPoller implements OnModuleInit {
     private readonly scores: ScoresService,
   ) {
     this.liveMs = +(cfg.get('POLL_INTERVAL_LIVE_MS') ?? 15_000);
-    this.idleMs = +(cfg.get('POLL_INTERVAL_IDLE_MS') ?? 600_000);
+    this.watchMs = +(cfg.get('POLL_INTERVAL_WATCH_MS') ?? 60_000);
+    // Wake ~1h before kickoff so lineups (published ~1h out) are ready and we
+    // catch the start; matches can run long (ET + penalties) — the live=all
+    // window handles that since a match stays "live" until api ends it.
+    this.preWindowMs = +(cfg.get('POLL_PRE_WINDOW_MS') ?? 65 * 60_000);
+    // Longest we'll sleep with no match near. Kept long on purpose — waking here
+    // costs nothing (schedule refresh is throttled separately), so a long sleep
+    // just avoids needless CPU. Dedicated var so a legacy POLL_INTERVAL_IDLE_MS
+    // can't force frequent wakes.
+    this.maxIdleMs = Math.max(+(cfg.get('POLL_MAX_IDLE_MS') ?? 60 * 60_000), this.watchMs);
+    this.refreshEveryMs = +(cfg.get('POLL_SCHEDULE_REFRESH_MS') ?? 2 * 60 * 60_000);
     this.leagues = activeLeagueIds(cfg.get<string>('POLL_LEAGUE_IDS'));
     this.log.log(
       `Poller will track ${this.leagues.length} league(s): ${this.leagues.map((l) => l.code).join(', ')}`,
@@ -64,104 +78,82 @@ export class ScoresPoller implements OnModuleInit {
   async tick() {
     if (this.stopped) return;
     const start = Date.now();
-    let nextDelay = this.idleMs;
+    let nextDelay = this.maxIdleMs;
 
     try {
       // Step 0: Reap any match frozen in a live state — ended but dropped from
-      // `live=all` while other matches kept us busy. Do this BEFORE the window
-      // check: a stuck LIVE row keeps hasActiveMatches() true, so without this
-      // we'd poll live=all every tick forever on a phantom match (and the row
-      // would never flip to full-time for clients). Pure DB, no upstream call.
+      // `live=all` while other matches kept us busy. Pure DB, no upstream call.
       const reaped = await this.scores.finalizeStaleLiveMatches();
       if (reaped) this.log.warn(`reaped ${reaped} stale live match(es)`);
 
-      // Step 1: Are we even in a live window across ANY tracked league? If
-      // not, skip the upstream call entirely and reschedule. We OR the
-      // kickoff-proximity window with a DB check for matches actually in play,
-      // so the poller can't idle mid-match (and self-heals a frozen one).
-      const inWindow =
-        (await this.cache.isLiveWindow(15)) || (await this.scores.hasActiveMatches());
-      if (!inWindow) {
-        const next = await this.cache.getNextKickoff();
-        if (next) {
-          const untilKickoff = next.getTime() - Date.now() - 60_000;
-          nextDelay = Math.max(this.liveMs, Math.min(this.idleMs, untilKickoff));
-        }
-        // Opportunistic schedule refresh — once per quiet tick at most.
-        if (Date.now() - start < 1000) {
+      // Step 1: Decide whether a match is in play or imminent. `hasActiveMatches`
+      // covers anything LIVE/HT and anything whose kickoff has passed (≤3.5h) but
+      // hasn't finished — so we can't idle mid-match or through a late kickoff.
+      // We ALSO watch from ~1h before the next kickoff (lineups + catch the start).
+      const active = await this.scores.hasActiveMatches();
+      const next = await this.cache.getNextKickoff();
+      const untilNext = next ? next.getTime() - Date.now() : Infinity;
+      const watching = active || untilNext <= this.preWindowMs;
+
+      if (!watching) {
+        // No match near. This is the big quota win: instead of waking every few
+        // minutes and hitting the schedule endpoint, sleep until ~1h before the
+        // next kickoff and refresh the full schedule only every refreshEveryMs
+        // (settles finished scores + updates the next kickoff). No per-tick calls.
+        if (Date.now() - this.lastScheduleRefresh >= this.refreshEveryMs) {
           await this.refreshSchedule();
+          this.lastScheduleRefresh = Date.now();
         }
+        nextDelay = next
+          ? Math.min(this.maxIdleMs, Math.max(this.watchMs, untilNext - this.preWindowMs))
+          : this.maxIdleMs;
         this.log.log(
-          `idle tick: nextKickoff=${next?.toISOString() ?? 'unknown'} nextDelay=${nextDelay}ms`,
+          `idle: nextKickoff=${next?.toISOString() ?? 'unknown'} sleep=${Math.round(nextDelay / 1000)}s`,
         );
         return;
       }
 
-      // Step 2: Live tick. ONE upstream call returns every live match
-      // globally; filter to the leagues we track.
+      // Step 2: Watch/live. ONE upstream call — `live=all` — returns every match
+      // in play globally (incl. extra time & shootouts, which stay live until api
+      // ends them). Filter to the leagues we track.
       const trackedIds = new Set(this.leagues.map((l) => l.id));
       const allLive = await this.api.liveFixtures();
       const liveMatches = allLive.filter((f) => trackedIds.has(f.league.id));
 
-      let scanned: ApiFixture[] = liveMatches;
-      const wasLive = liveMatches.length > 0;
-      if (wasLive) await this.cache.markLive();
-
-      // Prime events/lineups/statistics for the live matches in ONE batched
-      // `/fixtures?ids=` call, instead of the app firing 3 separate per-match
-      // enrichment calls on every open. Turns those into cache hits and keeps
-      // the data fresh for everyone. Best-effort — never blocks the tick.
-      if (wasLive) {
+      if (liveMatches.length) {
+        await this.cache.markLive();
+        // Prime events/lineups/stats for the live matches in ONE batched call so
+        // app opens hit the cache. Best-effort — never blocks the tick.
         await this.cache
           .primeLiveFixtures(liveMatches.map((f) => f.fixture.id))
           .catch((e) => this.log.warn(`prime failed: ${(e as Error).message}`));
       }
 
-      // Nothing live anywhere → idle refresh per league (parallel) so
-      // SCHEDULED→LIVE transitions get caught.
-      if (!liveMatches.length) {
-        const today = new Date().toISOString().slice(0, 10);
-        const perLeague = await Promise.all(
-          this.leagues.map((l) =>
-            this.api
-              .listMatches({ league: l.id, season: l.season, date: today })
-              .catch((e) => {
-                this.log.warn(`idle scan failed for league=${l.id}: ${(e as Error).message}`);
-                return [] as ApiFixture[];
-              }),
-          ),
-        );
-        scanned = perLeague.flat();
-      }
-
-      const { changed, live, finishedFixtureIds } =
-        await this.scores.ingestSnapshot(scanned);
-
+      const { changed, live, finishedFixtureIds } = await this.scores.ingestSnapshot(liveMatches);
       for (const id of finishedFixtureIds ?? []) {
         await this.cache.freezeFixture(id);
       }
 
-      // A match just reached full-time → refresh group tables, then resolve the
-      // knockout bracket (group winners/runners-up → real teams; drop dup seeds).
-      if ((finishedFixtureIds?.length ?? 0) > 0) {
-        await this.scores
-          .recomputeStandings()
-          .then(() => this.scores.reconcileKnockout())
-          .catch((e) => this.log.warn(`standings/knockout recompute failed: ${(e as Error).message}`));
+      // Refresh the full schedule (settles results, recomputes standings/bracket
+      // + the next kickoff) on a full-time transition, or — while we're watching
+      // but nothing is live yet (pre-kickoff / a postponement) — at most every
+      // refreshEveryMs. This is the only place per-league schedule calls happen.
+      const finished = (finishedFixtureIds?.length ?? 0) > 0;
+      if (finished || (!liveMatches.length && Date.now() - this.lastScheduleRefresh >= this.refreshEveryMs)) {
+        await this.refreshSchedule();
+        this.lastScheduleRefresh = Date.now();
       }
 
-      await this.recomputeNextKickoff(scanned);
-
-      nextDelay = live > 0 ? this.liveMs : this.idleMs;
+      nextDelay = liveMatches.length > 0 ? this.liveMs : this.watchMs;
 
       const quota = this.api.getQuota();
       this.log.log(
-        `live tick: scanned=${scanned.length} live=${live} changed=${changed} ` +
-          `quota=${quota.minuteRemaining}/min ${quota.dailyRemaining}/day nextDelay=${nextDelay}ms (${Date.now() - start}ms)`,
+        `live: live=${live} changed=${changed} ` +
+          `quota=${quota.minuteRemaining}/min ${quota.dailyRemaining}/day sleep=${Math.round(nextDelay / 1000)}s (${Date.now() - start}ms)`,
       );
     } catch (err) {
       this.log.error(`poll tick failed: ${(err as Error).message}`);
-      nextDelay = Math.min(this.idleMs, 60_000);
+      nextDelay = Math.min(this.maxIdleMs, 60_000);
     } finally {
       this.timer = setTimeout(() => this.tick().catch(() => {}), nextDelay);
     }
