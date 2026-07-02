@@ -661,25 +661,45 @@ class _MatchHeroCenter extends StatelessWidget {
       child: SizedBox(
         height: 52,
         child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0x8C0F0E0D),
-              borderRadius: BorderRadius.circular(AppRadii.r3),
-              border: Border.all(color: AppColors.borderSoft),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-                fontSize: isLiveOrFinished ? 20 : 17,
-                fontWeight: FontWeight.w800,
-                color: isLiveOrFinished ? AppColors.fg : AppColors.gold,
-                letterSpacing: -0.4,
-                fontFeatures: const [FontFeature.tabularFigures()],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0x8C0F0E0D),
+                  borderRadius: BorderRadius.circular(AppRadii.r3),
+                  border: Border.all(color: AppColors.borderSoft),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
+                    fontSize: isLiveOrFinished ? 20 : 17,
+                    fontWeight: FontWeight.w800,
+                    color: isLiveOrFinished ? AppColors.fg : AppColors.gold,
+                    letterSpacing: -0.4,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               ),
-            ),
+              if (match.hasPenaltyShootout)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    'pens ${match.penaltyLabel}',
+                    style: const TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

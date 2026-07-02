@@ -582,6 +582,27 @@ class _Hero extends ConsumerWidget {
                     Expanded(child: _Side(team: match.awayTeam, alignEnd: true)),
                   ],
                 ),
+                if (match.hasPenaltyShootout) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Penalties  ${match.penaltyLabel}',
+                      style: const TextStyle(
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.gold,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ],
                 if (heroEvents.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _HeroGoalscorers(
