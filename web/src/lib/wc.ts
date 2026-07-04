@@ -81,6 +81,74 @@ export function prettyTeamName(name: string): string {
   return name;
 }
 
+// ── Knockout bracket structure ───────────────────────────────────────────────
+// The bracket is a fixed tree (FIFA match numbers 73–104). We render from this
+// structure — not from fixture array order — so every tie sits in its correct
+// slot and half (e.g. a left-half team can only meet a right-half team in the
+// final). Fixtures are matched into slots by team pair.
+
+/** Round of 32 matchups by FIFA match number (official listing). */
+export const WC_R32: Record<number, [string, string]> = {
+  73: ['South Africa', 'Canada'], 74: ['Germany', 'Paraguay'], 75: ['Netherlands', 'Morocco'],
+  76: ['Brazil', 'Japan'], 77: ['France', 'Sweden'], 78: ['Ivory Coast', 'Norway'],
+  79: ['Mexico', 'Ecuador'], 80: ['England', 'DR Congo'], 81: ['United States', 'Bosnia and Herzegovina'],
+  82: ['Belgium', 'Senegal'], 83: ['Portugal', 'Croatia'], 84: ['Spain', 'Austria'],
+  85: ['Switzerland', 'Algeria'], 86: ['Argentina', 'Cape Verde'], 87: ['Colombia', 'Ghana'],
+  88: ['Australia', 'Egypt'],
+};
+
+/** Feed tree: match number → its two feeders. "W74" = winner of 74, "L101" = loser of 101. */
+export const WC_FEED: Record<number, [string, string]> = {
+  89: ['W74', 'W77'], 90: ['W73', 'W75'], 91: ['W76', 'W78'], 92: ['W79', 'W80'],
+  93: ['W83', 'W84'], 94: ['W81', 'W82'], 95: ['W86', 'W88'], 96: ['W85', 'W87'],
+  97: ['W89', 'W90'], 98: ['W93', 'W94'], 99: ['W91', 'W92'], 100: ['W95', 'W96'],
+  101: ['W97', 'W98'], 102: ['W99', 'W100'], 103: ['L101', 'L102'], 104: ['W101', 'W102'],
+};
+
+export interface BracketColumn { round: string; nums: number[] }
+/** Column layout — match numbers in vertical order so adjacent pairs feed the next round. */
+export const WC_BRACKET: {
+  left: BracketColumn[];
+  right: BracketColumn[];
+  final: number;
+  bronze: number;
+} = {
+  left: [
+    { round: 'Round of 32', nums: [74, 77, 73, 75, 83, 84, 81, 82] },
+    { round: 'Round of 16', nums: [89, 90, 93, 94] },
+    { round: 'Quarter-finals', nums: [97, 98] },
+    { round: 'Semi-finals', nums: [101] },
+  ],
+  right: [
+    { round: 'Semi-finals', nums: [102] },
+    { round: 'Quarter-finals', nums: [99, 100] },
+    { round: 'Round of 16', nums: [91, 92, 95, 96] },
+    { round: 'Round of 32', nums: [76, 78, 79, 80, 86, 88, 85, 87] },
+  ],
+  final: 104,
+  bronze: 103,
+};
+
+const NATION_ALIASES: Record<string, string> = {
+  unitedstates: 'usa', usa: 'usa',
+  drcongo: 'congodr', congodr: 'congodr',
+  capeverde: 'capeverde', capeverdeislands: 'capeverde', caboverde: 'capeverde',
+  bosniaandherzegovina: 'bosnia', bosniaherzegovina: 'bosnia',
+  korearepublic: 'southkorea', southkorea: 'southkorea',
+  czechrepublic: 'czechia', czechia: 'czechia',
+  turkey: 'turkiye', turkiye: 'turkiye',
+};
+
+/** Normalise a nation name so template/feed names and api names compare equal. */
+export function normNation(name: string): string {
+  const n = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z]/g, '');
+  return NATION_ALIASES[n] ?? n;
+}
+
 /** A URL-safe match slug: "canada-vs-bosnia-and-herzegovina-2026-06-13". */
 export function matchSlug(home: string, away: string, kickoffISO: string): string {
   const norm = (s: string) =>
