@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
 import type { Fixture } from '@/lib/api';
 import { getCompetitionFixtures } from '@/lib/api';
-import { WC, WC_R32, WC_FEED, WC_BRACKET, prettyTeamName, normNation } from '@/lib/wc';
+import { WC, WC_R32, WC_FEED, normNation } from '@/lib/wc';
 import { pageMeta, breadcrumbLd } from '@/lib/seo';
 import { Breadcrumbs, JsonLd, PlayCta } from '@/components/seo-bits';
 import { WcSubnav } from '@/components/wc-subnav';
-import { TeamCrest } from '@/components/team-crest';
-import { KickoffTime } from '@/components/kickoff-time';
+import { BracketTree } from '@/components/bracket-tree';
 
 export const revalidate = 120;
 const PATH = '/world-cup-2026/bracket';
@@ -19,7 +18,7 @@ export const metadata: Metadata = pageMeta({
   path: PATH,
 });
 
-// ── Resolve each bracket slot from the fixtures ──────────────────────────────
+/** Resolve each bracket slot (match number) to its fixture, propagating winners. */
 function buildResolver(fixtures: Fixture[]) {
   const ko = fixtures.filter((f) => f.stage && !/group/i.test(f.stage));
   const key = (a: string, b: string) => [normNation(a), normNation(b)].sort().join('|');
@@ -66,7 +65,7 @@ function buildResolver(fixtures: Fixture[]) {
 
 export default async function BracketPage() {
   const fixtures = await getCompetitionFixtures(WC.competitionNameMatch, '2026-06-28', WC.endDate);
-  const fixtureForSlot = buildResolver(fixtures);
+  const resolver = buildResolver(fixtures);
   const anyResolved = fixtures.some((f) => f.stage && !/group/i.test(f.stage) && FINISHED.has(f.status));
 
   const crumbs = [
@@ -96,104 +95,12 @@ export default async function BracketPage() {
             bracket fills in automatically as ties are decided (knockouts begin <strong>28 June</strong>).
           </div>
         )}
+        <p className="mt-3 text-xs text-fg-muted2 lg:hidden">← scroll to see the full bracket →</p>
       </section>
 
-      {/* Two-sided bracket: left rounds → final → right rounds. Equal-height
-          columns + justify-around keep each round centred against its feeders. */}
-      <div className="mt-10 overflow-x-auto pb-8">
-        <div className="mx-auto flex min-h-[720px] w-max items-stretch gap-x-4 px-3 sm:px-5">
-          {WC_BRACKET.left.map((col, i) => (
-            <Column key={`L${i}`} label={col.round} nums={col.nums} resolver={fixtureForSlot} stub="right" />
-          ))}
-
-          <div className="mx-2 flex w-[160px] flex-col justify-center px-1">
-            <h2 className="mb-3 text-center text-[11px] font-bold uppercase tracking-wide text-gold">Final</h2>
-            <Slot n={WC_BRACKET.final} resolver={fixtureForSlot} highlight />
-            <p className="mt-2 text-center text-[10px] uppercase tracking-wide text-fg-muted2">New York · 19 Jul</p>
-            <h2 className="mb-2 mt-6 text-center text-[10px] font-bold uppercase tracking-wide text-fg-muted2">3rd place</h2>
-            <Slot n={WC_BRACKET.bronze} resolver={fixtureForSlot} />
-          </div>
-
-          {WC_BRACKET.right.map((col, i) => (
-            <Column key={`R${i}`} label={col.round} nums={col.nums} resolver={fixtureForSlot} stub="left" />
-          ))}
-        </div>
-      </div>
+      <BracketTree resolver={resolver} />
 
       <PlayCta slug="world-cup-2026-bracket" headline="Predict the entire World Cup 2026 bracket" />
     </>
-  );
-}
-
-function Column({
-  label, nums, resolver, stub,
-}: { label: string; nums: number[]; resolver: (n: number) => Fixture | null; stub: 'left' | 'right' }) {
-  return (
-    <div className="flex w-[150px] flex-col">
-      <h2 className="mb-3 text-center text-[11px] font-bold uppercase tracking-wide text-gold">{label}</h2>
-      <div className="flex flex-1 flex-col justify-around">
-        {nums.map((n) => <Slot key={n} n={n} resolver={resolver} stub={stub} />)}
-      </div>
-    </div>
-  );
-}
-
-const STUB = {
-  right: "relative after:absolute after:left-full after:top-1/2 after:h-px after:w-4 after:bg-border after:content-['']",
-  left: "relative before:absolute before:right-full before:top-1/2 before:h-px before:w-4 before:bg-border before:content-['']",
-  none: '',
-} as const;
-
-function Slot({
-  n, resolver, stub = 'none', highlight = false,
-}: { n: number; resolver: (n: number) => Fixture | null; stub?: 'left' | 'right' | 'none'; highlight?: boolean }) {
-  const f = resolver(n);
-  const wrap = `rounded-md border px-2 py-1.5 ${STUB[stub]} `;
-
-  if (!f) {
-    const feed = WC_FEED[n];
-    const labels: [string, string] = feed ? [prettyTeamName(feed[0]), prettyTeamName(feed[1])] : ['TBC', 'TBC'];
-    return (
-      <div className={wrap + (highlight ? 'border-dashed border-gold/40 bg-gold/5' : 'border-dashed border-border-soft bg-surface-1/30')}>
-        <PlaceholderRow label={labels[0]} />
-        <div className="my-1 h-px bg-border-soft/60" />
-        <PlaceholderRow label={labels[1]} />
-      </div>
-    );
-  }
-
-  const done = FINISHED.has(f.status);
-  const hp = f.homePenalties ?? 0, ap = f.awayPenalties ?? 0;
-  const pens = f.homePenalties != null && f.awayPenalties != null && (hp > 0 || ap > 0);
-  const homeWin = done && (f.homeScore > f.awayScore || (f.homeScore === f.awayScore && hp > ap));
-  const awayWin = done && (f.awayScore > f.homeScore || (f.homeScore === f.awayScore && ap > hp));
-
-  return (
-    <div className={wrap + (highlight ? 'border-gold/50 bg-gold/5 shadow-card' : 'border-border bg-surface-1/70')}>
-      <TeamRow team={f.homeTeam} score={done ? f.homeScore : null} winner={homeWin} />
-      <div className="my-1 h-px bg-border-soft/60" />
-      <TeamRow team={f.awayTeam} score={done ? f.awayScore : null} winner={awayWin} />
-      {pens && <p className="mt-1 text-center text-[9px] font-mono text-gold">pens {hp}-{ap}</p>}
-      {!done && <p className="mt-1 text-center text-[9px] font-mono text-fg-muted2"><KickoffTime iso={f.kickoffAt} withDate /></p>}
-    </div>
-  );
-}
-
-function TeamRow({ team, score, winner }: { team: Fixture['homeTeam']; score: number | null; winner: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <TeamCrest team={team} size={15} />
-      <span className={`flex-1 truncate text-xs ${winner ? 'font-bold text-fg' : 'font-medium text-fg-soft'}`}>{team.shortName ?? team.name}</span>
-      {score !== null && <span className={`font-mono text-xs ${winner ? 'font-bold text-fg' : 'text-fg-muted'}`}>{score}</span>}
-    </div>
-  );
-}
-
-function PlaceholderRow({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="h-[15px] w-[15px] shrink-0 rounded-sm bg-surface-2" />
-      <span className="truncate text-xs text-fg-muted2">{label}</span>
-    </div>
   );
 }
