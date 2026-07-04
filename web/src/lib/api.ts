@@ -18,6 +18,8 @@ export interface Fixture {
   status: string;
   homeScore: number;
   awayScore: number;
+  homePenalties?: number | null;
+  awayPenalties?: number | null;
   homeTeam: Team;
   awayTeam: Team;
   competition: { id: string; name: string } | null;
