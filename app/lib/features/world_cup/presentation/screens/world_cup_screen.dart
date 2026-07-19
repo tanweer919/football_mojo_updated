@@ -10,8 +10,6 @@ import '../../../../core/widgets/pitch_buttons.dart';
 import '../../../../core/widgets/pitch_scaffold.dart';
 import '../../../../core/widgets/premium_image.dart';
 import '../../../../core/widgets/skeleton.dart';
-import '../../../home/presentation/providers/home_dashboard_providers.dart';
-import '../../../scores/data/models/match_dto.dart';
 import '../../data/world_cup_models.dart';
 import '../../data/world_cup_repository.dart';
 
@@ -60,7 +58,7 @@ class WorldCupScreen extends ConsumerWidget {
                   return const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      'Group standings update live as matches are played.',
+                      'Final group tables from the tournament.',
                       style: TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
                   );
@@ -77,20 +75,13 @@ class WorldCupScreen extends ConsumerWidget {
                 );
               },
             ),
-            // Upcoming WC schedule — moved off the home dashboard so the
-            // tournament context lives here in one place.
-            SectionHead(
-              title: 'Schedule',
-              action: 'Full draw →',
-              // `/matches` is a bottom-nav tab — switch to it with go(), not
-              // push() (pushing a shell sibling can no-op).
-              onAction: () => context.go('/matches'),
-            ),
+            // Knockout bracket — relive the full path to the title.
+            const SectionHead(title: 'Knockout bracket'),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: _WcUpcomingMatches(),
+              child: _RecapBracketCta(),
             ),
-            // Stats — top scorers + assists shortcut.
+            // Stats — golden boot + assists.
             SectionHead(
               title: 'Stats',
               action: 'Top scorers →',
@@ -184,7 +175,7 @@ class _Hero extends StatelessWidget {
                   height: 0.95,
                 ),
                 children: [
-                  TextSpan(text: 'The world\nis '),
+                  TextSpan(text: 'The world was\n'),
                   TextSpan(
                     text: 'watching.',
                     style: TextStyle(
@@ -464,7 +455,7 @@ class _StatsTeaser extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 2),
-                  Eyebrow('Live tournament leaderboards', size: 10),
+                  Eyebrow('Golden Boot & top assists', size: 10),
                 ],
               ),
             ),
@@ -476,138 +467,48 @@ class _StatsTeaser extends StatelessWidget {
   }
 }
 
-// ─── UPCOMING MATCHES ──────────────────────────────────────────────────────
-
-/// Next 4 WC2026 fixtures pulled from the home-fixtures provider. The
-/// provider stays in features/home because that's where it's seeded —
-/// scoping here would just duplicate plumbing.
-class _WcUpcomingMatches extends ConsumerWidget {
-  const _WcUpcomingMatches();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(homeFixturesProvider);
-    return async.when(
-      loading: () => const Skeleton(height: 160, radius: 16),
-      error: (_, __) => const _NoFixturesTile(
-        title: 'Schedule unavailable',
-        subtitle: "Couldn't reach the fixtures feed. Pull to refresh.",
-      ),
-      data: (f) {
-        final wcMatches = f.upcoming
-            .where((m) => m.competitionId == _wcCompetitionId)
-            .take(4)
-            .toList();
-        if (wcMatches.isEmpty) {
-          return const _NoFixturesTile(
-            title: 'World Cup fixtures drop when the draw is finalised.',
-            subtitle: 'Check back closer to June 2026.',
-          );
-        }
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.r4),
-            border: Border.all(color: AppColors.borderSoft),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final m in wcMatches) _WcFixtureRow(match: m),
-              const SizedBox(height: 6),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _NoFixturesTile extends StatelessWidget {
-  const _NoFixturesTile({required this.title, required this.subtitle});
-  final String title;
-  final String subtitle;
+class _RecapBracketCta extends StatelessWidget {
+  const _RecapBracketCta();
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.r4),
-        border: Border.all(color: AppColors.borderSoft),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.event_note, color: AppColors.gold, size: 22),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 13,
-              color: AppColors.muted,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 11,
-              color: AppColors.muted2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WcFixtureRow extends StatelessWidget {
-  const _WcFixtureRow({required this.match});
-  final MatchDto match;
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('EEE HH:mm');
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/matches/${match.id}'),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      onTap: () => context.push('/tournament/bracket'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r4),
+          border: Border.all(color: AppColors.borderSoft),
+          gradient: const LinearGradient(
+            colors: [AppColors.surface2, AppColors.surface],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
         child: Row(
           children: [
-            _WcFixtureSide(team: match.homeTeam, alignEnd: true),
-            const SizedBox(width: 10),
-            Container(
-              constraints: const BoxConstraints(minWidth: 70),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(AppRadii.r2),
-                border: Border.all(color: AppColors.borderSoft),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                df.format(match.kickoffAt.toLocal()),
-                style: const TextStyle(
-                  fontFamily: 'JetBrainsMono',
-                  fontFamilyFallback: ['SF Mono', 'Menlo', 'monospace'],
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.fg,
-                ),
+            const Icon(Icons.account_tree_outlined, size: 24, color: AppColors.gold),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text(
+                    'Round of 32 to the final',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.fg,
+                      letterSpacing: -0.21,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Eyebrow('Every knockout result', size: 10),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
-            _WcFixtureSide(team: match.awayTeam, alignEnd: false),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.muted),
           ],
         ),
       ),
@@ -615,45 +516,6 @@ class _WcFixtureRow extends StatelessWidget {
   }
 }
 
-class _WcFixtureSide extends StatelessWidget {
-  const _WcFixtureSide({required this.team, required this.alignEnd});
-  final TeamDto team;
-  final bool alignEnd;
-  @override
-  Widget build(BuildContext context) {
-    final crest = SizedBox(
-      width: 22,
-      height: 16,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: PremiumImage(url: team.crestUrl, fit: BoxFit.contain),
-      ),
-    );
-    final name = Flexible(
-      child: Text(
-        team.shortName ?? team.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontWeight: FontWeight.w700,
-          fontSize: 12.5,
-          color: AppColors.fg,
-        ),
-      ),
-    );
-    return Expanded(
-      child: Row(
-        mainAxisAlignment:
-            alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: alignEnd
-            ? [name, const SizedBox(width: 8), crest]
-            : [crest, const SizedBox(width: 8), name],
-      ),
-    );
-  }
-}
 
 class _ErrorTile extends StatelessWidget {
   const _ErrorTile({required this.message});

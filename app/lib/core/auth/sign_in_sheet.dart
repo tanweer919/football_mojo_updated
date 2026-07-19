@@ -401,7 +401,7 @@ class _BottomBlock extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Bullet('Live scores, news & World Cup 2026 in one home'),
+                _Bullet('Live scores, news & club football in one home'),
                 _Bullet('Global Cup, 1v1 ladders, friend leagues'),
                 _Bullet('Earn iconic player cards — yours forever'),
               ],

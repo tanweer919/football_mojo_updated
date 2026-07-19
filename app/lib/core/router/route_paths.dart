@@ -48,6 +48,7 @@ class RoutePaths {
   static const playerProfile      = '/players/:id';
   static const standings          = '/wc/standings';
   static const topScorers         = '/wc/top-scorers';
+  static const wcRecap            = '/wc/recap';
 
   // Following
   static const teamPicker         = '/following/pick';

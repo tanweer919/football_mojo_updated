@@ -18,7 +18,7 @@ class PitchTabbar extends ConsumerWidget {
   static const _items = <_Dest>[
     _Dest('Home',      _IconHome(),      RoutePaths.home),
     _Dest('My Team',   _IconMyTeam(),    RoutePaths.myTeam),
-    _Dest('World Cup', _IconWorldCup(),  RoutePaths.tournament),
+    _Dest('Leagues',   _IconLeagues(),   RoutePaths.tournament),
     _Dest('Fantasy',   _IconFantasy(),   RoutePaths.fantasyHome),
     // Tab opens the public marketplace browse. The "Collection" affordance
     // in the market header lets signed-in users jump into their album.
@@ -166,10 +166,10 @@ class _IconMyTeam extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Icon(Icons.flag_outlined);
 }
-class _IconWorldCup extends StatelessWidget {
-  const _IconWorldCup();
+class _IconLeagues extends StatelessWidget {
+  const _IconLeagues();
   @override
-  Widget build(BuildContext context) => const Icon(Icons.public);
+  Widget build(BuildContext context) => const Icon(Icons.emoji_events_outlined);
 }
 class _IconFantasy extends StatelessWidget {
   const _IconFantasy();

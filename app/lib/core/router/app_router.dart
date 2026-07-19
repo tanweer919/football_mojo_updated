@@ -47,6 +47,7 @@ import '../../features/tournament/presentation/screens/bracket_screen.dart';
 import '../../features/world_cup/presentation/screens/standings_screen.dart';
 import '../../features/world_cup/presentation/screens/top_scorers_screen.dart';
 import '../../features/world_cup/presentation/screens/world_cup_screen.dart';
+import '../../features/tournament/presentation/screens/tournament_screen.dart';
 import '../analytics/analytics_service.dart';
 import '../auth/auth_providers.dart';
 import '../bootstrap/deferred_bootstrap.dart';
@@ -90,7 +91,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: RoutePaths.album,       builder: (_, __) => const AlbumScreen()),
           GoRoute(path: RoutePaths.market,      builder: (_, __) => const CardsMarketScreen()),
           GoRoute(path: RoutePaths.news,        builder: (_, __) => const NewsScreen()),
-          GoRoute(path: RoutePaths.tournament,  builder: (_, __) => const WorldCupScreen()),
+          // Leagues hub — generic competition screen (club standings, scorers,
+          // and knockout brackets) driven by the server's active competitions.
+          GoRoute(path: RoutePaths.tournament,  builder: (_, __) => const TournamentScreen()),
           // Legacy "Today" tab — routable but no longer in nav.
           GoRoute(path: RoutePaths.today,       builder: (_, __) => const TodayScreen()),
         ],
@@ -200,6 +203,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.injuries,    builder: (_, __) => const InjuriesScreen()),
       GoRoute(path: RoutePaths.standings,   builder: (_, __) => const StandingsScreen(competitionId: 'WC2026')),
       GoRoute(path: RoutePaths.topScorers,  builder: (_, __) => const TopScorersScreen()),
+      // World Cup 2026 recap — frozen tournament archive (bracket, tables, golden boot).
+      GoRoute(path: RoutePaths.wcRecap,     builder: (_, __) => const WorldCupScreen()),
       GoRoute(path: RoutePaths.proPaywall,  builder: (_, __) => const ProPaywallScreen()),
       GoRoute(path: RoutePaths.wallet,      builder: (_, __) => const WalletScreen()),
       GoRoute(path: RoutePaths.teamPicker,  builder: (_, __) => const TeamPickerScreen()),

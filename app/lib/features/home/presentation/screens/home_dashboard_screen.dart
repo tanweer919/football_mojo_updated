@@ -24,16 +24,11 @@ import '../../../fantasy/presentation/providers/fantasy_providers.dart';
 import '../../../insights/data/insights_repository.dart';
 import '../../../insights/data/models/broadcast_dto.dart';
 import '../../../insights/data/models/match_event_dto.dart';
-import '../../../insights/data/standings_repository.dart';
 import '../../../highlights/highlight_link.dart';
 import '../../../market/data/market_models.dart';
 import '../../../market/data/market_repository.dart';
 import '../../../news/data/models/news_article.dart';
 import '../../../news/presentation/providers/home_news_provider.dart';
-import '../../../predictions/data/predictions_repository.dart';
-import '../../../tournament/data/wc2026_bracket.dart' show wc2026TotalPicks;
-import '../../../world_cup/data/world_cup_models.dart';
-import '../../../world_cup/data/world_cup_repository.dart';
 import '../../../news/presentation/providers/news_feed_provider.dart';
 import '../../../news/presentation/widgets/news_thumb.dart';
 import '../../../profile/data/profile_models.dart' show ProfileTeam;
@@ -42,7 +37,6 @@ import '../../../profile/data/profile_repository.dart' show myProfileProvider;
 import '../../../profile/presentation/widgets/notification_bell.dart';
 import '../../../scores/data/models/match_dto.dart';
 import '../../../scores/presentation/providers/live_matches_provider.dart';
-import '../../../../core/config/remote_app_config.dart';
 import '../providers/home_dashboard_providers.dart';
 import '../../data/daily_brief_repository.dart';
 
@@ -108,12 +102,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             // AI matchday brief — today's preview / yesterday's results.
             const _MatchdayBrief(),
 
-            // Bracket card — user's WC2026 bracket: champion + progress,
-            // or a CTA when they haven't started.
+            // World Cup 2026 recap — the tournament is over; relive the
+            // bracket, final and golden boot.
             const _SectionGap(),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: _BracketCard(),
+              child: _WcRecapCard(),
             ),
 
             // Large MREC below the fold — self-hides on the ads kill-switch /
@@ -139,18 +133,10 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             const _YourTeamsSection(),
 
-            // European leagues — hidden during WC mode since all domestic
-            // seasons are over and the section is empty.
-            _EuroLeaguesSection(wcMode: ref.watch(wcModeProvider)),
-
-            // Group spotlight — seeded WC2026 standings so pre-tournament
-            // the home page already shows draw structure.
-            _SectionHead(
-              title: 'World Cup groups',
-              action: 'All groups →',
-              onAction: () => context.push(RoutePaths.standings),
-            ),
-            const _GroupSpotlight(),
+            // Domestic & European leagues — club standings, top scorers and
+            // live fixtures. Always shown now the World Cup is over; tap through
+            // to the Leagues tab for full tables.
+            const _EuroLeaguesSection(wcMode: false),
 
             // (Removed: WC upcoming schedule + host venues — both moved
             // to /world-cup screen so tournament context lives there.)
@@ -3294,179 +3280,8 @@ class _FeaturedCardsStrip extends ConsumerWidget {
 /// Picks one WC2026 group and renders the four crests in a single card.
 /// Rotates based on the day so the home page doesn't feel static across
 /// repeat visits — Group A on Monday, Group B on Tuesday, etc.
-class _GroupSpotlight extends ConsumerWidget {
-  const _GroupSpotlight();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(standingsProvider);
-    return async.when(
-      loading:
-          () => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Skeleton(height: 160, radius: 16),
-          ),
-      error:
-          (_, __) => const _StripEmpty(
-            title: 'Group draws loading',
-            subtitle: 'Couldn’t reach the tournament feed. Pull to refresh.',
-          ),
-      data: (groups) {
-        if (groups.isEmpty) {
-          return const _StripEmpty(
-            title: 'Group draws not seeded yet',
-            subtitle:
-                'Run npm run seed:wc in backend/ to populate the tournament.',
-          );
-        }
-        // Pick a stable group for the current day so it doesn't flicker
-        // between rebuilds, but rotates across visits over the week.
-        final dayOfYear =
-            DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
-        final group = groups[dayOfYear % groups.length];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => context.push(RoutePaths.standings),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadii.r4),
-                border: Border.all(color: AppColors.borderSoft),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A1815), Color(0xFF0F0D0B)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Eyebrow(group.name, gold: true, size: 11),
-                      const Spacer(),
-                      const Text(
-                        '→',
-                        style: TextStyle(
-                          color: AppColors.gold,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // 4 teams in a 2×2 grid — crest + short name + position
-                  // (or "—" when standings haven't started counting yet).
-                  Row(
-                    children: [
-                      for (var i = 0; i < group.rows.length && i < 4; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        Expanded(child: _GroupTeamCell(row: group.rows[i])),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _GroupTeamCell extends StatelessWidget {
-  const _GroupTeamCell({required this.row});
-  final StandingRow row;
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          width: 36,
-          height: 36,
-          child: PremiumImage(url: row.teamLogo, fit: BoxFit.contain),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          row.teamName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: AppColors.fg,
-            letterSpacing: -0.1,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          row.played > 0 ? '${row.points} pts' : '—',
-          style: TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontFamilyFallback: const ['SF Mono', 'Menlo', 'monospace'],
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: row.played > 0 ? AppColors.gold : AppColors.muted2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BRACKET CARD — surfaces the user's WC bracket on home
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// Three render states:
-//   1. No bracket yet  → gold CTA: "Predict the bracket · earn up to 250 gems"
-//   2. In progress     → champion crest + progress bar + "X / 55 picks"
-//   3. Locked + scored → champion + points so far + leaderboard rank hint
-//
-// Tap routes to /tournament/bracket. Listens to myBracketProvider + the
-// groups provider (needed to resolve the champion teamId → team object
-// so we can show the crest + name).
-class _BracketCard extends ConsumerWidget {
-  const _BracketCard();
-  static const _competitionId = 'WC2026';
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mine = ref.watch(myBracketProvider(_competitionId));
-    final groups = ref.watch(wcGroupsProvider(_competitionId));
-    return mine.when(
-      loading: () => const SkeletonBlock(height: 92, radius: AppRadii.r4),
-      // Unauthed or unreachable — fall back to the CTA state so the
-      // surface still funnels users into the bracket.
-      error: (_, __) => const _BracketCta(),
-      data: (b) {
-        if (b == null) return const _BracketCta();
-        WcTeamRef? champion;
-        final championId = b.championId;
-        if (championId != null) {
-          for (final g in groups.valueOrNull ?? const <WcGroup>[]) {
-            for (final s in g.standings) {
-              if (s.team.id == championId) {
-                champion = s.team;
-                break;
-              }
-            }
-            if (champion != null) break;
-          }
-        }
-        return _BracketStatus(bracket: b, champion: champion);
-      },
-    );
-  }
-}
-
-class _BracketCta extends StatelessWidget {
-  const _BracketCta();
+class _WcRecapCard extends StatelessWidget {
+  const _WcRecapCard();
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -3474,7 +3289,7 @@ class _BracketCta extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.r4),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.r4),
-        onTap: () => context.push(RoutePaths.bracket),
+        onTap: () => context.push(RoutePaths.wcRecap),
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
           decoration: BoxDecoration(
@@ -3496,21 +3311,17 @@ class _BracketCta extends StatelessWidget {
                   color: AppColors.gold.withValues(alpha: 0.16),
                   border: Border.all(color: AppColors.goldHairline),
                 ),
-                child: const Icon(
-                  Icons.account_tree_outlined,
-                  size: 20,
-                  color: AppColors.gold,
-                ),
+                child: const Icon(Icons.emoji_events, size: 20, color: AppColors.gold),
               ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Eyebrow('WORLD CUP BRACKET', gold: true, size: 10),
+                    Eyebrow('WORLD CUP 2026', gold: true, size: 10),
                     SizedBox(height: 2),
                     Text(
-                      'Predict who wins the trophy',
+                      'Relive the tournament',
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 15,
@@ -3521,15 +3332,8 @@ class _BracketCta extends StatelessWidget {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Group stage → final. Earn gems for every correct pick — 500 for the champion.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: AppColors.muted,
-                        height: 1.35,
-                      ),
+                      'Champions, bracket, results & golden boot',
+                      style: TextStyle(fontFamily: 'Inter', fontSize: 12.5, color: AppColors.muted),
                     ),
                   ],
                 ),
@@ -3544,154 +3348,3 @@ class _BracketCta extends StatelessWidget {
   }
 }
 
-class _BracketStatus extends StatelessWidget {
-  const _BracketStatus({required this.bracket, required this.champion});
-  final BracketDto bracket;
-  final WcTeamRef? champion;
-
-  /// 48 group positions + 8 best-thirds + 32 knockout winners = 88.
-  /// Single source of truth so it can't drift from the bracket screen.
-  static const _totalSlots = wc2026TotalPicks;
-
-  @override
-  Widget build(BuildContext context) {
-    final filled = bracket.totalPickCount;
-    final pct = (filled / _totalSlots).clamp(0.0, 1.0);
-    final scored = bracket.pointsAwarded > 0;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.r4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.r4),
-        onTap: () => context.push(RoutePaths.bracket),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.r4),
-            border: Border.all(color: AppColors.goldHairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Champion crest or trophy fallback.
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.gold.withValues(alpha: 0.16),
-                      border: Border.all(color: AppColors.goldHairline),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child:
-                        champion?.crestUrl != null
-                            ? Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: PremiumImage(
-                                url: champion!.crestUrl,
-                                fit: BoxFit.contain,
-                              ),
-                            )
-                            : const Icon(
-                              Icons.emoji_events_rounded,
-                              size: 20,
-                              color: AppColors.gold,
-                            ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Eyebrow('YOUR BRACKET', gold: true, size: 10),
-                        const SizedBox(height: 2),
-                        Text(
-                          champion != null
-                              ? 'Champion: ${champion!.shortName}'
-                              : 'Pick your champion',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                            color: AppColors.fg,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (scored)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        '${bracket.pointsAwarded} pts',
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.gold,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    )
-                  else
-                    const Icon(Icons.chevron_right, color: AppColors.muted),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: pct,
-                  minHeight: 6,
-                  backgroundColor: AppColors.surface3,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.gold),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    bracket.isLocked
-                        ? 'Locked  ·  $filled / $_totalSlots picks'
-                        : '$filled / $_totalSlots picks',
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!bracket.isLocked && filled < _totalSlots)
-                    const Text(
-                      'Tap to continue →',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.gold,
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
