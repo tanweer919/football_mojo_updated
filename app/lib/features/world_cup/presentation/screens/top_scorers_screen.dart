@@ -26,8 +26,8 @@ class _TopScorersScreenState extends ConsumerState<TopScorersScreen> {
   @override
   Widget build(BuildContext context) {
     final async = _showAssists
-        ? ref.watch(topAssistsProvider)
-        : ref.watch(topScorersProvider);
+        ? ref.watch(topAssistsProvider('WC2026'))
+        : ref.watch(topScorersProvider('WC2026'));
     return PitchScreen(
       title: 'Stats',
       onBack: () => context.canPop() ? context.pop() : context.go('/world-cup'),

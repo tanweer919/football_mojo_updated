@@ -23,7 +23,7 @@ class TournamentScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(competitionsProvider);
+    final async = ref.watch(allCompetitionsProvider);
 
     return async.when(
       loading: () => Scaffold(
@@ -32,7 +32,7 @@ class TournamentScreen extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(),
-        body: ErrorView(message: '$e', onRetry: () => ref.invalidate(competitionsProvider)),
+        body: ErrorView(message: '$e', onRetry: () => ref.invalidate(allCompetitionsProvider)),
       ),
       data: (list) {
         if (list.isEmpty) {
@@ -58,35 +58,70 @@ class _CompetitionView extends ConsumerStatefulWidget {
 class _CompetitionViewState extends ConsumerState<_CompetitionView> {
   late CompetitionDto _current = widget.competition;
 
+  /// Distinct leagues — the top-ranked (live/upcoming/most-recent) season of
+  /// each — for the competition picker.
+  List<CompetitionDto> get _leagues {
+    final seen = <String>{};
+    return [for (final c in widget.allCompetitions) if (seen.add(c.name)) c];
+  }
+
+  /// Seasons available for the currently-selected league, newest first.
+  List<CompetitionDto> get _seasons {
+    final list = widget.allCompetitions.where((c) => c.name == _current.name).toList();
+    list.sort((a, b) => b.season.compareTo(a.season));
+    return list;
+  }
+
+  static String _seasonLabel(CompetitionDto c) {
+    final y = int.tryParse(c.season);
+    if (y == null) return c.season;
+    // Leagues span two calendar years (2025 → "2025/26"); one-off tournaments don't.
+    return c.isLeague ? '$y/${((y + 1) % 100).toString().padLeft(2, '0')}' : '$y';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _current;
     final tabs = <_TabDef>[];
-    // Leagues get a single standings table; tournaments get groups (visually distinct).
-    if (c.isLeague    && c.showsStandings) tabs.add(const _TabDef('Standings', GroupStandings()));
-    if (c.isTournament && c.showsGroups)   tabs.add(const _TabDef('Groups',    GroupStandings()));
-    tabs.add(const _TabDef('Top scorers', _TopScorersTab()));
-    tabs.add(const _TabDef('Top assists', _TopAssistsTab()));
+    // Leagues get a single standings table; tournaments get groups. Every tab is
+    // keyed to the selected competition id so switching league/year switches data.
+    if (c.isLeague     && c.showsStandings) tabs.add(_TabDef('Standings', GroupStandings(competitionId: c.id)));
+    if (c.isTournament && c.showsGroups)    tabs.add(_TabDef('Groups',    GroupStandings(competitionId: c.id)));
+    tabs.add(_TabDef('Top scorers', TopPlayerList(
+      provider: topScorersProvider(c.id), unit: 'goals',
+      emptyMessage: 'Updates after the first match of the season.')));
+    tabs.add(_TabDef('Top assists', TopPlayerList(
+      provider: topAssistsProvider(c.id), unit: 'assists',
+      emptyMessage: 'Updates after the first match of the season.')));
     if (c.showsBracket) tabs.add(const _TabDef('Bracket', _BracketLink()));
+
+    final seasons = _seasons;
 
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: GestureDetector(
-            onTap: widget.allCompetitions.length > 1 ? _showCompetitionPicker : null,
+            onTap: _leagues.length > 1 ? _showLeaguePicker : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                if (widget.allCompetitions.length > 1) ...[
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down),
-                ],
+                if (_leagues.length > 1) const Icon(Icons.arrow_drop_down),
               ],
             ),
           ),
           actions: [
+            // Year (season) selector — shown when the league has more than one season.
+            if (seasons.length > 1)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ActionChip(
+                  avatar: const Icon(Icons.calendar_today_outlined, size: 15),
+                  label: Text(_seasonLabel(c)),
+                  onPressed: _showSeasonPicker,
+                ),
+              ),
             IconButton(
               tooltip: 'Injuries',
               icon: const Icon(Icons.medical_services_outlined),
@@ -106,7 +141,33 @@ class _CompetitionViewState extends ConsumerState<_CompetitionView> {
     );
   }
 
-  void _showCompetitionPicker() {
+  void _showLeaguePicker() => _picker(
+        title: 'Competition',
+        items: _leagues,
+        // Switching league jumps to that league's newest available season.
+        onPick: (c) => setState(() => _current = c),
+        labelFor: (c) => c.name,
+        subtitleFor: (c) => '${_seasonLabel(c)} · ${c.teamCount} teams',
+        selected: (c) => c.name == _current.name,
+      );
+
+  void _showSeasonPicker() => _picker(
+        title: '${_current.name} · season',
+        items: _seasons,
+        onPick: (c) => setState(() => _current = c),
+        labelFor: _seasonLabel,
+        subtitleFor: (c) => c.isLive ? 'In progress' : c.isUpcoming ? 'Upcoming' : 'Final',
+        selected: (c) => c.id == _current.id,
+      );
+
+  void _picker({
+    required String title,
+    required List<CompetitionDto> items,
+    required void Function(CompetitionDto) onPick,
+    required String Function(CompetitionDto) labelFor,
+    required String Function(CompetitionDto) subtitleFor,
+    required bool Function(CompetitionDto) selected,
+  }) {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -115,13 +176,17 @@ class _CompetitionViewState extends ConsumerState<_CompetitionView> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            for (final c in widget.allCompetitions)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Text(title, style: Theme.of(context).textTheme.labelLarge),
+            ),
+            for (final item in items)
               ListTile(
-                title: Text(c.name),
-                subtitle: Text('${c.season} · ${c.teamCount} teams'),
-                trailing: c.id == _current.id ? const Icon(Icons.check) : null,
+                title: Text(labelFor(item)),
+                subtitle: Text(subtitleFor(item)),
+                trailing: selected(item) ? const Icon(Icons.check) : null,
                 onTap: () {
-                  setState(() => _current = c);
+                  onPick(item);
                   Navigator.of(context).pop();
                 },
               ),
@@ -136,24 +201,6 @@ class _TabDef {
   const _TabDef(this.label, this.child);
   final String label;
   final Widget child;
-}
-
-class _TopScorersTab extends StatelessWidget {
-  const _TopScorersTab();
-  @override
-  Widget build(BuildContext context) => TopPlayerList(
-        provider: topScorersProvider, unit: 'goals',
-        emptyMessage: 'Updates after the first match of the season.',
-      );
-}
-
-class _TopAssistsTab extends StatelessWidget {
-  const _TopAssistsTab();
-  @override
-  Widget build(BuildContext context) => TopPlayerList(
-        provider: topAssistsProvider, unit: 'assists',
-        emptyMessage: 'Updates after the first match of the season.',
-      );
 }
 
 class _BracketLink extends StatelessWidget {

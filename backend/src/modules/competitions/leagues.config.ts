@@ -44,14 +44,14 @@ export const LEAGUES: LeagueConfig[] = [
     endsAt:   '2026-07-19T23:59:59Z',
   },
   {
-    id: 2, season: 2025, code: 'UCL_2025',
+    id: 2, season: 2026, code: 'UCL_2025',
     name: 'UEFA Champions League', type: 'tournament', country: 'EUR',
     seedSquads: false,
     startsAt: '2025-09-01T00:00:00Z',
     endsAt:   '2026-06-01T23:59:59Z',
   },
   {
-    id: 3, season: 2025, code: 'UEL_2025',
+    id: 3, season: 2026, code: 'UEL_2025',
     name: 'UEFA Europa League', type: 'tournament', country: 'EUR',
     seedSquads: false,
     startsAt: '2025-09-01T00:00:00Z',
@@ -61,35 +61,35 @@ export const LEAGUES: LeagueConfig[] = [
   // Domestic top flights — fixtures + teams only by default; squads are huge
   // (~25/team × 20 teams = 500 players × 5 leagues = 2.5k api calls).
   {
-    id: 39, season: 2025, code: 'PL_2025',
+    id: 39, season: 2026, code: 'PL_2025',
     name: 'Premier League', type: 'league', country: 'ENG',
     seedSquads: false,
     startsAt: '2025-08-15T00:00:00Z',
     endsAt:   '2026-05-25T23:59:59Z',
   },
   {
-    id: 140, season: 2025, code: 'LALIGA_2025',
+    id: 140, season: 2026, code: 'LALIGA_2025',
     name: 'La Liga', type: 'league', country: 'ESP',
     seedSquads: false,
     startsAt: '2025-08-15T00:00:00Z',
     endsAt:   '2026-05-25T23:59:59Z',
   },
   {
-    id: 135, season: 2025, code: 'SERIEA_2025',
+    id: 135, season: 2026, code: 'SERIEA_2025',
     name: 'Serie A', type: 'league', country: 'ITA',
     seedSquads: false,
     startsAt: '2025-08-22T00:00:00Z',
     endsAt:   '2026-05-25T23:59:59Z',
   },
   {
-    id: 78, season: 2025, code: 'BUNDES_2025',
+    id: 78, season: 2026, code: 'BUNDES_2025',
     name: 'Bundesliga', type: 'league', country: 'GER',
     seedSquads: false,
     startsAt: '2025-08-22T00:00:00Z',
     endsAt:   '2026-05-23T23:59:59Z',
   },
   {
-    id: 61, season: 2025, code: 'LIGUE1_2025',
+    id: 61, season: 2026, code: 'LIGUE1_2025',
     name: 'Ligue 1', type: 'league', country: 'FRA',
     seedSquads: false,
     startsAt: '2025-08-15T00:00:00Z',

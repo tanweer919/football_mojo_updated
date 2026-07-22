@@ -30,6 +30,12 @@ final competitionsProvider = FutureProvider<List<CompetitionDto>>((ref) {
   return ref.read(competitionsRepositoryProvider).list(onlyActive: true);
 });
 
+/// Every competition the backend knows, including past/future seasons. Powers
+/// the Leagues screen's league + year (season) selector.
+final allCompetitionsProvider = FutureProvider<List<CompetitionDto>>((ref) {
+  return ref.read(competitionsRepositoryProvider).list(onlyActive: false);
+});
+
 /// The user's currently-selected competition for filtering Today / Matches.
 /// `null` means "All" — show every match across every known competition.
 class SelectedCompetitionNotifier extends Notifier<String?> {

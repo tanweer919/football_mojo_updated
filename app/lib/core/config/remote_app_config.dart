@@ -8,10 +8,12 @@ import '../network/dio_provider.dart';
 /// Cached in memory for the app session. Falls back to sensible defaults
 /// if the network request fails (offline, server error, etc.).
 class RemoteAppConfig {
-  const RemoteAppConfig({this.wcMode = true, this.adsEnabled = true});
+  const RemoteAppConfig({this.wcMode = false, this.adsEnabled = true});
 
-  /// When true the home screen hides dormant European-league sections
-  /// and promotes World Cup content. Driven by the server env `WC_MODE`.
+  /// Legacy World-Cup emphasis flag. When true the home screen hid dormant
+  /// European-league sections and promoted World Cup content. The World Cup is
+  /// over, so this defaults to false (club football forward). Driven by the
+  /// server env `WC_MODE` — set it to false in production too.
   final bool wcMode;
 
   /// Master ad kill-switch from the server env `ADS_ENABLED`. When false,
@@ -22,7 +24,7 @@ class RemoteAppConfig {
 
   factory RemoteAppConfig.fromJson(Map<String, dynamic> json) {
     return RemoteAppConfig(
-      wcMode: json['wcMode'] as bool? ?? true,
+      wcMode: json['wcMode'] as bool? ?? false,
       adsEnabled: json['adsEnabled'] as bool? ?? true,
     );
   }
@@ -45,7 +47,7 @@ final remoteAppConfigProvider = FutureProvider<RemoteAppConfig>((ref) async {
 
 /// Convenience accessor: true when World Cup mode is active.
 final wcModeProvider = Provider<bool>((ref) {
-  return ref.watch(remoteAppConfigProvider).valueOrNull?.wcMode ?? true;
+  return ref.watch(remoteAppConfigProvider).valueOrNull?.wcMode ?? false;
 });
 
 /// Convenience accessor: true when ads should be shown. Defaults to true

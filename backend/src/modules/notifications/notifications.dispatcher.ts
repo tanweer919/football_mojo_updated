@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
 import { PrismaService } from '../../common/prisma.service';
-import { REDIS_SUB } from '../../common/redis.module';
+import { REDIS_PUB, REDIS_SUB } from '../../common/redis.module';
 import { FirebaseAdminService } from '../auth/firebase-admin.service';
 
 /**
@@ -22,9 +22,18 @@ export class NotificationsDispatcher implements OnModuleInit {
 
   constructor(
     @Inject(REDIS_SUB) private readonly sub: Redis,
+    @Inject(REDIS_PUB) private readonly redis: Redis,
     private readonly fcm: FirebaseAdminService,
     private readonly prisma: PrismaService,
   ) {}
+
+  /// Exactly-once across the cluster: the first caller to set `key` wins and
+  /// sends; duplicate publishes (or extra worker replicas all subscribed to the
+  /// same Redis channels) get `null` and skip. TTL covers a full match.
+  private async claimOnce(key: string, ttlSeconds = 6 * 60 * 60): Promise<boolean> {
+    const won = await this.redis.set(key, '1', 'EX', ttlSeconds, 'NX');
+    return won === 'OK';
+  }
 
   async onModuleInit() {
     if (process.env.WORKER_MODE !== 'true') {
