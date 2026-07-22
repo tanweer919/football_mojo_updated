@@ -55,9 +55,10 @@ class StandingsGroup {
 class StandingsRepository {
   StandingsRepository(this._dio);
   final Dio _dio;
-  Future<List<StandingsGroup>> fetch() async {
+  Future<List<StandingsGroup>> fetch([String? competitionId]) async {
     // /v1/insights/standings returns [{ league: { standings: [[row, row, ...], [...]] } }]
-    final res = await _dio.get<List<dynamic>>('/v1/insights/standings');
+    final res = await _dio.get<List<dynamic>>('/v1/insights/standings',
+        queryParameters: competitionId == null ? null : {'competitionId': competitionId});
     final list = (res.data ?? const []).cast<Map<String, dynamic>>();
     if (list.isEmpty) return [];
     final league = (list.first['league'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -75,4 +76,6 @@ class StandingsRepository {
 }
 
 final standingsRepositoryProvider = Provider<StandingsRepository>((ref) => StandingsRepository(ref.read(dioProvider)));
-final standingsProvider = FutureProvider<List<StandingsGroup>>((ref) => ref.read(standingsRepositoryProvider).fetch());
+// Family-keyed by competition id (null → backend default) for the league/year selector.
+final standingsProvider = FutureProvider.family<List<StandingsGroup>, String?>(
+    (ref, competitionId) => ref.read(standingsRepositoryProvider).fetch(competitionId));

@@ -9,13 +9,17 @@ import '../../../../core/widgets/team_crest.dart';
 import '../../data/standings_repository.dart';
 
 class GroupStandings extends ConsumerWidget {
-  const GroupStandings({super.key});
+  const GroupStandings({super.key, this.competitionId});
+
+  /// Which competition's table to show (null → backend default season).
+  final String? competitionId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(standingsProvider);
+    final async = ref.watch(standingsProvider(competitionId));
     return async.when(
       loading: () => const SkeletonList(itemHeight: 240, count: 3),
-      error: (e, _) => ErrorView(message: '$e', onRetry: () => ref.invalidate(standingsProvider)),
+      error: (e, _) => ErrorView(message: '$e', onRetry: () => ref.invalidate(standingsProvider(competitionId))),
       data: (groups) {
         if (groups.isEmpty) {
           return const EmptyState(

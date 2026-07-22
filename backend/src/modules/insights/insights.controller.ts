@@ -3,6 +3,7 @@ import { Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiFootballCacheService } from '../api-football/api-football-cache.service';
 import { ApiFootballClient } from '../api-football/api-football.client';
+import { LEAGUES } from '../competitions/leagues.config';
 
 /**
  * "Extras" surfaced from api-football. Two-tier caching:
@@ -27,6 +28,20 @@ export class InsightsController {
     this.season = +(cfg.get<string>('API_FOOTBALL_WC_SEASON') ?? '2026');
   }
 
+  /**
+   * Resolve a competition id (e.g. "PL_2025") to its api-football league id +
+   * season via the LEAGUES config. Drives the league/year selector — standings
+   * and scorers switch to whatever competition the client asks for. Falls back
+   * to the configured default when the id is missing/unknown.
+   */
+  private resolve(competitionId?: string): { leagueId: number; season: number } {
+    if (competitionId) {
+      const l = LEAGUES.find((x) => x.code === competitionId);
+      if (l) return { leagueId: l.id, season: l.season };
+    }
+    return { leagueId: this.leagueId, season: this.season };
+  }
+
   @Get('injuries')
   @CacheTTL(900_000)
   injuries() {
@@ -35,14 +50,16 @@ export class InsightsController {
 
   @Get('top-scorers')
   @CacheTTL(900_000)
-  topScorers() {
-    return this.cache.topScorers(this.leagueId, this.season);
+  topScorers(@Query('competitionId') competitionId?: string) {
+    const { leagueId, season } = this.resolve(competitionId);
+    return this.cache.topScorers(leagueId, season);
   }
 
   @Get('top-assists')
   @CacheTTL(900_000)
-  topAssists() {
-    return this.cache.topAssists(this.leagueId, this.season);
+  topAssists(@Query('competitionId') competitionId?: string) {
+    const { leagueId, season } = this.resolve(competitionId);
+    return this.cache.topAssists(leagueId, season);
   }
 
   @Get('predictions/:fixtureId')
@@ -101,8 +118,9 @@ export class InsightsController {
 
   @Get('standings')
   @CacheTTL(900_000)
-  standings() {
-    return this.cache.standings(this.leagueId, this.season);
+  standings(@Query('competitionId') competitionId?: string) {
+    const { leagueId, season } = this.resolve(competitionId);
+    return this.cache.standings(leagueId, season);
   }
 
   /** Quota visibility for ops dashboards. */

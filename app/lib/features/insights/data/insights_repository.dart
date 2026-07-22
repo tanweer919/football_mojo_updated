@@ -84,16 +84,18 @@ class InsightsRepository {
         .toList(growable: false);
   }
 
-  Future<List<TopPlayerDto>> topScorers() async {
-    final res = await _dio.get<List<dynamic>>('/v1/insights/top-scorers');
+  Future<List<TopPlayerDto>> topScorers([String? competitionId]) async {
+    final res = await _dio.get<List<dynamic>>('/v1/insights/top-scorers',
+        queryParameters: competitionId == null ? null : {'competitionId': competitionId});
     return (res.data ?? const [])
         .cast<Map<String, dynamic>>()
         .map((j) => TopPlayerDto.fromJson(j, statKey: 'goals'))
         .toList(growable: false);
   }
 
-  Future<List<TopPlayerDto>> topAssists() async {
-    final res = await _dio.get<List<dynamic>>('/v1/insights/top-assists');
+  Future<List<TopPlayerDto>> topAssists([String? competitionId]) async {
+    final res = await _dio.get<List<dynamic>>('/v1/insights/top-assists',
+        queryParameters: competitionId == null ? null : {'competitionId': competitionId});
     return (res.data ?? const [])
         .cast<Map<String, dynamic>>()
         .map((j) => TopPlayerDto.fromJson(j, statKey: 'assists'))
@@ -119,5 +121,9 @@ final h2hProvider = FutureProvider.family<List<H2HMatchDto>, ({String team1, Str
 );
 
 final injuriesProvider   = FutureProvider<List<InjuryDto>>   ((ref) => ref.read(insightsRepositoryProvider).injuries());
-final topScorersProvider = FutureProvider<List<TopPlayerDto>>((ref) => ref.read(insightsRepositoryProvider).topScorers());
-final topAssistsProvider = FutureProvider<List<TopPlayerDto>>((ref) => ref.read(insightsRepositoryProvider).topAssists());
+// Family-keyed by competition id (null → backend default season) so the
+// Leagues screen can switch league/year.
+final topScorersProvider = FutureProvider.family<List<TopPlayerDto>, String?>(
+    (ref, competitionId) => ref.read(insightsRepositoryProvider).topScorers(competitionId));
+final topAssistsProvider = FutureProvider.family<List<TopPlayerDto>, String?>(
+    (ref, competitionId) => ref.read(insightsRepositoryProvider).topAssists(competitionId));
