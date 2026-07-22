@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/router/route_paths.dart';
+import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/skeleton.dart';
 import '../../../competitions/data/competition_models.dart';
@@ -34,14 +35,26 @@ class TournamentScreen extends ConsumerWidget {
         appBar: AppBar(),
         body: ErrorView(message: '$e', onRetry: () => ref.invalidate(allCompetitionsProvider)),
       ),
-      data: (list) {
+      data: (all) {
+        // The finished World Cup lives in its own recap, not the Leagues hub.
+        final list = all.where((c) => c.id != 'WC2026').toList();
         if (list.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Competitions')),
-            body: const Center(child: Text('No active competitions')),
+            appBar: AppBar(title: const Text('Leagues')),
+            body: const EmptyState(
+              icon: Icons.emoji_events_outlined,
+              title: 'No competitions in season',
+              subtitle: 'Domestic and European seasons kick off in August. Check back soon.',
+            ),
           );
         }
-        return _CompetitionView(competition: list.first, allCompetitions: list);
+        // Default to a competition that's live or upcoming; otherwise the most
+        // recent — so we never open on a stale finished season if a new one exists.
+        final current = list.firstWhere(
+          (c) => c.isLive || c.isUpcoming,
+          orElse: () => list.first,
+        );
+        return _CompetitionView(competition: current, allCompetitions: list);
       },
     );
   }
