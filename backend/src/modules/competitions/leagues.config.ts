@@ -34,6 +34,34 @@ export interface LeagueConfig {
   endsAt: string;   // ISO
 }
 
+// Domestic top flights. api-football serves several completed seasons, so we
+// surface the last few — that's what powers the app's league YEAR selector.
+// It's the football off-season (WC just ended; new seasons start in August),
+// so the newest COMPLETED season (2025/26 → api season 2025) is the default and
+// has full data. Add 2026 here once the 2026/27 season actually kicks off.
+const DOMESTIC = [
+  { id: 39,  base: 'PL',     name: 'Premier League', country: 'ENG', start: '08-15', end: '05-25' },
+  { id: 140, base: 'LALIGA', name: 'La Liga',        country: 'ESP', start: '08-15', end: '05-25' },
+  { id: 135, base: 'SERIEA', name: 'Serie A',        country: 'ITA', start: '08-22', end: '05-25' },
+  { id: 78,  base: 'BUNDES', name: 'Bundesliga',     country: 'GER', start: '08-22', end: '05-23' },
+  { id: 61,  base: 'LIGUE1', name: 'Ligue 1',        country: 'FRA', start: '08-15', end: '05-23' },
+] as const;
+const CLUB_SEASONS = [2025, 2024, 2023]; // completed seasons with data, newest first
+
+const domesticLeagues: LeagueConfig[] = DOMESTIC.flatMap((d) =>
+  CLUB_SEASONS.map((season): LeagueConfig => ({
+    id: d.id,
+    season,
+    code: `${d.base}_${season}`,
+    name: d.name,
+    type: 'league',
+    country: d.country,
+    seedSquads: false,
+    startsAt: `${season}-${d.start}T00:00:00Z`,
+    endsAt: `${season + 1}-${d.end}T23:59:59Z`,
+  })),
+);
+
 export const LEAGUES: LeagueConfig[] = [
   // International tournaments — full squad ingest, treated as the headline competition.
   {
@@ -44,57 +72,23 @@ export const LEAGUES: LeagueConfig[] = [
     endsAt:   '2026-07-19T23:59:59Z',
   },
   {
-    id: 2, season: 2026, code: 'UCL_2025',
+    id: 2, season: 2025, code: 'UCL_2025',
     name: 'UEFA Champions League', type: 'tournament', country: 'EUR',
     seedSquads: false,
     startsAt: '2025-09-01T00:00:00Z',
     endsAt:   '2026-06-01T23:59:59Z',
   },
   {
-    id: 3, season: 2026, code: 'UEL_2025',
+    id: 3, season: 2025, code: 'UEL_2025',
     name: 'UEFA Europa League', type: 'tournament', country: 'EUR',
     seedSquads: false,
     startsAt: '2025-09-01T00:00:00Z',
     endsAt:   '2026-05-30T23:59:59Z',
   },
 
-  // Domestic top flights — fixtures + teams only by default; squads are huge
-  // (~25/team × 20 teams = 500 players × 5 leagues = 2.5k api calls).
-  {
-    id: 39, season: 2026, code: 'PL_2025',
-    name: 'Premier League', type: 'league', country: 'ENG',
-    seedSquads: false,
-    startsAt: '2025-08-15T00:00:00Z',
-    endsAt:   '2026-05-25T23:59:59Z',
-  },
-  {
-    id: 140, season: 2026, code: 'LALIGA_2025',
-    name: 'La Liga', type: 'league', country: 'ESP',
-    seedSquads: false,
-    startsAt: '2025-08-15T00:00:00Z',
-    endsAt:   '2026-05-25T23:59:59Z',
-  },
-  {
-    id: 135, season: 2026, code: 'SERIEA_2025',
-    name: 'Serie A', type: 'league', country: 'ITA',
-    seedSquads: false,
-    startsAt: '2025-08-22T00:00:00Z',
-    endsAt:   '2026-05-25T23:59:59Z',
-  },
-  {
-    id: 78, season: 2026, code: 'BUNDES_2025',
-    name: 'Bundesliga', type: 'league', country: 'GER',
-    seedSquads: false,
-    startsAt: '2025-08-22T00:00:00Z',
-    endsAt:   '2026-05-23T23:59:59Z',
-  },
-  {
-    id: 61, season: 2026, code: 'LIGUE1_2025',
-    name: 'Ligue 1', type: 'league', country: 'FRA',
-    seedSquads: false,
-    startsAt: '2025-08-15T00:00:00Z',
-    endsAt:   '2026-05-23T23:59:59Z',
-  },
+  // Domestic top flights (last few completed seasons — see DOMESTIC/CLUB_SEASONS
+  // above). Fixtures + teams only; squads are huge on the free tier.
+  ...domesticLeagues,
 ];
 
 /** Lookup by api-football league id. Returns undefined for leagues we don't track. */
